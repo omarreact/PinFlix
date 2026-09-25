@@ -37,7 +37,7 @@ export async function assertPublicNetworkUrl(rawUrl: string) {
   }
 }
 
-function isBlockedHostOrAddress(value: string) {
+function isBlockedHostOrAddress(value: string): boolean {
   const normalized = value.toLowerCase().replace(/^\[|\]$/g, "");
   if (!normalized || normalized === "localhost" || normalized === "::1") return true;
 
