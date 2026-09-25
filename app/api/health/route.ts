@@ -1,5 +1,6 @@
 import { getHealthAggregates, recordSourceResult } from "@/src/lib/iptv/health";
 import { getTaxonomySummary } from "@/src/lib/providers/cineplexbd";
+import { probeCineplexConnectivity } from "@/src/lib/providers/cineplexbd/api";
 import { getLiveProviderHealth } from "@/src/lib/providers/live-tv";
 
 export async function POST(request: Request) {
@@ -19,8 +20,9 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  const [cineplexbd, liveTv] = await Promise.all([
+  const [cineplexbd, cineplexConnectivity, liveTv] = await Promise.all([
     getTaxonomySummary(),
+    probeCineplexConnectivity(),
     getLiveProviderHealth(),
   ]);
 
@@ -28,7 +30,10 @@ export async function GET() {
     ok: true,
     service: "pinflix",
     sources: getHealthAggregates(),
-    cineplexbd,
+    cineplexbd: {
+      ...cineplexbd,
+      connectivity: cineplexConnectivity,
+    },
     liveTv,
   });
 }
