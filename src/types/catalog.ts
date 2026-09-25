@@ -36,6 +36,8 @@ export type ChannelPreview = {
   availability: "available" | "limited" | "offline";
   geoFlags?: string[];
   epg?: EpgNowNext;
+  provider?: string;
+  networkScope?: "public" | "local";
 };
 
 export type Channel = ChannelPreview & {
