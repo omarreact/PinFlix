@@ -1,146 +1,208 @@
 import * as cheerio from "cheerio";
 import type { Entertainment } from "@/src/types/catalog";
+import { CINEPLEX_BASE_URL } from "./api";
 
-const BASE_URL = "http://cineplexbd.net";
+type CatalogContext = {
+  forcedKind?: "movie" | "show";
+  category?: string;
+};
 
 function cleanUrl(url: string) {
   if (url.startsWith("http")) return url;
-  return `${BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
+  return `${CINEPLEX_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
 }
 
-export function parseCatalog(html: string): Entertainment[] {
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function extractNumericId(href: string) {
+  try {
+    const url = new URL(href, CINEPLEX_BASE_URL);
+    return url.searchParams.get("series_id") || url.searchParams.get("id") || "";
+  } catch {
+    return "";
+  }
+}
+
+function inferKind(href: string, forcedKind?: "movie" | "show"): "movie" | "show" {
+  if (forcedKind) return forcedKind;
+  if (href.includes("series_id=") || href.includes("tview.php")) return "show";
+  return "movie";
+}
+
+function providerId(kind: "movie" | "show", rawId: string) {
+  return `cb-${kind === "show" ? "series" : "movie"}-${rawId}`;
+}
+
+function findYear(text: string) {
+  const match = text.match(/\b(19|20)\d{2}\b/);
+  return match ? Number(match[0]) : undefined;
+}
+
+function findRating(text: string) {
+  const match = text.match(/(?:★|rating|score)\s*:?\s*([0-9]+(?:\.[0-9]+)?)/i);
+  return match ? Number(match[1]) : undefined;
+}
+
+export function parseCatalog(html: string, context: CatalogContext = {}): Entertainment[] {
   const $ = cheerio.load(html);
   const items: Entertainment[] = [];
-  
-  const selectors = "a[href*='view.php'], a[href*='watch.php'], a[href*='tview.php'], .movie-card a, a:has(.poster), a:has(img[src*='uploads'])";
-  
-  $(selectors).each((_, el) => {
-    const $el = $(el);
-    const href = $el.attr("href");
+  const seen = new Set<string>();
+
+  const selectors =
+    "a[href*='view.php'], a[href*='watch.php'], a[href*='tview.php'], .movie-card a, a:has(.poster), a:has(img[src*='uploads'])";
+
+  $(selectors).each((_, element) => {
+    const anchor = $(element);
+    const href = anchor.attr("href")?.trim();
     if (!href) return;
-    
-    let idStr = "";
-    let kind: "movie" | "show" = "movie";
-    
-    if (href.includes("series_id=")) {
-      idStr = new URLSearchParams(href.split("?")[1]).get("series_id") || "";
-      kind = "show";
-    } else if (href.includes("tview.php")) {
-      idStr = new URLSearchParams(href.split("?")[1]).get("id") || "";
-      kind = "show";
-    } else {
-      idStr = new URLSearchParams(href.split("?")[1]).get("id") || "";
+
+    const rawId = extractNumericId(href);
+    if (!rawId) return;
+
+    const kind = inferKind(href, context.forcedKind);
+    const id = providerId(kind, rawId);
+    if (seen.has(id)) return;
+
+    const titleElement = anchor
+      .find(".truncate, div.text-sm, div.cp-title, h2, .card-title, .title")
+      .first();
+    const posterElement = anchor
+      .find("img.poster, .tvCard img, img[class*='poster'], img[src*='uploads/']")
+      .first();
+    const fallbackImage = anchor.find("img").first();
+
+    const title =
+      titleElement.text().trim() ||
+      posterElement.attr("alt")?.trim() ||
+      fallbackImage.attr("alt")?.trim() ||
+      "";
+
+    if (!title) return;
+
+    const text = anchor.text().replace(/\s+/g, " ").trim();
+    const genreText = anchor.find("p").first().text().trim();
+    let rawImage =
+      posterElement.attr("data-src") ||
+      posterElement.attr("src") ||
+      fallbackImage.attr("data-src") ||
+      fallbackImage.attr("src");
+
+    if (!rawImage) {
+      const style = anchor.find("div[style*='background-image']").attr("style");
+      const match = style?.match(/url\((['"]?)(.*?)\1\)/i);
+      rawImage = match?.[2];
     }
-    
-    if (!idStr) return;
-    
-    const titleEl = $el.find(".truncate, div.text-sm, div.cp-title, h2, .card-title, .title").first();
-    const posterEl = $el.find("img.poster, .tvCard img, img[class*='poster'], img[src*='uploads/']").first();
-    const fallbackImg = $el.find("img").first();
-    
-    const title = titleEl.text().trim() || posterEl.attr("alt") || "Unknown Title";
-    if (title === "Unknown Title") return;
-    
-    const genreStr = $el.find("p").first().text().trim();
-    let rawImg = posterEl.attr("data-src") || posterEl.attr("src") || fallbackImg.attr("data-src") || fallbackImg.attr("src");
-    
-    if (!rawImg) {
-      const style = $el.find("div[style*='background-image']").attr("style");
-      if (style && style.includes("url(")) {
-        rawImg = style.split("url(")[1].split(")")[0].replace(/['"]/g, "");
-      }
-    }
-    
-    const posterUrl = rawImg ? cleanUrl(rawImg) : "";
-    
-    // Check if we already have this id to prevent duplicates
-    if (!items.find(item => item.id === `cb-${idStr}`)) {
-      items.push({
-        id: `cb-${idStr}`,
-        slug: `cb-${idStr}`,
-        title,
-        kind,
-        year: new Date().getFullYear(), // Fallback, details fetch will refine
-        rating: 0, 
-        genres: genreStr ? [genreStr] : [],
-        backdrop: posterUrl,
-        poster: posterUrl,
-        synopsis: "",
-      });
-    }
+
+    const poster = rawImage ? cleanUrl(rawImage) : "";
+    const year = findYear(text);
+    const rating = findRating(text);
+
+    seen.add(id);
+    items.push({
+      id,
+      slug: id,
+      provider: "cineplexbd",
+      providerId: rawId,
+      detailUrl: new URL(href, CINEPLEX_BASE_URL).pathname + new URL(href, CINEPLEX_BASE_URL).search,
+      category: context.category,
+      title,
+      kind,
+      ...(year !== undefined ? { year } : {}),
+      ...(rating !== undefined ? { rating } : {}),
+      genres: genreText ? [genreText] : [],
+      backdrop: poster,
+      poster,
+      synopsis: "",
+    });
   });
-  
+
   return items;
 }
 
-export function parseDetails(html: string, urlPath: string, metaJson?: any): Partial<Entertainment> {
+export function parseHasNextPage(html: string) {
   const $ = cheerio.load(html);
-  
-  let title = $("h1, .movie-title, title").first().text().replace(" — Watch", "").trim();
+  return $("ul.pagination li.active + li a, a:contains(Next), a:contains(»), a.next").length > 0;
+}
+
+export function parseDetails(
+  html: string,
+  urlPath: string,
+  metaJson?: unknown,
+): Partial<Entertainment> {
+  const $ = cheerio.load(html);
+  const meta = asObject(metaJson);
+
+  const title = $("h1, .movie-title, title")
+    .first()
+    .text()
+    .replace(" — Watch", "")
+    .trim();
+
   let synopsis = $("p.leading-relaxed, #synopsis, .description").first().text().trim();
-  
-  let genreStr = $("span.chip:contains(,)").text().trim();
-  if (!genreStr) {
-    const genres: string[] = [];
-    $("div.ganre-wrapper a, .meta-cat, .genre a").each((_, el) => {
-      genres.push($(el).text().trim());
+  if (typeof meta?.synopsis === "string" && meta.synopsis.trim()) synopsis = meta.synopsis.trim();
+
+  let genreText = $("span.chip:contains(,)").text().trim();
+  if (!genreText) {
+    const values: string[] = [];
+    $("div.ganre-wrapper a, .meta-cat, .genre a").each((_, element) => {
+      const value = $(element).text().trim();
+      if (value) values.push(value);
     });
-    genreStr = genres.join(", ");
+    genreText = values.join(", ");
   }
-  const genres = genreStr.split(",").map(g => g.trim()).filter(Boolean);
-  
-  const detailsImg = $("img.poster, .tvCard img, .movie-poster img").first();
-  const rawDetailsImg = detailsImg.attr("data-src") || detailsImg.attr("src");
-  const posterUrl = rawDetailsImg ? cleanUrl(rawDetailsImg) : "";
-  
-  const yearStr = $("span.chip").filter((_, el) => /^\d{4}$/.test($(el).text().trim())).text().trim();
-  const year = parseInt(yearStr) || new Date().getFullYear();
-  
-  const ratingScore = $("span.pill:contains(User Score:)").text().trim();
-  const starScore = $(".pill:contains(★)").first().text().trim();
-  let rating = 0;
-  
-  if (metaJson?.rating) {
-    rating = parseFloat(metaJson.rating) || 0;
-  } else if (starScore) {
-    const match = starScore.match(/([\d.]+)/);
-    if (match) rating = parseFloat(match[1]);
-  } else if (ratingScore) {
-    const match = ratingScore.match(/([\d.]+)/);
-    if (match) rating = parseFloat(match[1]);
+
+  const detailsImage = $("img.poster, .tvCard img, .movie-poster img").first();
+  const rawImage = detailsImage.attr("data-src") || detailsImage.attr("src");
+  const poster = rawImage ? cleanUrl(rawImage) : "";
+
+  const yearText = $("span.chip")
+    .filter((_, element) => /^\d{4}$/.test($(element).text().trim()))
+    .first()
+    .text()
+    .trim();
+  const year = /^\d{4}$/.test(yearText) ? Number(yearText) : undefined;
+
+  let rating: number | undefined;
+  if (typeof meta?.rating === "string" || typeof meta?.rating === "number") {
+    const parsed = Number(meta.rating);
+    if (Number.isFinite(parsed)) rating = parsed;
   }
-  
-  if (metaJson?.synopsis) synopsis = metaJson.synopsis;
-  
-  let episodesCount: number | undefined;
-  if (urlPath.includes("watch.php") || urlPath.includes("series_id=")) {
-    // If it's a TV show, count the episodes in metaJson if available
-    if (metaJson?.episodes) {
-      episodesCount = Object.keys(metaJson.episodes).length;
-    } else {
-      episodesCount = $("a.ep-card").length || undefined;
-    }
+  if (rating === undefined) {
+    const scoreText =
+      $(".pill:contains(★)").first().text().trim() ||
+      $("span.pill:contains(User Score:)").first().text().trim();
+    rating = findRating(scoreText);
+  }
+
+  let episodes: number | undefined;
+  if (urlPath.includes("watch.php") || urlPath.includes("series_id=") || urlPath.includes("tview.php")) {
+    const metaEpisodes = asObject(meta?.episodes);
+    episodes = metaEpisodes ? Object.keys(metaEpisodes).length : $("a.ep-card").length || undefined;
   }
 
   return {
-    title,
-    synopsis,
-    genres,
-    poster: posterUrl,
-    backdrop: posterUrl, // They often use the poster as backdrop
-    year,
-    rating,
-    ...(episodesCount !== undefined ? { episodes: episodesCount } : {})
+    ...(title ? { title } : {}),
+    ...(synopsis ? { synopsis } : {}),
+    genres: genreText.split(",").map((value) => value.trim()).filter(Boolean),
+    ...(poster ? { poster, backdrop: poster } : {}),
+    ...(year !== undefined ? { year } : {}),
+    ...(rating !== undefined ? { rating } : {}),
+    ...(episodes !== undefined ? { episodes } : {}),
   };
 }
 
 export function parsePlayerUrl(html: string): string | null {
   const videoSrcMatch = html.match(/const videoSrc\s*=\s*['"]([^'"]+)['"]/);
-  if (videoSrcMatch && videoSrcMatch[1]) {
-    return cleanUrl(videoSrcMatch[1]);
-  }
+  if (videoSrcMatch?.[1]) return cleanUrl(videoSrcMatch[1]);
+
   const $ = cheerio.load(html);
-  const sourceUrl = $("source[type='video/mp4'], source[type='application/x-mpegURL'], source").first().attr("src");
-  if (sourceUrl) return cleanUrl(sourceUrl);
-  return null;
+  const sourceUrl = $("source[type='video/mp4'], source[type='application/x-mpegURL'], source")
+    .first()
+    .attr("src");
+
+  return sourceUrl ? cleanUrl(sourceUrl) : null;
 }

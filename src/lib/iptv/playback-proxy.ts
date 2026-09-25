@@ -69,12 +69,11 @@ export async function assertSafeUpstream(rawUrl: string) {
 
   const port = parsed.port || (parsed.protocol === "https:" ? "443" : "80");
   const allowedPorts = hostPorts.get(hostname);
-  if (hostname === "vod.cineplexbd.net" || hostname === "test-streams.mux.dev") {
-    if (!allowedPorts || !allowedPorts.has(port)) {
-      throw new Error("Upstream port is not allowed for this public host.");
-    }
-  } else if (hostname && !allowedHosts.has(hostname)) {
+  if (!allowedHosts.has(hostname)) {
     throw new Error("Upstream host is not permitted.");
+  }
+  if (!allowedPorts || !allowedPorts.has(port)) {
+    throw new Error("Upstream port is not allowed for this public host.");
   }
 
   const addresses = await lookup(hostname, { all: true });
@@ -103,17 +102,35 @@ export function buildUpstreamHeaders(request: Request, omitRange = false) {
   return headers;
 }
 
-export async function proxyUpstreamResponse(request: Request, upstreamUrl: URL) {
-  await assertSafeUpstream(upstreamUrl.toString());
+async function fetchSafeUpstream(request: Request, initialUrl: URL) {
+  let currentUrl = initialUrl;
 
-  // Detect manifest early so we can omit Range for manifest fetches.
-  // This server returns 206 for all GET requests; sending Range would yield a
-  // partial manifest and break rewriting.
-  const isManifestPath = /(?:\.(m3u8|m3u))(?=$|[?#])/i.test(upstreamUrl.pathname);
-  const upstream = await fetch(upstreamUrl, {
-    headers: buildUpstreamHeaders(request, isManifestPath),
-    cache: "no-store",
-  });
+  for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
+    await assertSafeUpstream(currentUrl.toString());
+
+    const isManifestPath = /(?:\.(m3u8|m3u))(?=$|[?#])/i.test(currentUrl.pathname);
+    const response = await fetch(currentUrl, {
+      headers: buildUpstreamHeaders(request, isManifestPath),
+      cache: "no-store",
+      redirect: "manual",
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) throw new Error("Upstream redirect is missing a Location header.");
+      currentUrl = new URL(location, currentUrl);
+      continue;
+    }
+
+    return { response, finalUrl: currentUrl, isManifestPath };
+  }
+
+  throw new Error("Too many upstream redirects.");
+}
+
+export async function proxyUpstreamResponse(request: Request, upstreamUrl: URL) {
+  const { response: upstream, finalUrl, isManifestPath } = await fetchSafeUpstream(request, upstreamUrl);
+
   if (!upstream.ok || !upstream.body) {
     throw new Error(`Upstream returned ${upstream.status}.`);
   }
@@ -121,7 +138,7 @@ export async function proxyUpstreamResponse(request: Request, upstreamUrl: URL) 
   const contentType = upstream.headers.get("content-type") ?? "application/octet-stream";
   if (isHlsMimeType(contentType) || isManifestPath) {
     const manifest = await upstream.text();
-    const rewritten = rewriteManifestText(manifest, upstreamUrl.toString());
+    const rewritten = rewriteManifestText(manifest, finalUrl.toString());
     return new Response(rewritten, {
       status: 200,
       headers: {
