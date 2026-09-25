@@ -6,16 +6,29 @@ export function tmdbImage(path: string | null | undefined, size: "w185" | "w342"
   return `${IMAGE_BASE}/${size}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+/** Same env names as live-iptv: TMDB_API_READ_TOKEN (preferred) or TMDB_API_KEY. Also accepts TMDB_ACCESS_TOKEN. */
+function getTmdbToken() {
+  return (
+    process.env.TMDB_API_READ_TOKEN?.trim() ||
+    process.env.TMDB_ACCESS_TOKEN?.trim() ||
+    ""
+  );
+}
+
+function getTmdbApiKey() {
+  return process.env.TMDB_API_KEY?.trim() || "";
+}
+
 export function isTmdbConfigured() {
-  return Boolean(process.env.TMDB_ACCESS_TOKEN || process.env.TMDB_API_KEY);
+  return Boolean(getTmdbToken() || getTmdbApiKey());
 }
 
 export async function tmdbFetch<T>(path: string, revalidate = 3600): Promise<T> {
-  const token = process.env.TMDB_ACCESS_TOKEN?.trim();
-  const apiKey = process.env.TMDB_API_KEY?.trim();
+  const token = getTmdbToken();
+  const apiKey = getTmdbApiKey();
 
   if (!token && !apiKey) {
-    throw new Error("TMDB is not configured. Set TMDB_ACCESS_TOKEN or TMDB_API_KEY.");
+    throw new Error("TMDB is not configured. Set TMDB_API_READ_TOKEN or TMDB_API_KEY.");
   }
 
   const url = new URL(path.startsWith("http") ? path : `${BASE}${path.startsWith("/") ? path : `/${path}`}`);
