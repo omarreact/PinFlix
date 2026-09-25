@@ -52,24 +52,29 @@ const movieCategories = [
   "Bangla Movies",
   "Chinese",
   "Documentaries",
+  "Documentary",
   "Dual Audio",
   "English",
   "Exclusive Full HD",
   "Foreign",
   "Hindi",
+  "Indian Bangla",
   "Indonesian",
+  "Italy Movies",
   "Japanese",
   "Kids Cartoon",
   "Korean",
   "Pakistani",
   "Punjabi",
   "Romance",
+  "Turkey Movies",
 ] as const;
 
 const hindiDubbedCategories = [
   ["Hindi Dubbed/Chinees Movies", "Chinese Movies"],
   ["Hindi Dubbed/English Movies", "English Movies"],
   ["Hindi Dubbed/Indonesian Movies", "Indonesian Movies"],
+  ["Hindi Dubbed/Italy Movies", "Italy Movies"],
   ["Hindi Dubbed/Japanese Movies", "Japanese Movies"],
   ["Hindi Dubbed/Korean Movies", "Korean Movies"],
   ["Hindi Dubbed/Tamil Movies", "Tamil Movies"],
@@ -77,6 +82,7 @@ const hindiDubbedCategories = [
 
 const regionalSeries = [
   "Bangla Series",
+  "Bangla Tv Series",
   "Bangla Drama",
   "Indian Bangla",
   "Indian Bangla Drama",
@@ -91,8 +97,10 @@ const webSeries = [
   "Hindi Series",
   "Pakistani Series",
   "English Series",
+  "Chinese Series",
   "Korean Series",
   "Japanese Series",
+  "Others Dubbed Series",
   "Others Series",
 ] as const;
 
