@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function NotFound() { return <div className="mx-auto max-w-xl py-24 text-center"><p className="text-6xl font-black text-brand">404</p><h1 className="mt-4 text-2xl font-bold">That stream wandered off.</h1><p className="mt-2 text-muted">The page you requested is not available.</p><Link href="/" className="mt-7 inline-block rounded-xl bg-brand px-5 py-3 font-semibold">Back home</Link></div>; }

@@ -1,0 +1,2 @@
+import { resolveChannel } from "@/src/lib/iptv/sources";
+export async function GET(request: Request) { const id = new URL(request.url).searchParams.get("channelId"); const channel = id ? resolveChannel(id) : undefined; return channel ? Response.json({ channelId: channel.id, quality: channel.streams[0]?.quality, protocol: channel.streams[0]?.protocol, url: `/api/proxy?channelId=${encodeURIComponent(channel.id)}&source=0` }) : Response.json({ error: "Channel not found" }, { status: 404 }); }
