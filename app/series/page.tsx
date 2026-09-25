@@ -25,17 +25,11 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
     ? await cineplexbd.getCategoryPage(activeCategory.id, page)
     : null;
 
-  const taxonomy = await cineplexbd.getCineplexTaxonomy();
-
   return <div className="space-y-8">
     <div>
       <p className="text-xs font-bold uppercase tracking-[.18em] text-brand">TV Series</p>
       <h1 className="mt-2 text-3xl font-black">{activeCategory?.label ?? "Series & shows"}</h1>
-      <p className="mt-2 text-muted">
-        {taxonomy.source === "live"
-          ? "Browse CineplexBD series, animations, shows and sports collections."
-          : "CineplexBD is temporarily unavailable, so verified fallback categories are shown."}
-      </p>
+      <p className="mt-2 text-muted">Browse CineplexBD series, animations, shows and sports collections.</p>
     </div>
 
     <CineplexCategoryNav categories={categories} activeId={activeCategory?.id} basePath="/series" />
