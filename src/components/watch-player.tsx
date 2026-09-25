@@ -39,9 +39,10 @@ export function WatchPlayer({ channelId, posterLabel }: { channelId: string; pos
   useEffect(() => {
     const savedQuality = window.localStorage.getItem("pinflix-quality");
     fetch(`/api/resolve?channelId=${encodeURIComponent(channelId)}`).then(async (response) => {
-      if (!response.ok) throw new Error("Unable to resolve this stream.");
-      const data = await response.json() as { sources: ResolvedSource[] };
+      const data = await response.json() as { sources?: ResolvedSource[]; error?: string; code?: string };
+      if (!response.ok) throw new Error(data.error || "Unable to resolve this stream.");
       const resolved = data.sources ?? [];
+
       if (savedQuality) {
         const savedPosition = resolved.findIndex((item) => item.quality === savedQuality);
         if (savedPosition >= 0) setSourcePosition(savedPosition);
