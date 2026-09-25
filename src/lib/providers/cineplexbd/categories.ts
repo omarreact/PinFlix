@@ -222,7 +222,7 @@ export function parseCineplexTaxonomy(html: string): CineplexTaxonomy {
         endpoint,
         query: Object.fromEntries(url.searchParams.entries()),
         hasSubmenu:
-          anchor.closest("li, nav, .group, .dropdown, .menu-item").find(
+          anchor.closest("li, .group, .dropdown, .menu-item").find(
             "a[href*='category.php'], a[href*='tcategory.php']",
           ).length > 0 || upper === "MOVIE" || upper === "TV SERIES",
         contentType:
