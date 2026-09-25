@@ -28,17 +28,11 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
     ? categoryPage?.items ?? []
     : [...staticEntertainment.filter((item) => item.kind === "movie"), ...latest.filter((item) => item.kind === "movie")];
 
-  const taxonomy = await cineplexbd.getCineplexTaxonomy();
-
   return <div className="space-y-8">
     <div>
       <p className="text-xs font-bold uppercase tracking-[.18em] text-brand">Movies</p>
       <h1 className="mt-2 text-3xl font-black">{activeCategory?.label ?? "Stories worth staying for"}</h1>
-      <p className="mt-2 text-muted">
-        {taxonomy.source === "live"
-          ? "Browse the current CineplexBD movie catalog through PinFlix."
-          : "CineplexBD is temporarily unavailable, so verified fallback categories are shown."}
-      </p>
+      <p className="mt-2 text-muted">Browse the CineplexBD movie catalog through PinFlix.</p>
     </div>
 
     <CineplexCategoryNav categories={categories} activeId={activeCategory?.id} basePath="/movies" />
