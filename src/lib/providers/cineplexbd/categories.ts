@@ -174,7 +174,7 @@ function normalizeLiveCategory(anchorHref: string, label: string): CineplexCateg
     const known = fallbackMatch(endpoint, categoryValue);
     const group = known?.group ?? inferGroup(endpoint, categoryValue, label);
     const kind = known?.kind ?? inferKind(endpoint, categoryValue, label);
-    const friendlyLabel = known?.label ?? label || categoryValue.split("/").at(-1) || categoryValue;
+    const friendlyLabel = known?.label ?? (label || categoryValue.split("/").at(-1) || categoryValue);
 
     return {
       id: `cineplex-${group}-${slugify(categoryValue)}`,
