@@ -27,7 +27,8 @@ export function WatchPlayer({ channelId, posterLabel }: { channelId: string; pos
   const [subtitleTracks, setSubtitleTracks] = useState<ResolvedSubtitle[]>([]);
   const [selectedSubtitle, setSelectedSubtitle] = useState("off");
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(false);
+  // Start muted so browsers allow autoplay; user can unmute with the control or M key.
+  const [muted, setMuted] = useState(true);
   const [buffering, setBuffering] = useState(true);
   const [status, setStatus] = useState<"loading" | "ready" | "switching" | "error">("loading");
   const [error, setError] = useState("");
@@ -72,7 +73,22 @@ export function WatchPlayer({ channelId, posterLabel }: { channelId: string; pos
     };
     const playResolved = () => {
       if (cancelled) return;
-      video.play().then(() => { setPlaying(true); setStatus("ready"); report(true); }).catch(() => setStatus("ready"));
+      // Force muted for the initial play attempt so browsers allow autoplay.
+      video.muted = true;
+      setMuted(true);
+      video.play()
+        .then(() => {
+          setPlaying(true);
+          setStatus("ready");
+          setBuffering(false);
+          report(true);
+        })
+        .catch(() => {
+          // Autoplay may still be blocked; mark ready so UI is usable and user can press Play.
+          setStatus("ready");
+          setBuffering(false);
+          setPlaying(false);
+        });
     };
     const failover = () => {
       if (cancelled) return;
@@ -173,7 +189,25 @@ export function WatchPlayer({ channelId, posterLabel }: { channelId: string; pos
   const isBusy = status === "loading" || status === "switching";
   return <div className="overflow-hidden rounded-xl border border-border bg-black">
     <div className="relative aspect-video">
-      <video ref={videoRef} muted={muted} controls={false} playsInline className="h-full w-full object-contain" aria-label={`Player for ${channelId}`} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onWaiting={() => setBuffering(true)} onPlaying={() => { setBuffering(false); setStatus("ready"); }} onError={() => failoverRef.current()} />
+      <video
+        ref={videoRef}
+        muted={muted}
+        controls={false}
+        playsInline
+        preload="auto"
+        className="h-full w-full object-contain"
+        aria-label={`Player for ${channelId}`}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onWaiting={() => setBuffering(true)}
+        onPlaying={() => { setBuffering(false); setStatus("ready"); }}
+        onCanPlay={() => {
+          setBuffering(false);
+          setStatus((current) => (current === "loading" ? "ready" : current));
+        }}
+        onLoadedData={() => setBuffering(false)}
+        onError={() => failoverRef.current()}
+      />
       {subtitleTracks.map((track) => <track key={track.language} kind="subtitles" srcLang={track.language} label={track.label} src={track.url} />)}
       {isBusy && <div className="absolute inset-0 grid place-items-center bg-[#05070a]/80 text-center"><div><div className="text-6xl">{posterLabel}</div><p className="mt-4 font-semibold">{status === "switching" ? "Switching source…" : "Loading stream…"}</p></div></div>}
       {buffering && status === "ready" && <div className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1 text-xs text-muted">Buffering…</div>}
