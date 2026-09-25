@@ -221,7 +221,10 @@ export function parseCineplexTaxonomy(html: string): CineplexTaxonomy {
         href: `${url.pathname}${url.search}`,
         endpoint,
         query: Object.fromEntries(url.searchParams.entries()),
-        hasSubmenu: upper === "MOVIE" || upper === "TV SERIES",
+        hasSubmenu:
+          anchor.closest("li, nav, .group, .dropdown, .menu-item").find(
+            "a[href*='category.php'], a[href*='tcategory.php']",
+          ).length > 0 || upper === "MOVIE" || upper === "TV SERIES",
         contentType:
           upper === "MOVIE"
             ? "movie"
@@ -230,7 +233,7 @@ export function parseCineplexTaxonomy(html: string): CineplexTaxonomy {
               : upper === "SOFTWARE"
                 ? "software"
                 : "navigation",
-        supportedInPinflix: upper !== "SOFTWARE",
+        supportedInPinflix: upper !== "SOFTWARE" && upper !== "TOP WATCH",
       });
     } catch {
       // Ignore malformed upstream navigation links.
