@@ -2,7 +2,7 @@ import type { ChannelPreview, StreamProtocol } from "@/src/types/catalog";
 
 export type LiveNetworkScope = "public" | "local";
 
-export type LiveProviderId = "roarzone" | "mango";
+export type LiveProviderId = "roarzone" | "mango" | "iptvorg";
 
 export type ProviderChannel = ChannelPreview & {
   provider: LiveProviderId;
