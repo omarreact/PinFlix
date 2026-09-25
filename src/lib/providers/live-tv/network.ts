@@ -44,16 +44,29 @@ function isBlockedHostOrAddress(value: string) {
   if (net.isIPv4(normalized)) {
     const [a, b] = normalized.split(".").map(Number);
     return (
+      a === 0 ||
       a === 10 ||
       a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
       (a === 169 && b === 254) ||
       (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168)
+      (a === 192 && b === 168) ||
+      a >= 224
     );
   }
 
   if (net.isIPv6(normalized)) {
-    return normalized === "::1" || normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe80:");
+    if (normalized.startsWith("::ffff:")) {
+      const mapped = normalized.slice("::ffff:".length);
+      return net.isIPv4(mapped) ? isBlockedHostOrAddress(mapped) : true;
+    }
+    return (
+      normalized === "::" ||
+      normalized === "::1" ||
+      normalized.startsWith("fc") ||
+      normalized.startsWith("fd") ||
+      normalized.startsWith("fe80:")
+    );
   }
 
   return false;
