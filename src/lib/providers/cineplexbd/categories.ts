@@ -251,7 +251,9 @@ export async function getCineplexTaxonomy(): Promise<CineplexTaxonomy> {
   try {
     const html = await fetchHtml("/", 21_600);
     const live = parseCineplexTaxonomy(html);
-    if (live.categories.length > 0) return live;
+    const movieCount = live.categories.filter((item) => item.endpoint === "category.php").length;
+    const tvCount = live.categories.filter((item) => item.endpoint === "tcategory.php").length;
+    if (live.categories.length >= 10 && movieCount > 0 && tvCount > 0) return live;
   } catch (error) {
     console.warn("CineplexBD live taxonomy unavailable; using verified fallback.", error);
   }
