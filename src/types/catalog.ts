@@ -47,13 +47,17 @@ export type Entertainment = {
   slug: string;
   title: string;
   kind: "movie" | "show";
-  year: number;
-  rating: number;
+  year?: number;
+  rating?: number;
   genres: string[];
   backdrop: string;
   poster: string;
   synopsis: string;
   episodes?: number;
+  provider?: string;
+  providerId?: string;
+  detailUrl?: string;
+  category?: string;
   play?: {
     sources: StreamSource[];
     subtitles?: SubtitleTrack[];
