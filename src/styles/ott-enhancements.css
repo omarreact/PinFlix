@@ -1,0 +1,40 @@
+/* OTT-inspired extras for PinFlix — import from src/styles.css */
+
+.channel-logo-hover {
+  transition:
+    transform 180ms ease-out,
+    box-shadow 180ms ease-out,
+    border-color 180ms ease-out;
+}
+.channel-logo-hover:hover {
+  transform: scale(1.08);
+}
+
+@keyframes pinflix-live-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 70%, transparent);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.animate-live-pulse {
+  animation: pinflix-live-pulse 1.5s ease infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-live-pulse,
+  .channel-logo-hover {
+    animation: none !important;
+    transition: none !important;
+  }
+  .channel-logo-hover:hover {
+    transform: none;
+  }
+}
