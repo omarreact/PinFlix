@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import { BackLink } from "@/src/components/catalog-sections";
-import { findChannel, findEntertainment } from "@/src/lib/iptv/catalog";
+import { RelatedChannels } from "@/src/components/related-channels";
+import { channels as demoChannels, findChannel, findEntertainment } from "@/src/lib/iptv/catalog";
 import { WatchPlayer } from "@/src/components/watch-player";
 import * as cineplexbd from "@/src/lib/providers/cineplexbd";
-import { getLiveProviderChannel, providerFromChannelId } from "@/src/lib/providers/live-tv";
+import { getLiveProviderChannel, getPublicLiveChannels, providerFromChannelId, toPublicChannel } from "@/src/lib/providers/live-tv";
+import type { ChannelPreview } from "@/src/types/catalog";
 
 export default async function WatchPage({ params }: { params: Promise<{ channelId: string }> }) {
   const { channelId } = await params;
@@ -33,6 +35,16 @@ export default async function WatchPage({ params }: { params: Promise<{ channelI
   }
 
   if (!channel) notFound();
+
+  // Related live channels for circular logo row
+  let related: ChannelPreview[] = demoChannels;
+  try {
+    const live = await getPublicLiveChannels();
+    if (live.length > 0) related = live.map(toPublicChannel);
+  } catch {
+    // keep demo fallback
+  }
+
   return <div className="space-y-6">
     <BackLink href="/browse">Live TV</BackLink>
     <WatchPlayer channelId={channel.id} posterLabel={channel.networkScope === "local" ? "📡" : "📺"} />
@@ -46,5 +58,10 @@ export default async function WatchPage({ params }: { params: Promise<{ channelI
         ? <p className="mt-4 text-sm text-warning">This source is only reachable from a compatible local/BDIX network and is intentionally not proxied through Vercel.</p>
         : channel.epg?.now && <p className="mt-4 text-sm text-muted">Now: {channel.epg.now}{channel.epg.next ? ` · Next: ${channel.epg.next}` : ""}</p>}
     </div>
+    <RelatedChannels
+      channels={related}
+      currentId={channel.id}
+      preferCategory={channel.category}
+    />
   </div>;
 }
