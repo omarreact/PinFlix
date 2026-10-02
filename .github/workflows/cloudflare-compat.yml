@@ -7,7 +7,7 @@ on:
     branches: [cloudflare-workers-migration, main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   compatibility:
@@ -84,3 +84,20 @@ jobs:
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+      - name: Publish verified Cloudflare build output
+        if: github.event_name == 'push' && github.ref_name == 'cloudflare-workers-migration'
+        shell: bash
+        run: |
+          rm -rf /tmp/pinflix-cloudflare-publish
+          mkdir -p /tmp/pinflix-cloudflare-publish/.cloudflare
+          cp -R .cloudflare/output /tmp/pinflix-cloudflare-publish/.cloudflare/output
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan cloudflare-built-output
+          git rm -rf . >/dev/null 2>&1 || true
+          cp -R /tmp/pinflix-cloudflare-publish/.cloudflare .
+          git add -f .cloudflare/output
+          git commit -m "build: publish verified Cloudflare output"
+          git push --force origin HEAD:cloudflare-built-output
