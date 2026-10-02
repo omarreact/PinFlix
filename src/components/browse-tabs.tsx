@@ -7,8 +7,7 @@ import { cn } from "@/src/lib/utils";
 const tabs = [
   { id: "all", label: "All", href: "/" },
   { id: "movies", label: "Movies", href: "/movies" },
-  { id: "series", label: "TV Shows", href: "/series" },
-  { id: "live", label: "Live TV", href: "/browse" },
+  { id: "series", label: "Web Series", href: "/series" },
 ];
 
 export function BrowseTabs({ active }: { active?: string }) {
@@ -19,13 +18,11 @@ export function BrowseTabs({ active }: { active?: string }) {
       ? "movies"
       : pathname.startsWith("/series")
         ? "series"
-        : pathname.startsWith("/browse")
-          ? "live"
-          : "all");
+        : "all");
 
   return (
     <section>
-      <h2 className="mb-4 text-xl font-bold tracking-tight md:text-2xl">Browse your way</h2>
+      <h2 className="mb-4 text-xl font-bold tracking-tight md:text-2xl">Browse PinFlix</h2>
       <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1">
         {tabs.map((tab) => {
           const isActive = current === tab.id;

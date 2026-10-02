@@ -2,13 +2,11 @@ import { lookup } from "node:dns/promises";
 import net from "node:net";
 
 const allowedHosts = new Set([
-  "test-streams.mux.dev",
   "vod.cineplexbd.net",
   "cineplexbd.net",
   "www.cineplexbd.net",
 ]);
 const hostPorts = new Map<string, Set<string>>([
-  ["test-streams.mux.dev", new Set(["80", "443"])],
   ["vod.cineplexbd.net", new Set(["80", "443", "8081"])],
   ["cineplexbd.net", new Set(["80", "443"])],
   ["www.cineplexbd.net", new Set(["80", "443"])],

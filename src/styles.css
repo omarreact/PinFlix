@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "./styles/ott-enhancements.css";
 
 @theme {
   --color-bg: #080a0f;
@@ -14,7 +13,6 @@
   --color-brand: #10b981;
   --color-brand-2: #34d399;
   --color-coral: #ff5a5f;
-  --color-live: #ef4444;
   --color-success: #35d07f;
   --color-warning: #f5bd4f;
   --color-danger: #ff6868;

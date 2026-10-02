@@ -1,12 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/src/components/catalog-sections";
-import { RelatedChannels } from "@/src/components/related-channels";
-import { channels as demoChannels, findChannel, findEntertainment } from "@/src/lib/iptv/catalog";
 import { WatchPlayer } from "@/src/components/watch-player";
 import * as cineplexbd from "@/src/lib/providers/cineplexbd";
-import { getLiveProviderChannel, getPublicLiveChannels, providerFromChannelId, toPublicChannel } from "@/src/lib/providers/live-tv";
-import type { ChannelPreview } from "@/src/types/catalog";
 
 type SearchParams = Promise<{
   season?: string;
@@ -18,48 +14,43 @@ function positiveInteger(value: string | undefined, fallback: number) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function seriesHref(channelId: string, season: number, episode: number) {
+function seriesHref(mediaId: string, season: number, episode: number) {
   const params = new URLSearchParams({
     season: String(season),
     episode: String(episode),
   });
-  return `/watch/${encodeURIComponent(channelId)}?${params.toString()}`;
+  return `/watch/${encodeURIComponent(mediaId)}?${params.toString()}`;
 }
+
+export const dynamic = "force-dynamic";
 
 export default async function WatchPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ channelId: string }>;
+  params: Promise<{ mediaId: string }>;
   searchParams: SearchParams;
 }) {
-  const [{ channelId }, query] = await Promise.all([params, searchParams]);
-  let channel = findChannel(channelId);
+  const [{ mediaId }, query] = await Promise.all([params, searchParams]);
 
-  if (!channel && providerFromChannelId(channelId)) {
-    channel = await getLiveProviderChannel(channelId) || undefined;
-  }
+  if (!mediaId.startsWith("cb-")) notFound();
 
-  let item = findEntertainment(channelId);
-  if (!item && channelId.startsWith("cb-")) {
-    item = await cineplexbd.getDetails(channelId) || undefined;
-  }
+  const item = await cineplexbd.getDetails(mediaId);
+  if (!item) notFound();
 
-  if (!channel && !item) notFound();
+  const isSeries = item.kind === "show";
+  const requestedSeason = positiveInteger(query.season, 1);
+  const navigation = isSeries
+    ? await cineplexbd.getSeriesNavigation(item.id, requestedSeason)
+    : null;
+  const season = navigation?.season ?? requestedSeason;
+  const requestedEpisode = positiveInteger(query.episode, 1);
+  const episode = navigation
+    ? Math.min(requestedEpisode, Math.max(1, navigation.episodes))
+    : requestedEpisode;
 
-  if (item) {
-    const isCineplexSeries = item.kind === "show" && item.id.startsWith("cb-");
-    const requestedSeason = positiveInteger(query.season, 1);
-    const navigation = isCineplexSeries
-      ? await cineplexbd.getSeriesNavigation(item.id, requestedSeason)
-      : null;
-    const season = navigation?.season ?? requestedSeason;
-    const requestedEpisode = positiveInteger(query.episode, 1);
-    const episode = navigation
-      ? Math.min(requestedEpisode, Math.max(1, navigation.episodes))
-      : requestedEpisode;
-
-    return <div className="space-y-6">
+  return (
+    <div className="space-y-6">
       <BackLink href={`/entertainment/${item.slug}`}>Title details</BackLink>
 
       {navigation && (navigation.seasons.length > 1 || navigation.episodes > 1) && (
@@ -109,52 +100,22 @@ export default async function WatchPage({
       )}
 
       <WatchPlayer
-        channelId={item.id}
+        mediaId={item.id}
         posterLabel={item.kind === "movie" ? "🎬" : "📺"}
-        season={isCineplexSeries ? season : undefined}
-        episode={isCineplexSeries ? episode : undefined}
+        season={isSeries ? season : undefined}
+        episode={isSeries ? episode : undefined}
       />
 
       <div>
         <p className="text-sm font-bold uppercase tracking-[.18em] text-brand">Now playing</p>
         <h1 className="mt-2 text-3xl font-black">{item.title}</h1>
-        {isCineplexSeries && (
+        {isSeries && (
           <p className="mt-2 text-sm font-semibold text-muted">
             Season {season} · Episode {episode}
           </p>
         )}
-        <p className="mt-2 text-muted">{item.synopsis}</p>
+        {item.synopsis && <p className="mt-2 text-muted">{item.synopsis}</p>}
       </div>
-    </div>;
-  }
-
-  if (!channel) notFound();
-
-  let related: ChannelPreview[] = demoChannels;
-  try {
-    const live = await getPublicLiveChannels();
-    if (live.length > 0) related = live.map(toPublicChannel);
-  } catch {
-    // keep demo fallback
-  }
-
-  return <div className="space-y-6">
-    <BackLink href="/browse">Live TV</BackLink>
-    <WatchPlayer channelId={channel.id} posterLabel={channel.networkScope === "local" ? "📡" : "📺"} />
-    <div>
-      <p className="text-sm font-bold uppercase tracking-[.18em] text-brand">
-        {channel.networkScope === "local" ? "BDIX / Local channel" : "Live now"}
-      </p>
-      <h1 className="mt-2 text-3xl font-black">{channel.name}</h1>
-      <p className="mt-2 text-muted">{channel.description}</p>
-      {channel.networkScope === "local"
-        ? <p className="mt-4 text-sm text-warning">This source is only reachable from a compatible local/BDIX network and is intentionally not proxied through Vercel.</p>
-        : channel.epg?.now && <p className="mt-4 text-sm text-muted">Now: {channel.epg.now}{channel.epg.next ? ` · Next: ${channel.epg.next}` : ""}</p>}
     </div>
-    <RelatedChannels
-      channels={related}
-      currentId={channel.id}
-      preferCategory={channel.category}
-    />
-  </div>;
+  );
 }

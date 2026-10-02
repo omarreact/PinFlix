@@ -15,12 +15,12 @@ type ResolvedSource = {
 type HlsLevel = { index: number; label: string };
 
 export function WatchPlayer({
-  channelId,
+  mediaId,
   posterLabel,
   season,
   episode,
 }: {
-  channelId: string;
+  mediaId: string;
   posterLabel: string;
   season?: number;
   episode?: number;
@@ -49,7 +49,7 @@ export function WatchPlayer({
 
   useEffect(() => {
     const savedQuality = window.localStorage.getItem("pinflix-quality");
-    const params = new URLSearchParams({ channelId });
+    const params = new URLSearchParams({ id: mediaId });
     if (season) params.set("season", String(season));
     if (episode) params.set("episode", String(episode));
 
@@ -66,7 +66,7 @@ export function WatchPlayer({
       setStatus(resolved.length ? "loading" : "error");
       if (!resolved.length) setError("No playable sources are available.");
     }).catch((reason: Error) => { setStatus("error"); setError(reason.message); });
-  }, [channelId, episode, season]);
+  }, [mediaId, episode, season]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -82,9 +82,6 @@ export function WatchPlayer({
     hlsRef.current?.destroy();
     hlsRef.current = null;
 
-    const report = (success: boolean) => {
-      void fetch("/api/health", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channelId, sourceIndex: source.sourceIndex, success }) });
-    };
     const playResolved = () => {
       if (cancelled) return;
       // Force muted for the initial play attempt so browsers allow autoplay.
@@ -95,7 +92,6 @@ export function WatchPlayer({
           setPlaying(true);
           setStatus("ready");
           setBuffering(false);
-          report(true);
         })
         .catch(() => {
           // Autoplay may still be blocked; mark ready so UI is usable and user can press Play.
@@ -106,7 +102,6 @@ export function WatchPlayer({
     };
     const failover = () => {
       if (cancelled) return;
-      report(false);
       const nextPosition = sourcePosition + 1;
       if (nextPosition < sources.length) {
         setStatus("switching");
@@ -148,7 +143,7 @@ export function WatchPlayer({
       video.load();
       failoverRef.current = () => undefined;
     };
-  }, [channelId, source, sourcePosition, sources.length]);
+  }, [mediaId, source, sourcePosition, sources.length]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -210,7 +205,7 @@ export function WatchPlayer({
         playsInline
         preload="auto"
         className="h-full w-full object-contain"
-        aria-label={`Player for ${channelId}`}
+        aria-label={`Player for ${mediaId}`}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onWaiting={() => setBuffering(true)}
