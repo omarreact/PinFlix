@@ -2,6 +2,26 @@ import { getRankedChannelSources } from "@/src/lib/iptv/sources";
 import * as cineplexbd from "@/src/lib/providers/cineplexbd";
 import { providerFromChannelId, resolveLiveProviderChannel } from "@/src/lib/providers/live-tv";
 
+function toCineplexRewriteUrl(value: string) {
+  try {
+    const upstream = new URL(value);
+    const hostname = upstream.hostname.toLowerCase();
+    const port = upstream.port || (upstream.protocol === "https:" ? "443" : "80");
+
+    if (upstream.protocol === "http:" && hostname === "vod.cineplexbd.net" && port === "8081") {
+      return `/cineplex-vod${upstream.pathname}${upstream.search}`;
+    }
+
+    if (upstream.protocol === "http:" && hostname === "cineplexbd.net" && port === "80") {
+      return `/cineplex-origin${upstream.pathname}${upstream.search}`;
+    }
+  } catch {
+    // Fall back to the guarded application proxy for non-standard sources.
+  }
+
+  return null;
+}
+
 export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get("channelId");
   if (!id) return Response.json({ error: "Channel ID required" }, { status: 400 });
@@ -17,7 +37,7 @@ export async function GET(request: Request) {
         protocol: source.protocol,
         priority: source.priority,
         sourceIndex: index,
-        url: `/api/playback/proxy?url=${encodeURIComponent(source.url)}`,
+        url: toCineplexRewriteUrl(source.url) ?? `/api/playback/proxy?url=${encodeURIComponent(source.url)}`,
         subtitles: [],
       })),
     });
