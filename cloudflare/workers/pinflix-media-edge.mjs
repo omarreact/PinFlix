@@ -1,4 +1,6 @@
-import { connect } from "cloudflare:sockets";\n\nconst CATALOG_HOST = "cineplexbd.net";
+import { connect } from "cloudflare:sockets";
+
+const CATALOG_HOST = "cineplexbd.net";
 const ORIGIN_IPS = {
   "cineplexbd.net": "103.136.200.66",
   "www.cineplexbd.net": "103.136.200.66",
