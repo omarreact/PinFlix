@@ -7,7 +7,7 @@ type ResolvedSubtitle = { label: string; language: string; url: string };
 type ResolvedSource = {
   url: string;
   quality: string;
-  protocol: "hls" | "native" | "mpegts";
+  protocol: "hls" | "native";
   priority: number;
   sourceIndex: number;
   subtitles?: ResolvedSubtitle[];
