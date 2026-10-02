@@ -1,42 +1,45 @@
 # PinFlix
 
-PinFlix is a dark, keyboard-friendly streaming UI for curated live channels and entertainment catalogs. It uses Next.js App Router, TypeScript, Tailwind CSS v4, Zustand, and same-origin server routes for stream resolution.
+PinFlix is a Next.js streaming interface focused on CineplexBD movies and web series.
+
+## Current product scope
+
+- Fresh CineplexBD movie catalog
+- Fresh CineplexBD web-series catalog
+- Dynamic category discovery with verified fallbacks
+- Search across CineplexBD entertainment
+- Movie playback
+- Web-series season and episode selection
+- Same-origin HTTPS HLS delivery with a guarded Cineplex-only proxy fallback
+- Responsive web and TV-style player controls
+
+Live TV, IPTV channel catalogs, EPG, BDIX channel providers, demo channels, and the old static entertainment catalog have been removed.
 
 ## Setup
 
 ```bash
-npm install
-cp .env.example .env.local
+npm ci
 npm run dev
-```
-
-Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env.local
 ```
 
 Validation:
 
 ```bash
-npm run typecheck
-npm run lint
-npm run build
+npm run check
 ```
 
 ## Architecture
 
 ```text
-app/                 routes, pages, and same-origin API handlers
-src/components/      accessible UI, cards, app shell, player
-src/lib/iptv/        public catalog, server-only sources, proxy safety, health
-src/types/           domain contracts shared across server and UI
+app/                              pages and same-origin API handlers
+src/components/                   entertainment UI and player
+src/lib/providers/cineplexbd/     Cineplex catalog, parsing and playback resolution
+src/lib/cineplex-playback-proxy.ts guarded HLS/media fallback proxy
+src/types/                        entertainment and playback contracts
 ```
 
-Public channel data uses `ChannelPreview`. Upstream stream URLs live only in the server-side source resolver. The browser receives same-origin `/api/proxy` URLs, never upstream URLs.
-
-The player supports native media playback and HLS through `hls.js`, with keyboard shortcuts: Space/K play-pause, Left/Right seek, M mute, and F fullscreen. Focusable controls use `.tv-focus`, strong `:focus-visible` rings, scaling, and scroll margins for 10-foot navigation.
+The browser receives same-origin HTTPS media URLs whenever the CineplexBD source is HTTP-only. HLS manifests and child segments can fall back through the guarded proxy, which only accepts the approved CineplexBD hosts and ports.
 
 ## Legal and operational boundaries
 
-PinFlix is a playback shell for streams and metadata that you are authorized to use. Do not add copyrighted or geo-restricted sources without permission. The proxy is catalog-restricted, HTTPS-only, blocks private/internal addresses, and exposes aggregate health diagnostics without user identifiers.
+Use PinFlix only with media sources you are authorized to access. Upstream availability, regional routing, and content rights remain the responsibility of the source provider.
