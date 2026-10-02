@@ -37,6 +37,83 @@ jobs:
       - name: Build Cloudflare Workers target
         run: npm run build:vinext
 
+      - name: Build connector deployment package
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = ".cloudflare/output/v0/workers/default/bundle";
+          const out = ".cloudflare/output/pinflix-worker-upload.multipart";
+          const boundary = "----PinFlixWorkerUploadBoundary20261002";
+
+          function walk(dir, base = "") {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            const files = [];
+            for (const entry of entries) {
+              const rel = base ? base + "/" + entry.name : entry.name;
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) {
+                if (rel === ".vite") continue;
+                files.push(...walk(full, rel));
+              } else if (entry.isFile()) {
+                files.push(rel);
+              }
+            }
+            return files;
+          }
+
+          const metadata = {
+            main_module: "index.js",
+            compatibility_date: "2026-10-02",
+            compatibility_flags: ["nodejs_compat"],
+            observability: { enabled: true },
+            bindings: [
+              {
+                type: "service",
+                name: "ASSETS",
+                service: "pinflix-assets",
+                environment: "production"
+              }
+            ],
+            annotations: {
+              "workers/message": "PinFlix vinext migration verified build"
+            }
+          };
+
+          const chunks = [];
+          const push = (value) => chunks.push(Buffer.isBuffer(value) ? value : Buffer.from(value));
+          push("--" + boundary + "\r\n");
+          push('Content-Disposition: form-data; name="metadata"\r\n');
+          push("Content-Type: application/json\r\n\r\n");
+          push(JSON.stringify(metadata));
+          push("\r\n");
+
+          for (const rel of walk(root)) {
+            const full = path.join(root, rel);
+            let type = "text/plain";
+            if (rel.endsWith(".js")) type = "application/javascript+module";
+            else if (rel.endsWith(".json")) type = "application/json";
+            else if (rel.endsWith(".wasm")) type = "application/wasm";
+            else if (rel.endsWith(".map")) type = "application/source-map";
+
+            push("--" + boundary + "\r\n");
+            push('Content-Disposition: form-data; name="' + rel + '"; filename="' + rel + '"\r\n');
+            push("Content-Type: " + type + "\r\n\r\n");
+            push(fs.readFileSync(full));
+            push("\r\n");
+          }
+
+          push("--" + boundary + "--\r\n");
+          fs.writeFileSync(out, Buffer.concat(chunks));
+          fs.writeFileSync(
+            ".cloudflare/output/pinflix-worker-upload.content-type",
+            "multipart/form-data; boundary=" + boundary
+          );
+          console.log("Generated connector upload package:", fs.statSync(out).size, "bytes");
+          NODE
+
       - name: Package Cloudflare output
         run: tar -czf pinflix-cloudflare-output.tgz .cloudflare/output cloudflare.config.ts vite.config.ts package.json package-lock.json
 
