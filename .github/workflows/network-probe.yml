@@ -1,0 +1,36 @@
+name: PinFlix Network Probe
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    if: github.event.head_commit.message == 'ci: probe Cineplex network reachability'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe Cineplex routes
+        shell: bash
+        run: |
+          set +e
+          echo "=== DNS hostname ==="
+          getent ahostsv4 cineplexbd.net || true
+
+          echo "=== Direct hostname ==="
+          curl -v --max-time 10 -o /tmp/direct.html -w "\nHTTP=%{http_code}\n" http://cineplexbd.net/ 2>&1 | tail -n 40
+          head -c 500 /tmp/direct.html 2>/dev/null || true
+          echo
+
+          echo "=== Fixed IPv4 with Host/SNI equivalent for HTTP ==="
+          curl -v --max-time 10 --resolve cineplexbd.net:80:103.136.200.66 -o /tmp/fixed.html -w "\nHTTP=%{http_code}\n" http://cineplexbd.net/ 2>&1 | tail -n 40
+          head -c 500 /tmp/fixed.html 2>/dev/null || true
+          echo
+
+          echo "=== Previous Bangladesh Quick Tunnel ==="
+          curl -v --max-time 10 -o /tmp/tunnel.html -w "\nHTTP=%{http_code}\n" https://watson-cylinder-automation-cards.trycloudflare.com/catalog/ 2>&1 | tail -n 40
+          head -c 500 /tmp/tunnel.html 2>/dev/null || true
+          echo
