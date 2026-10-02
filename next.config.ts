@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
         destination: "http://vod.cineplexbd.net:8081/:path*",
       },
       {
-        source: "/cineplex-assets/:path*",
+        source: "/cineplex-origin/:path*",
         destination: "http://cineplexbd.net/:path*",
       },
     ];
