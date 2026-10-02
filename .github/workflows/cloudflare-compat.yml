@@ -181,6 +181,64 @@ jobs:
           grep -q "Missing upstream url param" /tmp/proxy-response.json
           echo "Local Workers runtime smoke test passed."
 
+      - name: Probe deployed Cloudflare staging runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl --fail --show-error --silent --max-time 15 \\
+            https://media.pincodeit.com/health > /tmp/pinflix-media-health.json
+          node - <<'NODE'
+          const fs = require("fs");
+          const x = JSON.parse(fs.readFileSync("/tmp/pinflix-media-health.json", "utf8"));
+          if (x.ok !== true || x.service !== "pinflix-media-edge") {
+            console.error(x);
+            process.exit(1);
+          }
+          if (!x.upstream || x.upstream.reachable !== true) {
+            console.error("Cineplex upstream is not reachable from the Cloudflare media Worker:", x);
+            process.exit(1);
+          }
+          NODE
+
+          curl --fail --show-error --silent --max-time 20 \\
+            https://pinflix-staging.pincodeit.com/api/cineplexbd/status > /tmp/pinflix-cineplex-status.json
+          node - <<'NODE'
+          const fs = require("fs");
+          const x = JSON.parse(fs.readFileSync("/tmp/pinflix-cineplex-status.json", "utf8"));
+          if (x.provider !== "cineplexbd" || x.connectivity?.reachable !== true || x.connectivity?.transport !== "relay") {
+            console.error(x);
+            process.exit(1);
+          }
+          if (x.taxonomy?.source !== "live") {
+            console.error("Expected live Cineplex taxonomy:", x);
+            process.exit(1);
+          }
+          NODE
+
+          curl --fail --show-error --silent --max-time 20 \\
+            "https://pinflix-staging.pincodeit.com/api/cineplexbd/catalog?category=cineplex-movies-english&page=1" \\
+            > /tmp/pinflix-catalog.json
+          node - <<'NODE' > /tmp/pinflix-poster-path.txt
+          const fs = require("fs");
+          const x = JSON.parse(fs.readFileSync("/tmp/pinflix-catalog.json", "utf8"));
+          if (!Array.isArray(x.items) || x.items.length === 0) {
+            console.error("Cloudflare staging catalog returned no items.");
+            process.exit(1);
+          }
+          const poster = x.items.find((item) => typeof item.poster === "string" && item.poster.startsWith("/cineplex-origin/"))?.poster;
+          if (!poster) {
+            console.error("No proxied Cineplex poster found in catalog.");
+            process.exit(1);
+          }
+          process.stdout.write(poster);
+          NODE
+
+          POSTER_PATH="$(cat /tmp/pinflix-poster-path.txt)"
+          curl --fail --show-error --silent --max-time 20 --head \\
+            "https://pinflix-staging.pincodeit.com$POSTER_PATH" > /tmp/pinflix-poster-headers.txt
+          echo "Deployed Cloudflare staging smoke test passed."
+
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
