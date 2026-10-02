@@ -184,59 +184,82 @@ jobs:
       - name: Probe deployed Cloudflare staging runtime
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
-          curl --fail --show-error --silent --max-time 15 \\
-            https://media.pincodeit.com/health > /tmp/pinflix-media-health.json
-          node - <<'NODE'
-          const fs = require("fs");
-          const x = JSON.parse(fs.readFileSync("/tmp/pinflix-media-health.json", "utf8"));
-          if (x.ok !== true || x.service !== "pinflix-media-edge") {
-            console.error(x);
-            process.exit(1);
-          }
-          if (!x.upstream || x.upstream.reachable !== true) {
-            console.error("Cineplex upstream is not reachable from the Cloudflare media Worker:", x);
-            process.exit(1);
-          }
-          NODE
+          MEDIA_HTTP="$(curl --show-error --silent --max-time 15 --output /tmp/pinflix-media-health.json --write-out "%{http_code}" https://media.pincodeit.com/health || true)"
+          STATUS_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-cineplex-status.json --write-out "%{http_code}" https://pinflix-staging.pincodeit.com/api/cineplexbd/status || true)"
+          CATALOG_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-catalog.json --write-out "%{http_code}" "https://pinflix-staging.pincodeit.com/api/cineplexbd/catalog?category=cineplex-movies-english&page=1" || true)"
 
-          curl --fail --show-error --silent --max-time 20 \\
-            https://pinflix-staging.pincodeit.com/api/cineplexbd/status > /tmp/pinflix-cineplex-status.json
-          node - <<'NODE'
-          const fs = require("fs");
-          const x = JSON.parse(fs.readFileSync("/tmp/pinflix-cineplex-status.json", "utf8"));
-          if (x.provider !== "cineplexbd" || x.connectivity?.reachable !== true || x.connectivity?.transport !== "relay") {
-            console.error(x);
-            process.exit(1);
-          }
-          if (x.taxonomy?.source !== "live") {
-            console.error("Expected live Cineplex taxonomy:", x);
-            process.exit(1);
-          }
-          NODE
+          MEDIA_BODY="$(cat /tmp/pinflix-media-health.json 2>/dev/null || true)"
+          STATUS_BODY="$(cat /tmp/pinflix-cineplex-status.json 2>/dev/null || true)"
+          CATALOG_BODY="$(cat /tmp/pinflix-catalog.json 2>/dev/null || true)"
 
-          curl --fail --show-error --silent --max-time 20 \\
-            "https://pinflix-staging.pincodeit.com/api/cineplexbd/catalog?category=cineplex-movies-english&page=1" \\
-            > /tmp/pinflix-catalog.json
-          node - <<'NODE' > /tmp/pinflix-poster-path.txt
+          {
+            echo "## Cloudflare staging smoke report"
+            echo
+            echo "- media HTTP: $MEDIA_HTTP"
+            echo "- status HTTP: $STATUS_HTTP"
+            echo "- catalog HTTP: $CATALOG_HTTP"
+            echo
+            echo "### media"
+            echo '~~~json'
+            printf '%s\n' "$MEDIA_BODY" | head -c 4000
+            echo
+            echo '~~~'
+            echo "### status"
+            echo '~~~json'
+            printf '%s\n' "$STATUS_BODY" | head -c 4000
+            echo
+            echo '~~~'
+            echo "### catalog sample"
+            echo '~~~json'
+            printf '%s\n' "$CATALOG_BODY" | head -c 4000
+            echo
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          node - "$MEDIA_HTTP" "$STATUS_HTTP" "$CATALOG_HTTP" <<'NODE'
           const fs = require("fs");
-          const x = JSON.parse(fs.readFileSync("/tmp/pinflix-catalog.json", "utf8"));
-          if (!Array.isArray(x.items) || x.items.length === 0) {
-            console.error("Cloudflare staging catalog returned no items.");
+          const [mediaHttp, statusHttp, catalogHttp] = process.argv.slice(2);
+          const readJson = (path) => {
+            try { return JSON.parse(fs.readFileSync(path, "utf8")); } catch { return null; }
+          };
+          const media = readJson("/tmp/pinflix-media-health.json");
+          const status = readJson("/tmp/pinflix-cineplex-status.json");
+          const catalog = readJson("/tmp/pinflix-catalog.json");
+
+          const failures = [];
+          if (mediaHttp !== "200") failures.push("media endpoint HTTP " + mediaHttp);
+          if (!media || media.ok !== true || media.service !== "pinflix-media-edge") failures.push("media health payload invalid");
+          if (media?.upstream?.reachable !== true) failures.push("Cloudflare media Worker cannot reach Cineplex upstream");
+          if (statusHttp !== "200") failures.push("staging status HTTP " + statusHttp);
+          if (status?.provider !== "cineplexbd") failures.push("staging provider status invalid");
+          if (status?.connectivity?.reachable !== true) failures.push("staging Cineplex connectivity is not reachable");
+          if (status?.connectivity?.transport !== "relay") failures.push("staging is not using relay transport");
+          if (status?.taxonomy?.source !== "live") failures.push("staging taxonomy is not live");
+          if (catalogHttp !== "200") failures.push("catalog HTTP " + catalogHttp);
+          if (!Array.isArray(catalog?.items) || catalog.items.length === 0) failures.push("catalog returned no items");
+
+          if (failures.length) {
+            console.error(failures.join("; "));
             process.exit(1);
           }
-          const poster = x.items.find((item) => typeof item.poster === "string" && item.poster.startsWith("/cineplex-origin/"))?.poster;
+
+          const poster = catalog.items.find((item) => typeof item.poster === "string" && item.poster.startsWith("/cineplex-origin/"))?.poster;
           if (!poster) {
             console.error("No proxied Cineplex poster found in catalog.");
             process.exit(1);
           }
-          process.stdout.write(poster);
+          fs.writeFileSync("/tmp/pinflix-poster-path.txt", poster);
           NODE
 
           POSTER_PATH="$(cat /tmp/pinflix-poster-path.txt)"
-          curl --fail --show-error --silent --max-time 20 --head \\
-            "https://pinflix-staging.pincodeit.com$POSTER_PATH" > /tmp/pinflix-poster-headers.txt
+          POSTER_HTTP="$(curl --show-error --silent --max-time 20 --head --output /tmp/pinflix-poster-headers.txt --write-out "%{http_code}" "https://pinflix-staging.pincodeit.com$POSTER_PATH" || true)"
+          echo "- poster HTTP: $POSTER_HTTP" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$POSTER_HTTP" != 2* && "$POSTER_HTTP" != 3* ]]; then
+            echo "Poster smoke check failed with HTTP $POSTER_HTTP" >&2
+            exit 1
+          fi
           echo "Deployed Cloudflare staging smoke test passed."
 
       - name: Audit production dependencies
