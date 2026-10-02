@@ -13,7 +13,7 @@ PinFlix is a Next.js streaming interface focused on CineplexBD movies and web se
 - Same-origin HTTPS HLS delivery with a guarded Cineplex-only proxy fallback
 - Responsive web and TV-style player controls
 
-Live TV, IPTV channel catalogs, EPG, BDIX channel providers, demo channels, and the old static entertainment catalog have been removed.
+The application now has a single entertainment catalog and playback architecture centered on CineplexBD.
 
 ## Setup
 
