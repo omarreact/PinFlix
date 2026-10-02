@@ -2,6 +2,9 @@ import { getRankedChannelSources } from "@/src/lib/iptv/sources";
 import * as cineplexbd from "@/src/lib/providers/cineplexbd";
 import { providerFromChannelId, resolveLiveProviderChannel } from "@/src/lib/providers/live-tv";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 function optionalPositiveInteger(value: string | null) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 && parsed <= 10_000
