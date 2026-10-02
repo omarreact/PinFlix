@@ -31,6 +31,9 @@ jobs:
       - name: Install current dependencies
         run: npm ci
 
+      - name: Align React with vinext App Router runtime
+        run: npm install --save-exact react@19.3.0 react-dom@19.3.0
+
       - name: Initialize vinext for Cloudflare Workers
         run: npx --yes vinext@latest init --platform=cloudflare --skip-check --force
 
