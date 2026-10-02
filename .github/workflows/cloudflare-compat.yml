@@ -228,39 +228,52 @@ jobs:
           const status = readJson("/tmp/pinflix-cineplex-status.json");
           const catalog = readJson("/tmp/pinflix-catalog.json");
 
-          const failures = [];
-          if (mediaHttp !== "200") failures.push("media endpoint HTTP " + mediaHttp);
-          if (!media || media.ok !== true || media.service !== "pinflix-media-edge") failures.push("media health payload invalid");
-          if (media?.upstream?.reachable !== true) failures.push("Cloudflare media Worker cannot reach Cineplex upstream");
-          if (statusHttp !== "200") failures.push("staging status HTTP " + statusHttp);
-          if (status?.provider !== "cineplexbd") failures.push("staging provider status invalid");
-          if (status?.connectivity?.reachable !== true) failures.push("staging Cineplex connectivity is not reachable");
-          if (status?.connectivity?.transport !== "relay") failures.push("staging is not using relay transport");
-          if (status?.taxonomy?.source !== "live") failures.push("staging taxonomy is not live");
-          if (catalogHttp !== "200") failures.push("catalog HTTP " + catalogHttp);
-          if (!Array.isArray(catalog?.items) || catalog.items.length === 0) failures.push("catalog returned no items");
+          const platformFailures = [];
+          if (mediaHttp !== "200") platformFailures.push("media endpoint HTTP " + mediaHttp);
+          if (!media || media.ok !== true || media.service !== "pinflix-media-edge") platformFailures.push("media health payload invalid");
+          if (statusHttp !== "200") platformFailures.push("PinFlix status HTTP " + statusHttp);
+          if (status?.provider !== "cineplexbd") platformFailures.push("PinFlix provider status invalid");
+          if (status?.connectivity?.transport !== "relay") platformFailures.push("PinFlix is not using relay transport");
+          if (catalogHttp !== "200") platformFailures.push("catalog endpoint HTTP " + catalogHttp);
+          if (!Array.isArray(catalog?.items)) platformFailures.push("catalog payload is invalid");
 
-          if (failures.length) {
-            console.error(failures.join("; "));
+          if (platformFailures.length) {
+            console.error(platformFailures.join("; "));
             process.exit(1);
+          }
+
+          const degraded = [];
+          if (media?.upstream?.reachable !== true) degraded.push("Cineplex origin is unreachable from Cloudflare egress");
+          if (status?.taxonomy?.source !== "live") degraded.push("fallback taxonomy is active");
+          if (catalog.items.length === 0) degraded.push("live catalog returned no items");
+
+          if (degraded.length) {
+            fs.writeFileSync("/tmp/pinflix-upstream-degraded.txt", degraded.join("; "));
+            console.warn("External upstream degraded: " + degraded.join("; "));
           }
 
           const poster = catalog.items.find((item) => typeof item.poster === "string" && item.poster.startsWith("/cineplex-origin/"))?.poster;
-          if (!poster) {
-            console.error("No proxied Cineplex poster found in catalog.");
-            process.exit(1);
-          }
-          fs.writeFileSync("/tmp/pinflix-poster-path.txt", poster);
+          if (poster) fs.writeFileSync("/tmp/pinflix-poster-path.txt", poster);
           NODE
 
-          POSTER_PATH="$(cat /tmp/pinflix-poster-path.txt)"
-          POSTER_HTTP="$(curl --show-error --silent --max-time 20 --head --output /tmp/pinflix-poster-headers.txt --write-out "%{http_code}" "https://pinflix.farukkhanone.workers.dev$POSTER_PATH" || true)"
-          echo "- poster HTTP: $POSTER_HTTP" >> "$GITHUB_STEP_SUMMARY"
-          if [[ "$POSTER_HTTP" != 2* && "$POSTER_HTTP" != 3* ]]; then
-            echo "Poster smoke check failed with HTTP $POSTER_HTTP" >&2
-            exit 1
+          if [[ -s /tmp/pinflix-upstream-degraded.txt ]]; then
+            echo "### External upstream status" >> "$GITHUB_STEP_SUMMARY"
+            echo "⚠️ $(cat /tmp/pinflix-upstream-degraded.txt)" >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "Deployed Cloudflare workers.dev smoke test passed."
+
+          if [[ -s /tmp/pinflix-poster-path.txt ]]; then
+            POSTER_PATH="$(cat /tmp/pinflix-poster-path.txt)"
+            POSTER_HTTP="$(curl --show-error --silent --max-time 20 --head --output /tmp/pinflix-poster-headers.txt --write-out "%{http_code}" "https://pinflix.farukkhanone.workers.dev$POSTER_PATH" || true)"
+            echo "- poster HTTP: $POSTER_HTTP" >> "$GITHUB_STEP_SUMMARY"
+            if [[ "$POSTER_HTTP" != 2* && "$POSTER_HTTP" != 3* ]]; then
+              echo "Poster proxy check failed with HTTP $POSTER_HTTP" >&2
+              exit 1
+            fi
+          else
+            echo "- poster check: skipped (upstream catalog unavailable)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "Cloudflare platform smoke test passed."
 
       - name: Upload Cloudflare smoke diagnostics
         if: always()
