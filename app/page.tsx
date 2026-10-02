@@ -33,7 +33,12 @@ export default async function HomePage() {
 
       {!featured && (
         <div className="rounded-2xl border border-line bg-surface p-6 text-muted">
-          CineplexBD did not return catalog data right now. Refresh to try again.
+          <p className="font-medium text-fg">Catalog temporarily unavailable</p>
+          <p className="mt-2 text-sm">
+            CineplexBD is not reachable from the current catalog relay. The app is healthy;
+            media playback will work once the origin or a Bangladesh-side relay is available.
+            Refresh to try again.
+          </p>
         </div>
       )}
     </div>
