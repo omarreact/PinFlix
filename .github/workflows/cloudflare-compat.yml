@@ -73,14 +73,28 @@ jobs:
               {
                 type: "service",
                 name: "ASSETS",
-                service: "pinflix-assets",
-                environment: "production"
+                service: "pinflix-assets"
               }
             ],
             annotations: {
               "workers/message": "PinFlix vinext migration verified build"
             }
           };
+
+          // vinext expects a native assets binding. Our connector-safe deployment
+          // uses a private asset Worker, so route immutable client assets there
+          // before the vinext request handler runs.
+          const entryPath = path.join(root, "index.js");
+          let entry = fs.readFileSync(entryPath, "utf8");
+          const exportMarker =
+            'var Ng=jg??{};export{Ng as default,Bo as i,zo as n,Ro as r,Vo as t};';
+          const wrappedExport =
+            'var Ng=jg??{},Pg={...Ng,async fetch(e,t,n){let r=new URL(e.url);if((r.pathname.startsWith("/_next/static/")||r.pathname==="/vinext-client-entry-manifest.json")&&t?.ASSETS)return t.ASSETS.fetch(e);return Ng.fetch(e,t,n)}};export{Pg as default,Bo as i,zo as n,Ro as r,Vo as t};';
+          if (!entry.includes(exportMarker)) {
+            throw new Error("Unable to patch vinext asset routing: export marker changed.");
+          }
+          entry = entry.replace(exportMarker, wrappedExport);
+          fs.writeFileSync(entryPath, entry);
 
           const chunks = [];
           const push = (value) => chunks.push(Buffer.isBuffer(value) ? value : Buffer.from(value));
