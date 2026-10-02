@@ -262,6 +262,20 @@ jobs:
           fi
           echo "Deployed Cloudflare staging smoke test passed."
 
+      - name: Upload Cloudflare smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: cloudflare-smoke-diagnostics
+          path: |
+            /tmp/pinflix-media-health.json
+            /tmp/pinflix-cineplex-status.json
+            /tmp/pinflix-catalog.json
+            /tmp/pinflix-poster-path.txt
+            /tmp/pinflix-poster-headers.txt
+          if-no-files-found: warn
+          retention-days: 1
+
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
