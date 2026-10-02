@@ -17,7 +17,7 @@ function toBrowserAssetUrl(url: string) {
   try {
     const parsed = new URL(absolute);
     if (parsed.hostname.toLowerCase() === "cineplexbd.net" && (!parsed.port || parsed.port === "80")) {
-      return `/cineplex-assets${parsed.pathname}${parsed.search}`;
+      return `/cineplex-origin${parsed.pathname}${parsed.search}`;
     }
   } catch {
     // Leave malformed/non-Cineplex URLs untouched.
