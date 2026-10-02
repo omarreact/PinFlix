@@ -1,5 +1,3 @@
-export type MediaKind = "channel" | "movie" | "show";
-
 export type StreamProtocol = "hls" | "native" | "mpegts";
 
 export type StreamSource = {
@@ -14,34 +12,6 @@ export type SubtitleTrack = {
   label: string;
   language: string;
   url: string;
-};
-
-export type EpgNowNext = {
-  now?: string;
-  next?: string;
-};
-
-export type ChannelPreview = {
-  id: string;
-  name: string;
-  country: string;
-  countryCode: string;
-  category: string;
-  groups: string[];
-  logo: string;
-  description: string;
-  accent: string;
-  isLive: boolean;
-  quality?: string;
-  availability: "available" | "limited" | "offline";
-  geoFlags?: string[];
-  epg?: EpgNowNext;
-  provider?: string;
-  networkScope?: "public" | "local";
-};
-
-export type Channel = ChannelPreview & {
-  streams: StreamSource[];
 };
 
 export type Entertainment = {
