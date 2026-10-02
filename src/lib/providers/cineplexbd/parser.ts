@@ -208,6 +208,47 @@ export function parseDetails(
   };
 }
 
+
+export function parseSeasonNumbers(html: string) {
+  const $ = cheerio.load(html);
+  const seasons = new Set<number>();
+
+  $("select[name='season'] option[value], a[href*='season=']").each((_, element) => {
+    const node = $(element);
+    const raw = node.attr("value") ?? (() => {
+      const href = node.attr("href");
+      if (!href) return "";
+      try {
+        return new URL(href, CINEPLEX_BASE_URL).searchParams.get("season") ?? "";
+      } catch {
+        return "";
+      }
+    })();
+
+    const value = Number(raw);
+    if (Number.isInteger(value) && value > 0 && value <= 500) seasons.add(value);
+  });
+
+  return [...seasons].sort((left, right) => left - right);
+}
+
+export function parseEpisodeCount(metaJson?: unknown, html = "") {
+  const meta = asObject(metaJson);
+  const episodes = meta?.episodes;
+
+  if (Array.isArray(episodes)) return Math.max(1, episodes.length);
+  const episodeObject = asObject(episodes);
+  if (episodeObject) return Math.max(1, Object.keys(episodeObject).length);
+
+  if (html) {
+    const $ = cheerio.load(html);
+    const count = $("a.ep-card, [data-episode], a[href*='ep=']").length;
+    if (count > 0) return count;
+  }
+
+  return 1;
+}
+
 export function parsePlayerUrl(html: string): string | null {
   const videoSrcMatch = html.match(/const videoSrc\s*=\s*['"]([^'"]+)['"]/);
   if (videoSrcMatch?.[1]) return toUpstreamUrl(videoSrcMatch[1]);
