@@ -12,11 +12,7 @@ export default function SearchPage() {
   const normalized = query.trim();
 
   useEffect(() => {
-    if (!normalized) {
-      setEntertainment([]);
-      setLoading(false);
-      return;
-    }
+    if (!normalized) return;
 
     let cancelled = false;
     const debounceId = window.setTimeout(() => {
@@ -52,8 +48,10 @@ export default function SearchPage() {
           value={query}
           onChange={(event) => {
             const value = event.target.value;
+            const hasQuery = Boolean(value.trim());
             setQuery(value);
-            setLoading(Boolean(value.trim()));
+            setLoading(hasQuery);
+            if (!hasQuery) setEntertainment([]);
           }}
           placeholder="Search movies and web series..."
           className="mt-5 w-full rounded-2xl border border-line bg-surface px-5 py-4 text-ink placeholder:text-muted focus:border-brand"
