@@ -1,4 +1,4 @@
-import { lookup } from "node:dns/promises";
+import { resolve4, resolve6 } from "node:dns/promises";
 import net from "node:net";
 
 const allowedHosts = new Set([
@@ -80,9 +80,18 @@ export async function assertSafeUpstream(rawUrl: string) {
     throw new Error("Upstream port is not allowed for this public host.");
   }
 
-  const addresses = await lookup(hostname, { all: true });
+  const [ipv4, ipv6] = await Promise.allSettled([
+    resolve4(hostname),
+    resolve6(hostname),
+  ]);
+
+  const addresses = [
+    ...(ipv4.status === "fulfilled" ? ipv4.value : []),
+    ...(ipv6.status === "fulfilled" ? ipv6.value : []),
+  ];
+
   if (!addresses.length) throw new Error("Unable to resolve the upstream host.");
-  if (addresses.some(({ address }) => isBlockedAddress(address))) {
+  if (addresses.some((address) => isBlockedAddress(address))) {
     throw new Error("Private or restricted upstream address is not allowed.");
   }
 }
