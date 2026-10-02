@@ -1,4 +1,4 @@
-import { proxyUpstreamResponse } from "@/src/lib/iptv/playback-proxy";
+import { proxyUpstreamResponse } from "@/src/lib/cineplex-playback-proxy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
