@@ -46,7 +46,8 @@ jobs:
 
           READY=0
           for attempt in $(seq 1 30); do
-            if curl --fail --silent --show-error --max-time 5 http://127.0.0.1:3001/ >/dev/null; then
+            STATUS=$(curl --silent --show-error --max-time 3 --output /tmp/auth.json --write-out "%{http_code}" http://127.0.0.1:3001/api/nid-dob/auth || true)
+            if [ "$STATUS" = "200" ]; then
               READY=1
               break
             fi
@@ -58,15 +59,17 @@ jobs:
             exit 1
           fi
 
-          curl --fail --silent --show-error --max-time 30 http://127.0.0.1:3001/api/health > /tmp/health.json
-          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/health.json","utf8")); if (x.service !== "pinflix" || x.provider !== "cineplexbd") process.exit(1); console.log(JSON.stringify(x));'
+          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/auth.json","utf8")); if (x.ok !== true || typeof x.authenticated !== "boolean") process.exit(1);'
 
-          PROXY_STATUS=$(curl --silent --show-error --max-time 30 --output /tmp/proxy-response.txt --write-out "%{http_code}" "http://127.0.0.1:3001/api/playback/proxy?url=http%3A%2F%2Fcineplexbd.net%2F")
-          if [ "$PROXY_STATUS" = "500" ] || grep -qi "not implemented" /tmp/proxy-response.txt; then
-            cat /tmp/proxy-response.txt
+          # Import and execute the guarded playback route without depending on upstream availability.
+          PROXY_STATUS=$(curl --silent --show-error --max-time 5 --output /tmp/proxy-response.json --write-out "%{http_code}" http://127.0.0.1:3001/api/playback/proxy)
+          if [ "$PROXY_STATUS" != "400" ]; then
+            cat /tmp/proxy-response.json
+            cat /tmp/pinflix-vinext.log
             exit 1
           fi
-          echo "Playback proxy route runtime status: $PROXY_STATUS"
+          grep -q "Missing upstream url param" /tmp/proxy-response.json
+          echo "Local Workers runtime smoke test passed."
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
