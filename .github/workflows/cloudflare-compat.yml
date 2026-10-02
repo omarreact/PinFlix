@@ -276,6 +276,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 1
 
+      - name: Publish Cloudflare staging diagnostics
+        if: always() && github.event_name == 'push' && github.ref_name == 'main'
+        shell: bash
+        run: |
+          set -u
+          rm -rf /tmp/pinflix-smoke-diagnostics
+          mkdir -p /tmp/pinflix-smoke-diagnostics
+          cp /tmp/pinflix-media-health.json /tmp/pinflix-smoke-diagnostics/media-health.json 2>/dev/null || true
+          cp /tmp/pinflix-cineplex-status.json /tmp/pinflix-smoke-diagnostics/cineplex-status.json 2>/dev/null || true
+          cp /tmp/pinflix-catalog.json /tmp/pinflix-smoke-diagnostics/catalog.json 2>/dev/null || true
+          cp /tmp/pinflix-poster-headers.txt /tmp/pinflix-smoke-diagnostics/poster-headers.txt 2>/dev/null || true
+          printf '%s\n' "$GITHUB_SHA" > /tmp/pinflix-smoke-diagnostics/source-sha.txt
+          date -u +'%Y-%m-%dT%H:%M:%SZ' > /tmp/pinflix-smoke-diagnostics/generated-at.txt
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan cloudflare-diagnostics
+          git rm -rf . >/dev/null 2>&1 || true
+          cp -R /tmp/pinflix-smoke-diagnostics/. .
+          git add .
+          git commit -m "diagnostics: Cloudflare staging smoke $GITHUB_SHA"
+          git push --force origin HEAD:cloudflare-diagnostics
+
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
