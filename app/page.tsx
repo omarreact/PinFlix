@@ -1,43 +1,41 @@
 import { Suspense } from "react";
-import { ChannelRail, EntertainmentRail } from "@/src/components/catalog-sections";
+import { EntertainmentRail } from "@/src/components/catalog-sections";
 import { HomeHero } from "@/src/components/home-hero";
-import { ContinueWatching } from "@/src/components/continue-watching";
 import { BrowseTabs } from "@/src/components/browse-tabs";
-import { channels as demoChannels, entertainment as staticEntertainment } from "@/src/lib/iptv/catalog";
 import * as cineplexbd from "@/src/lib/providers/cineplexbd";
-import * as tmdb from "@/src/lib/providers/tmdb";
-import { getPublicLiveChannels, toPublicChannel } from "@/src/lib/providers/live-tv";
+
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [latestMovies, latestSeries, fallbackMovies, fallbackSeries, live] = await Promise.all([
+  const [latestMovies, latestSeries] = await Promise.all([
     cineplexbd.getLatestPage("movie", 1),
     cineplexbd.getLatestPage("show", 1),
-    tmdb.isTmdbConfigured()
-      ? tmdb.getPopularMovies(1)
-      : Promise.resolve({ items: staticEntertainment.filter((item) => item.kind === "movie") }),
-    tmdb.isTmdbConfigured()
-      ? tmdb.getPopularTv(1)
-      : Promise.resolve({ items: staticEntertainment.filter((item) => item.kind === "show") }),
-    getPublicLiveChannels().catch(() => []),
   ]);
 
-  const livePreview = live.length > 0
-    ? live.slice(0, 16).map(toPublicChannel)
-    : demoChannels;
-
-  const movieRail = (latestMovies.items.length > 0 ? latestMovies.items : fallbackMovies.items).slice(0, 12);
-  const seriesRail = (latestSeries.items.length > 0 ? latestSeries.items : fallbackSeries.items).slice(0, 12);
+  const movieRail = latestMovies.items.slice(0, 12);
+  const seriesRail = latestSeries.items.slice(0, 12);
+  const featured = movieRail[0] ?? seriesRail[0];
 
   return (
     <div className="space-y-10 md:space-y-12">
-      <HomeHero />
-      <ContinueWatching />
+      <HomeHero item={featured} />
       <Suspense fallback={null}>
         <BrowseTabs active="all" />
       </Suspense>
-      <EntertainmentRail title="Recently added movies" items={movieRail} href="/movies" />
-      <EntertainmentRail title="Recently added series" items={seriesRail} href="/series" />
-      <ChannelRail title="Live right now" channels={livePreview} href="/browse" />
+
+      {movieRail.length > 0 && (
+        <EntertainmentRail title="Recently added movies" items={movieRail} href="/movies" />
+      )}
+
+      {seriesRail.length > 0 && (
+        <EntertainmentRail title="Recently added web series" items={seriesRail} href="/series" />
+      )}
+
+      {!featured && (
+        <div className="rounded-2xl border border-line bg-surface p-6 text-muted">
+          CineplexBD did not return catalog data right now. Refresh to try again.
+        </div>
+      )}
     </div>
   );
 }
