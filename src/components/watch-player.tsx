@@ -14,7 +14,17 @@ type ResolvedSource = {
 };
 type HlsLevel = { index: number; label: string };
 
-export function WatchPlayer({ channelId, posterLabel }: { channelId: string; posterLabel: string }) {
+export function WatchPlayer({
+  channelId,
+  posterLabel,
+  season,
+  episode,
+}: {
+  channelId: string;
+  posterLabel: string;
+  season?: number;
+  episode?: number;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<import("hls.js").default | null>(null);
   const failoverRef = useRef<() => void>(() => undefined);
@@ -39,7 +49,11 @@ export function WatchPlayer({ channelId, posterLabel }: { channelId: string; pos
 
   useEffect(() => {
     const savedQuality = window.localStorage.getItem("pinflix-quality");
-    fetch(`/api/resolve?channelId=${encodeURIComponent(channelId)}`).then(async (response) => {
+    const params = new URLSearchParams({ channelId });
+    if (season) params.set("season", String(season));
+    if (episode) params.set("episode", String(episode));
+
+    fetch(`/api/resolve?${params.toString()}`).then(async (response) => {
       const data = await response.json() as { sources?: ResolvedSource[]; error?: string; code?: string };
       if (!response.ok) throw new Error(data.error || "Unable to resolve this stream.");
       const resolved = data.sources ?? [];
@@ -52,7 +66,7 @@ export function WatchPlayer({ channelId, posterLabel }: { channelId: string; pos
       setStatus(resolved.length ? "loading" : "error");
       if (!resolved.length) setError("No playable sources are available.");
     }).catch((reason: Error) => { setStatus("error"); setError(reason.message); });
-  }, [channelId]);
+  }, [channelId, episode, season]);
 
   useEffect(() => {
     const video = videoRef.current;
