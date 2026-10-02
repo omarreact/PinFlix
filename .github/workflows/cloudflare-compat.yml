@@ -37,6 +37,17 @@ jobs:
       - name: Build Cloudflare Workers target
         run: npm run build:vinext
 
+      - name: Package Cloudflare output
+        run: tar -czf pinflix-cloudflare-output.tgz .cloudflare/output cloudflare.config.ts vite.config.ts package.json package-lock.json
+
+      - name: Upload Cloudflare output artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: pinflix-cloudflare-output
+          path: pinflix-cloudflare-output.tgz
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Smoke test local Workers runtime
         shell: bash
         run: |
