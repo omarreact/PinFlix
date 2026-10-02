@@ -15,12 +15,12 @@ type ResolvedSource = {
 type HlsLevel = { index: number; label: string };
 
 export function WatchPlayer({
-  channelId,
+  mediaId,
   posterLabel,
   season,
   episode,
 }: {
-  channelId: string;
+  mediaId: string;
   posterLabel: string;
   season?: number;
   episode?: number;
@@ -49,7 +49,7 @@ export function WatchPlayer({
 
   useEffect(() => {
     const savedQuality = window.localStorage.getItem("pinflix-quality");
-    const params = new URLSearchParams({ channelId });
+    const params = new URLSearchParams({ id: mediaId });
     if (season) params.set("season", String(season));
     if (episode) params.set("episode", String(episode));
 
@@ -66,7 +66,7 @@ export function WatchPlayer({
       setStatus(resolved.length ? "loading" : "error");
       if (!resolved.length) setError("No playable sources are available.");
     }).catch((reason: Error) => { setStatus("error"); setError(reason.message); });
-  }, [channelId, episode, season]);
+  }, [mediaId, episode, season]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -143,7 +143,7 @@ export function WatchPlayer({
       video.load();
       failoverRef.current = () => undefined;
     };
-  }, [channelId, source, sourcePosition, sources.length]);
+  }, [mediaId, source, sourcePosition, sources.length]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -205,7 +205,7 @@ export function WatchPlayer({
         playsInline
         preload="auto"
         className="h-full w-full object-contain"
-        aria-label={`Player for ${channelId}`}
+        aria-label={`Player for ${mediaId}`}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onWaiting={() => setBuffering(true)}
