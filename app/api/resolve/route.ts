@@ -40,7 +40,7 @@ function toCineplexRewriteUrl(value: string) {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const id = url.searchParams.get("channelId")?.trim() ?? "";
+  const id = url.searchParams.get("id")?.trim() ?? "";
 
   if (!id.startsWith("cb-")) {
     return Response.json({ error: "Cineplex title ID required" }, { status: 400 });
@@ -91,7 +91,7 @@ export async function GET(request: Request) {
   });
 
   return Response.json(
-    { channelId: id, sources },
+    { id, sources },
     {
       headers: {
         "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
