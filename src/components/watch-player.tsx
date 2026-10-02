@@ -82,9 +82,6 @@ export function WatchPlayer({
     hlsRef.current?.destroy();
     hlsRef.current = null;
 
-    const report = (success: boolean) => {
-      void fetch("/api/health", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channelId, sourceIndex: source.sourceIndex, success }) });
-    };
     const playResolved = () => {
       if (cancelled) return;
       // Force muted for the initial play attempt so browsers allow autoplay.
@@ -95,7 +92,6 @@ export function WatchPlayer({
           setPlaying(true);
           setStatus("ready");
           setBuffering(false);
-          report(true);
         })
         .catch(() => {
           // Autoplay may still be blocked; mark ready so UI is usable and user can press Play.
@@ -106,7 +102,6 @@ export function WatchPlayer({
     };
     const failover = () => {
       if (cancelled) return;
-      report(false);
       const nextPosition = sourcePosition + 1;
       if (nextPosition < sources.length) {
         setStatus("switching");
