@@ -46,14 +46,14 @@ export async function fetchJson(path: string, revalidate = 0): Promise<unknown> 
 }
 
 
-export async function probeCineplexConnectivity() {
+export async function probeCineplexConnectivity(timeoutMs = 8_000) {
   const startedAt = Date.now();
   try {
     const response = await fetch(CINEPLEX_BASE_URL, {
       headers,
       cache: "no-store",
       redirect: "manual",
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     return {
