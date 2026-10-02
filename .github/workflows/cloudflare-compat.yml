@@ -74,6 +74,11 @@ jobs:
                 type: "service",
                 name: "ASSETS",
                 service: "pinflix-assets"
+              },
+              {
+                type: "plain_text",
+                name: "CINEPLEX_CATALOG_RELAY_URL",
+                text: "https://media.pincodeit.com/catalog"
               }
             ],
             annotations: {
