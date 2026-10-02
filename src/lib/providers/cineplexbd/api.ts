@@ -1,5 +1,7 @@
 export const CINEPLEX_BASE_URL = "http://cineplexbd.net";
 
+const CATALOG_TIMEOUT_MS = 8_000;
+
 const headers = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   "Accept-Language": "en-US,en;q=0.9",
@@ -49,12 +51,12 @@ export async function fetchHtml(path: string, revalidate = 0): Promise<string> {
     ? {
         headers,
         next: { revalidate },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
       }
     : {
         headers,
         cache: "no-store",
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
       });
   if (!response.ok) throw new Error(`Failed to fetch catalog resource: HTTP ${response.status}`);
   return response.text();
@@ -66,12 +68,12 @@ export async function fetchJson(path: string, revalidate = 0): Promise<unknown> 
     ? {
         headers,
         next: { revalidate },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
       }
     : {
         headers,
         cache: "no-store",
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
       });
   if (!response.ok) throw new Error(`Failed to fetch catalog JSON: HTTP ${response.status}`);
   return response.json();
