@@ -1,4 +1,4 @@
-const CATALOG_HOST = "cineplexbd.net";
+import { connect } from "cloudflare:sockets";\n\nconst CATALOG_HOST = "cineplexbd.net";
 const ORIGIN_IPS = {
   "cineplexbd.net": "103.136.200.66",
   "www.cineplexbd.net": "103.136.200.66",
@@ -99,6 +99,24 @@ async function fetchWithOriginFallback(target, request, timeoutMs, options = {})
       signal: AbortSignal.timeout(timeoutMs),
     });
     attempts.push({ transport: "ipv4-fallback", status: response.status, ip: fallbackIp });
+    if (response.status !== 403 && response.status < 500) {
+      return { response, transport: "ipv4-fallback", attempts, finalUrl: target };
+    }
+
+    if (target.protocol === "http:" && (target.port === "" || target.port === "80")) {
+      try {
+        const socketResponse = await socketHttpFetch(target, request, timeoutMs);
+        attempts.push({ transport: "tcp-socket", status: socketResponse.status, ip: fallbackIp });
+        return { response: socketResponse, transport: "tcp-socket", attempts, finalUrl: target };
+      } catch (socketError) {
+        attempts.push({
+          transport: "tcp-socket",
+          ip: fallbackIp,
+          error: socketError instanceof Error ? socketError.message : "socket error",
+        });
+      }
+    }
+
     return { response, transport: "ipv4-fallback", attempts, finalUrl: target };
   } catch (error) {
     attempts.push({
@@ -109,6 +127,130 @@ async function fetchWithOriginFallback(target, request, timeoutMs, options = {})
     const err = new Error("Origin unavailable via hostname and IPv4 fallback");
     err.attempts = attempts;
     throw err;
+  }
+}
+
+function findHeaderBoundary(bytes) {
+  for (let i = 0; i <= bytes.length - 4; i += 1) {
+    if (bytes[i] === 13 && bytes[i + 1] === 10 && bytes[i + 2] === 13 && bytes[i + 3] === 10) return i;
+  }
+  return -1;
+}
+
+function concatBytes(chunks, total) {
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
+
+function decodeChunkedBody(bytes) {
+  const decoder = new TextDecoder();
+  const chunks = [];
+  let total = 0;
+  let offset = 0;
+
+  while (offset < bytes.length) {
+    let lineEnd = -1;
+    for (let i = offset; i < bytes.length - 1; i += 1) {
+      if (bytes[i] === 13 && bytes[i + 1] === 10) {
+        lineEnd = i;
+        break;
+      }
+    }
+    if (lineEnd < 0) throw new Error("Malformed chunked response.");
+
+    const sizeLine = decoder.decode(bytes.slice(offset, lineEnd)).split(";", 1)[0].trim();
+    const size = Number.parseInt(sizeLine, 16);
+    if (!Number.isFinite(size)) throw new Error("Invalid chunk size.");
+    offset = lineEnd + 2;
+    if (size === 0) break;
+    if (offset + size > bytes.length) throw new Error("Incomplete chunked response.");
+
+    const chunk = bytes.slice(offset, offset + size);
+    chunks.push(chunk);
+    total += chunk.byteLength;
+    offset += size + 2;
+  }
+
+  return concatBytes(chunks, total);
+}
+
+async function socketHttpFetch(target, request, timeoutMs) {
+  if (target.protocol !== "http:") throw new Error("TCP fallback only supports HTTP origins.");
+
+  const hostname = target.hostname.toLowerCase();
+  const ip = ORIGIN_IPS[hostname];
+  if (!ip) throw new Error("No socket fallback IP configured.");
+
+  const port = Number(target.port || "80");
+  const socket = connect({ hostname: ip, port }, { allowHalfOpen: true });
+  const writer = socket.writable.getWriter();
+  const headers = baseHeaders(request, target, { catalog: hostname === CATALOG_HOST });
+  const requestLines = [
+    `${request.method === "HEAD" ? "HEAD" : "GET"} ${target.pathname}${target.search} HTTP/1.1`,
+    `Host: ${target.host}`,
+  ];
+
+  for (const [name, value] of headers) {
+    if (name.toLowerCase() === "host") continue;
+    requestLines.push(`${name}: ${value}`);
+  }
+  requestLines.push("Connection: close", "", "");
+
+  const timer = setTimeout(() => {
+    try { socket.close(); } catch {}
+  }, timeoutMs);
+
+  try {
+    await writer.write(new TextEncoder().encode(requestLines.join("\r\n")));
+    await writer.close();
+
+    const reader = socket.readable.getReader();
+    const chunks = [];
+    let total = 0;
+    const maxBytes = 8 * 1024 * 1024;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      chunks.push(value);
+      total += value.byteLength;
+      if (total > maxBytes) throw new Error("TCP fallback response exceeded 8 MiB safety limit.");
+    }
+
+    const raw = concatBytes(chunks, total);
+    const boundary = findHeaderBoundary(raw);
+    if (boundary < 0) throw new Error("TCP fallback returned no HTTP headers.");
+
+    const headerText = new TextDecoder().decode(raw.slice(0, boundary));
+    const lines = headerText.split("\r\n");
+    const match = lines.shift()?.match(/^HTTP\/\d(?:\.\d)?\s+(\d{3})/i);
+    if (!match) throw new Error("TCP fallback returned an invalid HTTP status line.");
+    const status = Number(match[1]);
+
+    const responseHeaders = new Headers();
+    for (const line of lines) {
+      const colon = line.indexOf(":");
+      if (colon <= 0) continue;
+      responseHeaders.append(line.slice(0, colon).trim(), line.slice(colon + 1).trim());
+    }
+
+    let body = raw.slice(boundary + 4);
+    if ((responseHeaders.get("transfer-encoding") || "").toLowerCase().includes("chunked")) {
+      body = decodeChunkedBody(body);
+      responseHeaders.delete("transfer-encoding");
+      responseHeaders.set("content-length", String(body.byteLength));
+    }
+
+    return new Response(request.method === "HEAD" ? null : body, { status, headers: responseHeaders });
+  } finally {
+    clearTimeout(timer);
+    try { socket.close(); } catch {}
   }
 }
 
