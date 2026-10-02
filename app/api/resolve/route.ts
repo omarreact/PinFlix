@@ -2,6 +2,16 @@ import { getRankedChannelSources } from "@/src/lib/iptv/sources";
 import * as cineplexbd from "@/src/lib/providers/cineplexbd";
 import { providerFromChannelId, resolveLiveProviderChannel } from "@/src/lib/providers/live-tv";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function optionalPositiveInteger(value: string | null) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= 10_000
+    ? parsed
+    : undefined;
+}
+
 function toCineplexRewriteUrl(value: string) {
   try {
     const upstream = new URL(value);
@@ -27,19 +37,53 @@ export async function GET(request: Request) {
   if (!id) return Response.json({ error: "Channel ID required" }, { status: 400 });
 
   if (id.startsWith("cb-")) {
-    const streams = await cineplexbd.resolveStreams(id);
+    const url = new URL(request.url);
+    const streams = await cineplexbd.resolveStreams(id, {
+      season: optionalPositiveInteger(url.searchParams.get("season")),
+      episode: optionalPositiveInteger(url.searchParams.get("episode")),
+    });
     if (!streams.length) return Response.json({ error: "Stream not found" }, { status: 404 });
 
     return Response.json({
       channelId: id,
-      sources: streams.map((source, index) => ({
-        quality: source.quality,
-        protocol: source.protocol,
-        priority: source.priority,
-        sourceIndex: index,
-        url: toCineplexRewriteUrl(source.url) ?? `/api/playback/proxy?url=${encodeURIComponent(source.url)}`,
-        subtitles: [],
-      })),
+      sources: streams.flatMap((source, index) => {
+        const rewriteUrl = toCineplexRewriteUrl(source.url);
+        const proxyUrl = `/api/playback/proxy?url=${encodeURIComponent(source.url)}`;
+        const base = {
+          protocol: source.protocol,
+          priority: source.priority,
+          subtitles: [],
+        };
+
+        if (!rewriteUrl) {
+          return [{
+            ...base,
+            quality: source.quality,
+            sourceIndex: index,
+            url: proxyUrl,
+          }];
+        }
+
+        return [
+          {
+            ...base,
+            quality: `${source.quality} · Direct HTTPS`,
+            sourceIndex: index * 2,
+            url: rewriteUrl,
+          },
+          {
+            ...base,
+            quality: `${source.quality} · Proxy fallback`,
+            priority: source.priority + 1,
+            sourceIndex: index * 2 + 1,
+            url: proxyUrl,
+          },
+        ];
+      }),
+    }, {
+      headers: {
+        "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
+      },
     });
   }
 

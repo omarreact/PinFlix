@@ -1,5 +1,8 @@
 import { getCineplexTaxonomy } from "@/src/lib/providers/cineplexbd";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function GET() {
   const taxonomy = await getCineplexTaxonomy();
   return Response.json({
@@ -15,5 +18,7 @@ export async function GET() {
       regionalSpecial: taxonomy.categories.filter((item) => item.group === "regional-special").length,
       webSeriesSports: taxonomy.categories.filter((item) => item.group === "web-series-sports").length,
     },
+  }, {
+    headers: { "Cache-Control": "no-store" },
   });
 }

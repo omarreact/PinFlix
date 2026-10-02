@@ -16,7 +16,7 @@ type HlsErrorLog = {
 
 export default function HlsDebugPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const hlsRef = useRef<any>(null);
+  const hlsRef = useRef<import("hls.js").default | null>(null);
   const [sourceUrl, setSourceUrl] = useState(DEFAULT_SOURCE);
   const [currentSource, setCurrentSource] = useState(DEFAULT_SOURCE);
   const [status, setStatus] = useState("idle");

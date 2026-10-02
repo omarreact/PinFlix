@@ -5,7 +5,14 @@ import {
   getCineplexCategory,
   getCineplexTaxonomy,
 } from "./categories";
-import { parseCatalog, parseDetails, parseHasNextPage, parsePlayerUrl } from "./parser";
+import {
+  parseCatalog,
+  parseDetails,
+  parseEpisodeCount,
+  parseHasNextPage,
+  parsePlayerUrl,
+  parseSeasonNumbers,
+} from "./parser";
 import type { CineplexCatalogPage } from "./types";
 
 export * from "./types";
@@ -21,20 +28,6 @@ function parseProviderId(id: string): ParsedProviderId {
   if (id.startsWith("cb-movie-")) return { rawId: id.slice("cb-movie-".length), kind: "movie" };
   if (id.startsWith("cb-")) return { rawId: id.slice("cb-".length), kind: "movie" };
   return { rawId: id, kind: "movie" };
-}
-
-function transformVodUrl(url: string): string {
-  if (!url.includes("vod.cineplexbd.net:8081")) return url;
-
-  const transformed = url
-    .replace("http://vod.cineplexbd.net:8081/tv-series/", "/hls/t/")
-    .replace("http://vod.cineplexbd.net:8081/movies/", "/hls/m/")
-    .replace("http://vod.cineplexbd.net:8081/", "/hls/")
-    .replace("/index.m3u8", "/master.m3u8");
-
-  return transformed.startsWith("http")
-    ? transformed
-    : `${CINEPLEX_BASE_URL}${transformed.startsWith("/") ? transformed : `/${transformed}`}`;
 }
 
 async function tryFetchHtml(paths: string[]) {
@@ -79,12 +72,45 @@ export async function getLatestPage(
   page = 1,
 ): Promise<{ items: Entertainment[]; page: number; hasNextPage: boolean }> {
   const safePage = Math.max(1, Math.floor(page));
+
   try {
-    const html = await fetchHtml(`/search.php?q=&page=${safePage}`, 0);
+    if (kind === "movie") {
+      const html = await fetchHtml(`/search.php?q=&page=${safePage}`, 0);
+      return {
+        items: parseCatalog(html).filter((item) => item.kind === "movie"),
+        page: safePage,
+        hasNextPage: parseHasNextPage(html),
+      };
+    }
+
+    const [webSeries, recent] = await Promise.allSettled([
+      fetchHtml(
+        `/tcategory.php?category=${encodeURIComponent("Web Series")}&page=${safePage}`,
+        0,
+      ),
+      fetchHtml(`/search.php?q=&page=${safePage}`, 0),
+    ]);
+
+    const seen = new Set<string>();
+    const items = [
+      ...(webSeries.status === "fulfilled"
+        ? parseCatalog(webSeries.value, { forcedKind: "show" })
+        : []),
+      ...(recent.status === "fulfilled"
+        ? parseCatalog(recent.value).filter((item) => item.kind === "show")
+        : []),
+    ].filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+
     return {
-      items: parseCatalog(html).filter((item) => item.kind === kind),
+      items,
       page: safePage,
-      hasNextPage: parseHasNextPage(html),
+      hasNextPage:
+        (webSeries.status === "fulfilled" && parseHasNextPage(webSeries.value)) ||
+        (recent.status === "fulfilled" && parseHasNextPage(recent.value)),
     };
   } catch (error) {
     console.error(`CineplexBD latest ${kind} page error:`, error);
@@ -177,15 +203,70 @@ export async function getDetails(id: string): Promise<Entertainment | null> {
   }
 }
 
-async function resolveVideoUrl(id: string) {
+type SeriesPlaybackOptions = {
+  season?: number;
+  episode?: number;
+};
+
+function safePositiveInteger(value: number | undefined, fallback: number) {
+  return Number.isInteger(value) && Number(value) > 0 ? Number(value) : fallback;
+}
+
+export async function getSeriesNavigation(
+  id: string,
+  requestedSeason = 1,
+): Promise<{ seasons: number[]; season: number; episodes: number }> {
   const { rawId, kind } = parseProviderId(id);
+  const fallbackSeason = safePositiveInteger(requestedSeason, 1);
+
+  if (!rawId || kind !== "show") {
+    return { seasons: [fallbackSeason], season: fallbackSeason, episodes: 1 };
+  }
+
+  const encodedId = encodeURIComponent(rawId);
+  const page = await tryFetchHtml([
+    `/watch.php?series_id=${encodedId}&season=${fallbackSeason}`,
+    `/watch.php?series_id=${encodedId}`,
+    `/tview.php?id=${encodedId}`,
+  ]);
+
+  const seasons = page ? parseSeasonNumbers(page.html) : [];
+  const season = seasons.includes(fallbackSeason)
+    ? fallbackSeason
+    : seasons[0] ?? fallbackSeason;
+
+  let metaJson: unknown;
+  try {
+    metaJson = await fetchJson(
+      `/watch.php?series_id=${encodedId}&season=${season}&meta=1`,
+      0,
+    );
+  } catch {
+    metaJson = undefined;
+  }
+
+  return {
+    seasons: seasons.length ? seasons : [season],
+    season,
+    episodes: parseEpisodeCount(metaJson, page?.html ?? ""),
+  };
+}
+
+async function resolveVideoUrl(id: string, options: SeriesPlaybackOptions = {}) {
+  const { rawId, kind } = parseProviderId(id);
+  const season = safePositiveInteger(options.season, 1);
+  const episode = safePositiveInteger(options.episode, 1);
+  const encodedId = encodeURIComponent(rawId);
+
   const paths = kind === "show"
     ? [
-        `/watch.php?series_id=${encodeURIComponent(rawId)}`,
-        `/watch.php?id=${encodeURIComponent(rawId)}`,
-        `/player.php?id=${encodeURIComponent(rawId)}`,
+        `/watch.php?series_id=${encodedId}&season=${season}&ep=${episode}`,
+        `/watch.php?series_id=${encodedId}&season=${season}`,
+        `/watch.php?series_id=${encodedId}`,
+        `/watch.php?id=${encodedId}`,
+        `/player.php?id=${encodedId}`,
       ]
-    : [`/player.php?id=${encodeURIComponent(rawId)}`];
+    : [`/player.php?id=${encodedId}`];
 
   for (const path of paths) {
     try {
@@ -200,42 +281,24 @@ async function resolveVideoUrl(id: string) {
   return null;
 }
 
-export async function resolveStreams(id: string): Promise<StreamSource[]> {
+export async function resolveStreams(
+  id: string,
+  options: SeriesPlaybackOptions = {},
+): Promise<StreamSource[]> {
   try {
-    let videoUrl = await resolveVideoUrl(id);
+    let videoUrl = await resolveVideoUrl(id, options);
     if (!videoUrl) return [];
 
     if (videoUrl.startsWith("/")) videoUrl = `${CINEPLEX_BASE_URL}${videoUrl}`;
 
-    const isHls = videoUrl.includes(".m3u8");
-    if (!videoUrl.includes("vod.cineplexbd.net:8081")) {
-      return [{
-        url: videoUrl,
-        quality: isHls ? "Auto (HLS)" : "Source",
-        protocol: isHls ? "hls" : "native",
-        priority: 1,
-      }];
-    }
+    const isHls = /\.m3u8(?:$|[?#])/i.test(videoUrl);
 
-    const raw: StreamSource = {
+    return [{
       url: videoUrl,
-      quality: "Raw VOD",
-      protocol: "hls",
+      quality: isHls ? "Cineplex HLS" : "Cineplex source",
+      protocol: isHls ? "hls" : "native",
       priority: 1,
-    };
-
-    const transformedUrl = transformVodUrl(videoUrl);
-    if (transformedUrl === videoUrl) return [raw];
-
-    return [
-      raw,
-      {
-        url: transformedUrl,
-        quality: "Cineplex HLS fallback",
-        protocol: "hls",
-        priority: 2,
-      },
-    ];
+    }];
   } catch (error) {
     console.error("CineplexBD resolveStreams error:", error);
     return [];
