@@ -1,0 +1,197 @@
+name: Cloudflare Workers Compatibility
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [cloudflare-workers-migration, main]
+
+permissions:
+  contents: write
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Use Node 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify existing Next.js application
+        run: npm run check
+
+      - name: Verify vinext compatibility
+        run: npx --yes vinext@latest check
+
+      - name: Build Cloudflare Workers target
+        run: npm run build:vinext
+
+      - name: Build connector deployment package
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = ".cloudflare/output/v0/workers/default/bundle";
+          const out = ".cloudflare/output/pinflix-worker-upload.multipart";
+          const boundary = "----PinFlixWorkerUploadBoundary20261002";
+
+          function walk(dir, base = "") {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            const files = [];
+            for (const entry of entries) {
+              const rel = base ? base + "/" + entry.name : entry.name;
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) {
+                if (rel === ".vite") continue;
+                files.push(...walk(full, rel));
+              } else if (entry.isFile()) {
+                files.push(rel);
+              }
+            }
+            return files;
+          }
+
+          const metadata = {
+            main_module: "index.js",
+            compatibility_date: "2026-10-02",
+            compatibility_flags: ["nodejs_compat"],
+            observability: { enabled: true },
+            bindings: [
+              {
+                type: "service",
+                name: "ASSETS",
+                service: "pinflix-assets"
+              }
+            ],
+            annotations: {
+              "workers/message": "PinFlix vinext migration verified build"
+            }
+          };
+
+          // vinext expects a native assets binding. Our connector-safe deployment
+          // uses a private asset Worker, so route immutable client assets there
+          // before the vinext request handler runs.
+          const entryPath = path.join(root, "index.js");
+          let entry = fs.readFileSync(entryPath, "utf8");
+          const exportMarker =
+            'var Ng=jg??{};export{Ng as default,Bo as i,zo as n,Ro as r,Vo as t};';
+          const wrappedExport =
+            'var Ng=jg??{},Pg={...Ng,async fetch(e,t,n){let r=new URL(e.url);if((r.pathname.startsWith("/_next/static/")||r.pathname==="/vinext-client-entry-manifest.json")&&t?.ASSETS)return t.ASSETS.fetch(e);return Ng.fetch(e,t,n)}};export{Pg as default,Bo as i,zo as n,Ro as r,Vo as t};';
+          if (!entry.includes(exportMarker)) {
+            throw new Error("Unable to patch vinext asset routing: export marker changed.");
+          }
+          entry = entry.replace(exportMarker, wrappedExport);
+          fs.writeFileSync(entryPath, entry);
+
+          const chunks = [];
+          const push = (value) => chunks.push(Buffer.isBuffer(value) ? value : Buffer.from(value));
+          push("--" + boundary + "\r\n");
+          push('Content-Disposition: form-data; name="metadata"\r\n');
+          push("Content-Type: application/json\r\n\r\n");
+          push(JSON.stringify(metadata));
+          push("\r\n");
+
+          for (const rel of walk(root)) {
+            // Cloudflare's Worker module upload accepts JS/WASM modules here.
+            // JSON/CSS build metadata is not uploaded as a server module; client
+            // assets are served by the private pinflix-assets service.
+            if (!rel.endsWith(".js") && !rel.endsWith(".wasm")) continue;
+
+            const full = path.join(root, rel);
+            const type = rel.endsWith(".wasm")
+              ? "application/wasm"
+              : "application/javascript+module";
+
+            push("--" + boundary + "\r\n");
+            push('Content-Disposition: form-data; name="' + rel + '"; filename="' + rel + '"\r\n');
+            push("Content-Type: " + type + "\r\n\r\n");
+            push(fs.readFileSync(full));
+            push("\r\n");
+          }
+
+          push("--" + boundary + "--\r\n");
+          fs.writeFileSync(out, Buffer.concat(chunks));
+          fs.writeFileSync(
+            ".cloudflare/output/pinflix-worker-upload.content-type",
+            "multipart/form-data; boundary=" + boundary
+          );
+          console.log("Generated connector upload package:", fs.statSync(out).size, "bytes");
+          NODE
+
+      - name: Package Cloudflare output
+        run: tar -czf pinflix-cloudflare-output.tgz .cloudflare/output cloudflare.config.ts vite.config.ts package.json package-lock.json
+
+      - name: Upload Cloudflare output artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: pinflix-cloudflare-output
+          path: pinflix-cloudflare-output.tgz
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Smoke test local Workers runtime
+        shell: bash
+        run: |
+          npm run start:vinext -- --host 127.0.0.1 --port 3001 > /tmp/pinflix-vinext.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
+
+          READY=0
+          for attempt in $(seq 1 30); do
+            STATUS=$(curl --silent --show-error --max-time 3 --output /tmp/auth.json --write-out "%{http_code}" http://127.0.0.1:3001/api/nid-dob/auth || true)
+            if [ "$STATUS" = "200" ]; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$READY" -ne 1 ]; then
+            cat /tmp/pinflix-vinext.log
+            exit 1
+          fi
+
+          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/auth.json","utf8")); if (x.ok !== true || typeof x.authenticated !== "boolean") process.exit(1);'
+
+          # Import and execute the guarded playback route without depending on upstream availability.
+          PROXY_STATUS=$(curl --silent --show-error --max-time 5 --output /tmp/proxy-response.json --write-out "%{http_code}" http://127.0.0.1:3001/api/playback/proxy)
+          if [ "$PROXY_STATUS" != "400" ]; then
+            cat /tmp/proxy-response.json
+            cat /tmp/pinflix-vinext.log
+            exit 1
+          fi
+          grep -q "Missing upstream url param" /tmp/proxy-response.json
+          echo "Local Workers runtime smoke test passed."
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Publish verified Cloudflare build output
+        if: github.event_name == 'push' && github.ref_name == 'cloudflare-workers-migration'
+        shell: bash
+        run: |
+          rm -rf /tmp/pinflix-cloudflare-publish
+          mkdir -p /tmp/pinflix-cloudflare-publish/.cloudflare
+          cp -R .cloudflare/output /tmp/pinflix-cloudflare-publish/.cloudflare/output
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan cloudflare-built-output
+          git rm -rf . >/dev/null 2>&1 || true
+          cp -R /tmp/pinflix-cloudflare-publish/.cloudflare .
+          git add -f .cloudflare/output
+          git commit -m "build: publish verified Cloudflare output"
+          git push --force origin HEAD:cloudflare-built-output

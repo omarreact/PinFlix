@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
       ok: true,
-      host: "pinflix-theta.vercel.app",
+      host: new URL(request.url).host,
       porichoyConfigured: configured,
       providerNetwork,
       ready: configured && providerNetwork.reachable,
