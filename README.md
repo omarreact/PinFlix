@@ -43,3 +43,18 @@ The browser receives same-origin HTTPS media URLs whenever the CineplexBD source
 ## Legal and operational boundaries
 
 Use PinFlix only with media sources you are authorized to access. Upstream availability, regional routing, and content rights remain the responsibility of the source provider.
+
+
+## Cloudflare catalog connectivity
+
+The application can keep its public CineplexBD URL semantics while routing server-side catalog and metadata requests through an authorized network relay when the upstream is not reachable directly from Cloudflare.
+
+Set this only when you operate or are authorized to use the relay:
+
+```bash
+CINEPLEX_CATALOG_RELAY_URL=https://your-authorized-relay.example
+```
+
+The relay is expected to preserve the CineplexBD request path and query string. For example, a request for `/search.php?q=...` is sent to the same path on the configured relay. Media URLs are not rewritten to the relay by this setting.
+
+When the variable is absent or invalid, PinFlix uses the normal direct CineplexBD catalog path. The health endpoint reports the active transport as `direct` or `relay`.
