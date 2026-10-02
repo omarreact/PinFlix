@@ -1,5 +1,8 @@
 import { getCategoryPage } from "@/src/lib/providers/cineplexbd";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const categoryId = url.searchParams.get("category")?.trim();
@@ -14,5 +17,5 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unknown CineplexBD category" }, { status: 404 });
   }
 
-  return Response.json(result);
+  return Response.json(result, { headers: { "Cache-Control": "no-store" } });
 }
