@@ -105,12 +105,15 @@ jobs:
           push("\r\n");
 
           for (const rel of walk(root)) {
+            // Cloudflare's Worker module upload accepts JS/WASM modules here.
+            // JSON/CSS build metadata is not uploaded as a server module; client
+            // assets are served by the private pinflix-assets service.
+            if (!rel.endsWith(".js") && !rel.endsWith(".wasm")) continue;
+
             const full = path.join(root, rel);
-            let type = "text/plain";
-            if (rel.endsWith(".js")) type = "application/javascript+module";
-            else if (rel.endsWith(".json")) type = "application/json";
-            else if (rel.endsWith(".wasm")) type = "application/wasm";
-            else if (rel.endsWith(".map")) type = "application/source-map";
+            const type = rel.endsWith(".wasm")
+              ? "application/wasm"
+              : "application/javascript+module";
 
             push("--" + boundary + "\r\n");
             push('Content-Disposition: form-data; name="' + rel + '"; filename="' + rel + '"\r\n');
