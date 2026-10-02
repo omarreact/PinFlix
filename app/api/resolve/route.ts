@@ -43,14 +43,40 @@ export async function GET(request: Request) {
 
     return Response.json({
       channelId: id,
-      sources: streams.map((source, index) => ({
-        quality: source.quality,
-        protocol: source.protocol,
-        priority: source.priority,
-        sourceIndex: index,
-        url: toCineplexRewriteUrl(source.url) ?? `/api/playback/proxy?url=${encodeURIComponent(source.url)}`,
-        subtitles: [],
-      })),
+      sources: streams.flatMap((source, index) => {
+        const rewriteUrl = toCineplexRewriteUrl(source.url);
+        const proxyUrl = `/api/playback/proxy?url=${encodeURIComponent(source.url)}`;
+        const base = {
+          protocol: source.protocol,
+          priority: source.priority,
+          subtitles: [],
+        };
+
+        if (!rewriteUrl) {
+          return [{
+            ...base,
+            quality: source.quality,
+            sourceIndex: index,
+            url: proxyUrl,
+          }];
+        }
+
+        return [
+          {
+            ...base,
+            quality: `${source.quality} · Direct HTTPS`,
+            sourceIndex: index * 2,
+            url: rewriteUrl,
+          },
+          {
+            ...base,
+            quality: `${source.quality} · Proxy fallback`,
+            priority: source.priority + 1,
+            sourceIndex: index * 2 + 1,
+            url: proxyUrl,
+          },
+        ];
+      }),
     }, {
       headers: {
         "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
