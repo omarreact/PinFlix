@@ -180,7 +180,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Publish verified Cloudflare build output
-        if: github.event_name == 'push' && github.ref_name == 'cloudflare-workers-migration'
+        if: github.event_name == 'push' && (github.ref_name == 'cloudflare-workers-migration' || github.ref_name == 'main')
         shell: bash
         run: |
           rm -rf /tmp/pinflix-cloudflare-publish
