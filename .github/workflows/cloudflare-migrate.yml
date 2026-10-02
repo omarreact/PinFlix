@@ -5,6 +5,8 @@ on:
     branches: [cloudflare-workers-migration]
     paths:
       - ".github/workflows/cloudflare-migrate.yml"
+      - "eslint.config.mjs"
+      - "tsconfig.json"
 
 permissions:
   contents: write
