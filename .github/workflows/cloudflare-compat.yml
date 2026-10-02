@@ -78,7 +78,7 @@ jobs:
               {
                 type: "plain_text",
                 name: "CINEPLEX_CATALOG_RELAY_URL",
-                text: "https://media.pincodeit.com/catalog"
+                text: "https://pinflix-media-edge.farukkhanone.workers.dev/catalog"
               }
             ],
             annotations: {
@@ -181,21 +181,21 @@ jobs:
           grep -q "Missing upstream url param" /tmp/proxy-response.json
           echo "Local Workers runtime smoke test passed."
 
-      - name: Probe deployed Cloudflare staging runtime
+      - name: Probe deployed Cloudflare workers.dev runtime
         shell: bash
         run: |
           set -uo pipefail
 
-          MEDIA_HTTP="$(curl --show-error --silent --max-time 15 --output /tmp/pinflix-media-health.json --write-out "%{http_code}" https://media.pincodeit.com/health || true)"
-          STATUS_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-cineplex-status.json --write-out "%{http_code}" https://pinflix-staging.pincodeit.com/api/cineplexbd/status || true)"
-          CATALOG_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-catalog.json --write-out "%{http_code}" "https://pinflix-staging.pincodeit.com/api/cineplexbd/catalog?category=cineplex-movies-english&page=1" || true)"
+          MEDIA_HTTP="$(curl --show-error --silent --max-time 15 --output /tmp/pinflix-media-health.json --write-out "%{http_code}" https://pinflix-media-edge.farukkhanone.workers.dev/health || true)"
+          STATUS_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-cineplex-status.json --write-out "%{http_code}" https://pinflix.farukkhanone.workers.dev/api/cineplexbd/status || true)"
+          CATALOG_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-catalog.json --write-out "%{http_code}" "https://pinflix.farukkhanone.workers.dev/api/cineplexbd/catalog?category=cineplex-movies-english&page=1" || true)"
 
           MEDIA_BODY="$(cat /tmp/pinflix-media-health.json 2>/dev/null || true)"
           STATUS_BODY="$(cat /tmp/pinflix-cineplex-status.json 2>/dev/null || true)"
           CATALOG_BODY="$(cat /tmp/pinflix-catalog.json 2>/dev/null || true)"
 
           {
-            echo "## Cloudflare staging smoke report"
+            echo "## Cloudflare workers.dev smoke report"
             echo
             echo "- media HTTP: $MEDIA_HTTP"
             echo "- status HTTP: $STATUS_HTTP"
@@ -254,13 +254,13 @@ jobs:
           NODE
 
           POSTER_PATH="$(cat /tmp/pinflix-poster-path.txt)"
-          POSTER_HTTP="$(curl --show-error --silent --max-time 20 --head --output /tmp/pinflix-poster-headers.txt --write-out "%{http_code}" "https://pinflix-staging.pincodeit.com$POSTER_PATH" || true)"
+          POSTER_HTTP="$(curl --show-error --silent --max-time 20 --head --output /tmp/pinflix-poster-headers.txt --write-out "%{http_code}" "https://pinflix.farukkhanone.workers.dev$POSTER_PATH" || true)"
           echo "- poster HTTP: $POSTER_HTTP" >> "$GITHUB_STEP_SUMMARY"
           if [[ "$POSTER_HTTP" != 2* && "$POSTER_HTTP" != 3* ]]; then
             echo "Poster smoke check failed with HTTP $POSTER_HTTP" >&2
             exit 1
           fi
-          echo "Deployed Cloudflare staging smoke test passed."
+          echo "Deployed Cloudflare workers.dev smoke test passed."
 
       - name: Upload Cloudflare smoke diagnostics
         if: always()
@@ -275,29 +275,6 @@ jobs:
             /tmp/pinflix-poster-headers.txt
           if-no-files-found: warn
           retention-days: 1
-
-      - name: Publish Cloudflare staging diagnostics
-        if: always() && github.event_name == 'push' && github.ref_name == 'main'
-        shell: bash
-        run: |
-          set -u
-          rm -rf /tmp/pinflix-smoke-diagnostics
-          mkdir -p /tmp/pinflix-smoke-diagnostics
-          cp /tmp/pinflix-media-health.json /tmp/pinflix-smoke-diagnostics/media-health.json 2>/dev/null || true
-          cp /tmp/pinflix-cineplex-status.json /tmp/pinflix-smoke-diagnostics/cineplex-status.json 2>/dev/null || true
-          cp /tmp/pinflix-catalog.json /tmp/pinflix-smoke-diagnostics/catalog.json 2>/dev/null || true
-          cp /tmp/pinflix-poster-headers.txt /tmp/pinflix-smoke-diagnostics/poster-headers.txt 2>/dev/null || true
-          printf '%s\n' "$GITHUB_SHA" > /tmp/pinflix-smoke-diagnostics/source-sha.txt
-          date -u +'%Y-%m-%dT%H:%M:%SZ' > /tmp/pinflix-smoke-diagnostics/generated-at.txt
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan cloudflare-diagnostics
-          git rm -rf . >/dev/null 2>&1 || true
-          cp -R /tmp/pinflix-smoke-diagnostics/. .
-          git add .
-          git commit -m "diagnostics: Cloudflare staging smoke $GITHUB_SHA"
-          git push --force origin HEAD:cloudflare-diagnostics
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
