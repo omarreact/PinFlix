@@ -1,39 +1,23 @@
-import { getHealthAggregates, recordSourceResult } from "@/src/lib/iptv/health";
 import { getTaxonomySummary } from "@/src/lib/providers/cineplexbd";
 import { probeCineplexConnectivity } from "@/src/lib/providers/cineplexbd/api";
-import { getLiveProviderHealth } from "@/src/lib/providers/live-tv";
 
-export async function POST(request: Request) {
-  const body = await request.json() as {
-    channelId?: string;
-    sourceIndex?: number;
-    success?: boolean;
-    latencyMs?: number;
-  };
-
-  if (!body.channelId || typeof body.sourceIndex !== "number" || typeof body.success !== "boolean") {
-    return Response.json({ error: "Invalid health event" }, { status: 400 });
-  }
-
-  recordSourceResult(`${body.channelId}:${body.sourceIndex}`, body.success, body.latencyMs);
-  return Response.json({ ok: true });
-}
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const [cineplexbd, cineplexConnectivity, liveTv] = await Promise.all([
+  const [catalog, connectivity] = await Promise.all([
     getTaxonomySummary(),
     probeCineplexConnectivity(),
-    getLiveProviderHealth(),
   ]);
 
-  return Response.json({
-    ok: true,
-    service: "pinflix",
-    sources: getHealthAggregates(),
-    cineplexbd: {
-      ...cineplexbd,
-      connectivity: cineplexConnectivity,
+  return Response.json(
+    {
+      ok: connectivity.reachable,
+      service: "pinflix",
+      provider: "cineplexbd",
+      catalog,
+      connectivity,
     },
-    liveTv,
-  });
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
