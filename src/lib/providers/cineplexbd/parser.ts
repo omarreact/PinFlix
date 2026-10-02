@@ -7,9 +7,22 @@ type CatalogContext = {
   category?: string;
 };
 
-function cleanUrl(url: string) {
+function toUpstreamUrl(url: string) {
   if (url.startsWith("http")) return url;
   return `${CINEPLEX_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
+}
+
+function toBrowserAssetUrl(url: string) {
+  const absolute = toUpstreamUrl(url);
+  try {
+    const parsed = new URL(absolute);
+    if (parsed.hostname.toLowerCase() === "cineplexbd.net" && (!parsed.port || parsed.port === "80")) {
+      return `/cineplex-origin${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    // Leave malformed/non-Cineplex URLs untouched.
+  }
+  return absolute;
 }
 
 function asObject(value: unknown): Record<string, unknown> | null {
@@ -97,7 +110,7 @@ export function parseCatalog(html: string, context: CatalogContext = {}): Entert
       rawImage = match?.[2];
     }
 
-    const poster = rawImage ? cleanUrl(rawImage) : "";
+    const poster = rawImage ? toBrowserAssetUrl(rawImage) : "";
     const year = findYear(text);
     const rating = findRating(text);
 
@@ -157,7 +170,7 @@ export function parseDetails(
 
   const detailsImage = $("img.poster, .tvCard img, .movie-poster img").first();
   const rawImage = detailsImage.attr("data-src") || detailsImage.attr("src");
-  const poster = rawImage ? cleanUrl(rawImage) : "";
+  const poster = rawImage ? toBrowserAssetUrl(rawImage) : "";
 
   const yearText = $("span.chip")
     .filter((_, element) => /^\d{4}$/.test($(element).text().trim()))
@@ -197,12 +210,12 @@ export function parseDetails(
 
 export function parsePlayerUrl(html: string): string | null {
   const videoSrcMatch = html.match(/const videoSrc\s*=\s*['"]([^'"]+)['"]/);
-  if (videoSrcMatch?.[1]) return cleanUrl(videoSrcMatch[1]);
+  if (videoSrcMatch?.[1]) return toUpstreamUrl(videoSrcMatch[1]);
 
   const $ = cheerio.load(html);
   const sourceUrl = $("source[type='video/mp4'], source[type='application/x-mpegURL'], source")
     .first()
     .attr("src");
 
-  return sourceUrl ? cleanUrl(sourceUrl) : null;
+  return sourceUrl ? toUpstreamUrl(sourceUrl) : null;
 }

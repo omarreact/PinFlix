@@ -11,24 +11,36 @@ function toCineplexUrl(path: string) {
     : `${CINEPLEX_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-export async function fetchHtml(path: string, revalidate = 3600): Promise<string> {
+export async function fetchHtml(path: string, revalidate = 0): Promise<string> {
   const url = toCineplexUrl(path);
-  const response = await fetch(url, {
-    headers,
-    next: { revalidate },
-    signal: AbortSignal.timeout(15_000),
-  });
+  const response = await fetch(url, revalidate > 0
+    ? {
+        headers,
+        next: { revalidate },
+        signal: AbortSignal.timeout(15_000),
+      }
+    : {
+        headers,
+        cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
+      });
   if (!response.ok) throw new Error(`Failed to fetch ${url}: HTTP ${response.status}`);
   return response.text();
 }
 
-export async function fetchJson(path: string, revalidate = 3600): Promise<unknown> {
+export async function fetchJson(path: string, revalidate = 0): Promise<unknown> {
   const url = toCineplexUrl(path);
-  const response = await fetch(url, {
-    headers,
-    next: { revalidate },
-    signal: AbortSignal.timeout(15_000),
-  });
+  const response = await fetch(url, revalidate > 0
+    ? {
+        headers,
+        next: { revalidate },
+        signal: AbortSignal.timeout(15_000),
+      }
+    : {
+        headers,
+        cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
+      });
   if (!response.ok) throw new Error(`Failed to fetch JSON ${url}: HTTP ${response.status}`);
   return response.json();
 }

@@ -55,7 +55,7 @@ export async function search(query: string, page = 1): Promise<Entertainment[]> 
   try {
     const html = await fetchHtml(
       `/search.php?q=${encodeURIComponent(normalized)}&page=${Math.max(1, page)}`,
-      900,
+      0,
     );
     return parseCatalog(html);
   } catch (error) {
@@ -66,11 +66,29 @@ export async function search(query: string, page = 1): Promise<Entertainment[]> 
 
 export async function getLatest(page = 1): Promise<Entertainment[]> {
   try {
-    const html = await fetchHtml(`/search.php?q=&page=${Math.max(1, page)}`, 900);
+    const html = await fetchHtml(`/search.php?q=&page=${Math.max(1, page)}`, 0);
     return parseCatalog(html);
   } catch (error) {
     console.error("CineplexBD getLatest error:", error);
     return [];
+  }
+}
+
+export async function getLatestPage(
+  kind: "movie" | "show",
+  page = 1,
+): Promise<{ items: Entertainment[]; page: number; hasNextPage: boolean }> {
+  const safePage = Math.max(1, Math.floor(page));
+  try {
+    const html = await fetchHtml(`/search.php?q=&page=${safePage}`, 0);
+    return {
+      items: parseCatalog(html).filter((item) => item.kind === kind),
+      page: safePage,
+      hasNextPage: parseHasNextPage(html),
+    };
+  } catch (error) {
+    console.error(`CineplexBD latest ${kind} page error:`, error);
+    return { items: [], page: safePage, hasNextPage: false };
   }
 }
 
@@ -85,7 +103,7 @@ export async function getCategoryPage(categoryId: string, page = 1): Promise<Cin
   });
 
   try {
-    const html = await fetchHtml(`/${category.endpoint}?${params.toString()}`, 900);
+    const html = await fetchHtml(`/${category.endpoint}?${params.toString()}`, 0);
     const forcedKind = category.endpoint === "category.php" ? "movie" : "show";
     return {
       category,
@@ -124,11 +142,11 @@ export async function getDetails(id: string): Promise<Entertainment | null> {
       metaJson = kind === "show"
         ? await fetchJson(
             `/watch.php?series_id=${encodeURIComponent(rawId)}&season=1&meta=1`,
-            900,
+            60,
           )
         : await fetchJson(
             `/watch.php?id=${encodeURIComponent(rawId)}&season=1&meta=1`,
-            900,
+            60,
           );
     } catch {
       metaJson = undefined;
@@ -171,7 +189,7 @@ async function resolveVideoUrl(id: string) {
 
   for (const path of paths) {
     try {
-      const html = await fetchHtml(path, 300);
+      const html = await fetchHtml(path, 0);
       const url = parsePlayerUrl(html);
       if (url) return url;
     } catch {
