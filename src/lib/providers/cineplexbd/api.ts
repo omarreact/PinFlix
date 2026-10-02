@@ -5,10 +5,42 @@ const headers = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-function toCineplexUrl(path: string) {
+function configuredCatalogRelay() {
+  const raw = process.env.CINEPLEX_CATALOG_RELAY_URL?.trim();
+  if (!raw) return null;
+
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    url.hash = "";
+    url.search = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
+export function isCatalogRelayConfigured() {
+  return configuredCatalogRelay() !== null;
+}
+
+function publicCineplexUrl(path: string) {
   return path.startsWith("http")
-    ? path
-    : `${CINEPLEX_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+    ? new URL(path)
+    : new URL(path.startsWith("/") ? path : `/${path}`, CINEPLEX_BASE_URL);
+}
+
+function toCineplexUrl(path: string) {
+  const target = publicCineplexUrl(path);
+  const relay = configuredCatalogRelay();
+
+  if (!relay) return target.toString();
+
+  const relayUrl = new URL(relay);
+  const basePath = relayUrl.pathname.replace(/\/$/, "");
+  relayUrl.pathname = `${basePath}${target.pathname}`;
+  relayUrl.search = target.search;
+  return relayUrl.toString();
 }
 
 export async function fetchHtml(path: string, revalidate = 0): Promise<string> {
@@ -24,7 +56,7 @@ export async function fetchHtml(path: string, revalidate = 0): Promise<string> {
         cache: "no-store",
         signal: AbortSignal.timeout(15_000),
       });
-  if (!response.ok) throw new Error(`Failed to fetch ${url}: HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Failed to fetch catalog resource: HTTP ${response.status}`);
   return response.text();
 }
 
@@ -41,15 +73,14 @@ export async function fetchJson(path: string, revalidate = 0): Promise<unknown> 
         cache: "no-store",
         signal: AbortSignal.timeout(15_000),
       });
-  if (!response.ok) throw new Error(`Failed to fetch JSON ${url}: HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Failed to fetch catalog JSON: HTTP ${response.status}`);
   return response.json();
 }
-
 
 export async function probeCineplexConnectivity(timeoutMs = 8_000) {
   const startedAt = Date.now();
   try {
-    const response = await fetch(CINEPLEX_BASE_URL, {
+    const response = await fetch(toCineplexUrl("/"), {
       headers,
       cache: "no-store",
       redirect: "manual",
@@ -60,6 +91,7 @@ export async function probeCineplexConnectivity(timeoutMs = 8_000) {
       reachable: true,
       status: response.status,
       latencyMs: Date.now() - startedAt,
+      transport: isCatalogRelayConfigured() ? "relay" : "direct",
       outcome:
         response.status >= 200 && response.status < 400
           ? "reachable"
@@ -78,6 +110,7 @@ export async function probeCineplexConnectivity(timeoutMs = 8_000) {
       reachable: false,
       status: null,
       latencyMs: Date.now() - startedAt,
+      transport: isCatalogRelayConfigured() ? "relay" : "direct",
       outcome,
     } as const;
   }
