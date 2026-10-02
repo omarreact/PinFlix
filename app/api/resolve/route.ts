@@ -2,6 +2,13 @@ import { getRankedChannelSources } from "@/src/lib/iptv/sources";
 import * as cineplexbd from "@/src/lib/providers/cineplexbd";
 import { providerFromChannelId, resolveLiveProviderChannel } from "@/src/lib/providers/live-tv";
 
+function optionalPositiveInteger(value: string | null) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= 10_000
+    ? parsed
+    : undefined;
+}
+
 function toCineplexRewriteUrl(value: string) {
   try {
     const upstream = new URL(value);
@@ -27,7 +34,11 @@ export async function GET(request: Request) {
   if (!id) return Response.json({ error: "Channel ID required" }, { status: 400 });
 
   if (id.startsWith("cb-")) {
-    const streams = await cineplexbd.resolveStreams(id);
+    const url = new URL(request.url);
+    const streams = await cineplexbd.resolveStreams(id, {
+      season: optionalPositiveInteger(url.searchParams.get("season")),
+      episode: optionalPositiveInteger(url.searchParams.get("episode")),
+    });
     if (!streams.length) return Response.json({ error: "Stream not found" }, { status: 404 });
 
     return Response.json({
@@ -40,6 +51,10 @@ export async function GET(request: Request) {
         url: toCineplexRewriteUrl(source.url) ?? `/api/playback/proxy?url=${encodeURIComponent(source.url)}`,
         subtitles: [],
       })),
+    }, {
+      headers: {
+        "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
+      },
     });
   }
 
