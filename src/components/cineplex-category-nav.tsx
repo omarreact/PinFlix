@@ -27,21 +27,19 @@ export function CineplexCategoryNav({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {[...grouped.entries()].map(([group, items]) => (
-        <section key={group} className="space-y-2.5">
-          <h2 className="text-xs font-extrabold uppercase tracking-[.18em] text-slate-500">
-            {groupLabels[group] ?? group}
-          </h2>
+        <section key={group}>
+          <h2 className="mb-2.5 text-[11px] font-bold uppercase tracking-[.2em] text-zinc-500">{groupLabels[group] ?? group}</h2>
           <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible">
             {items.map((category) => (
               <Link
                 key={category.id}
                 href={`${basePath}?category=${encodeURIComponent(category.id)}`}
-                className={`tv-focus whitespace-nowrap rounded-full border px-4 py-2.5 text-sm font-semibold shadow-sm ${
+                className={`tv-focus shrink-0 whitespace-nowrap rounded-full border px-5 py-2.5 text-sm font-semibold transition ${
                   activeId === category.id
-                    ? "border-brand bg-brand text-white"
-                    : "border-line bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950"
+                    ? "border-transparent accent-gradient text-white shadow-[0_0_20px_rgba(168,85,247,.25)]"
+                    : "border-white/5 bg-surface/70 text-zinc-400 hover:border-white/15 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {category.label}
