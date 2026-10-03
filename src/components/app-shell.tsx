@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { Bookmark, Clapperboard, Film, PlayCircle, Search } from "lucide-react";
+import { Bookmark, Clapperboard, Film, PlayCircle, Search, UserRound } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 
 const nav = [
@@ -54,17 +54,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               })}
             </nav>
           </div>
-          <form onSubmit={submitSearch} className="relative ml-auto min-w-0">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" size={17} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              type="search"
-              placeholder="Search titles"
-              aria-label="Search titles"
-              className="h-10 w-32 rounded-full border border-white/10 bg-white/5 pl-10 pr-3 text-sm text-white placeholder:text-zinc-500 focus:border-brand/60 focus:bg-white/10 sm:w-52 md:w-64"
-            />
-          </form>
+
+          <div className="ml-auto flex min-w-0 items-center gap-2">
+            <form onSubmit={submitSearch} className="relative min-w-0">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" size={17} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                type="search"
+                placeholder="Search titles"
+                aria-label="Search titles"
+                className="h-10 w-28 rounded-full border border-white/10 bg-white/5 pl-10 pr-3 text-sm text-white placeholder:text-zinc-500 focus:border-brand/60 focus:bg-white/10 sm:w-52 md:w-64"
+              />
+            </form>
+            <Link
+              href="/saved"
+              aria-label="Open My List"
+              className="tv-focus hidden h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-gradient-to-br from-brand/35 to-brand-2/35 text-white shadow-inner sm:grid"
+            >
+              <UserRound size={17} />
+            </Link>
+          </div>
         </div>
 
         <nav className="mx-auto mt-2 flex max-w-md items-center justify-center gap-2 rounded-full border border-white/10 bg-bg/75 px-2 py-1.5 text-xs text-zinc-400 backdrop-blur-xl lg:hidden">
