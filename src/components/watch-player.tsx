@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Captions, ChevronDown, Maximize, Pause, Play, RefreshCw, Volume2, VolumeX } from "lucide-react";
+import { Captions, ChevronDown, Maximize, Pause, Play, RefreshCw, SkipForward, Volume2, VolumeX, X } from "lucide-react";
 
 type ResolvedSubtitle = { label: string; language: string; url: string };
 type ResolvedSource = {
@@ -16,12 +17,18 @@ type HlsLevel = { index: number; label: string };
 
 export function WatchPlayer({
   mediaId,
-  posterLabel,
+  title,
+  subtitle,
+  backHref,
+  nextHref,
   season,
   episode,
 }: {
   mediaId: string;
-  posterLabel: string;
+  title: string;
+  subtitle?: string;
+  backHref: string;
+  nextHref?: string;
   season?: number;
   episode?: number;
 }) {
@@ -223,9 +230,30 @@ export function WatchPlayer({
           <track key={track.language} kind="subtitles" srcLang={track.language} label={track.label} src={track.url} />
         ))}
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-black/90 via-black/35 to-transparent px-5 pb-16 pt-5 md:px-8">
-          <p className="text-[10px] font-bold uppercase tracking-[.22em] text-accent">Now playing</p>
-          <h1 className="mt-1 max-w-3xl truncate text-lg font-bold md:text-2xl">{posterLabel}</h1>
+        <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 bg-gradient-to-b from-black/90 via-black/35 to-transparent px-4 pb-16 pt-4 md:px-8 md:pt-6">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[.22em] text-accent">Now playing</p>
+            <h1 className="mt-1 max-w-3xl truncate text-lg font-bold md:text-2xl">{title}</h1>
+            {subtitle && <p className="mt-1 truncate text-xs text-zinc-400 md:text-sm">{subtitle}</p>}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {nextHref && (
+              <Link
+                href={nextHref}
+                className="tv-focus hidden min-h-11 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/15 sm:inline-flex"
+              >
+                Next episode
+                <SkipForward size={16} />
+              </Link>
+            )}
+            <Link
+              href={backHref}
+              aria-label="Close player"
+              className="tv-focus grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-white/10 text-white backdrop-blur hover:bg-white/15"
+            >
+              <X size={20} />
+            </Link>
+          </div>
         </div>
 
         {isBusy && (
