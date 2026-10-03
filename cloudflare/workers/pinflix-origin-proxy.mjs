@@ -1,8 +1,14 @@
 const ORIGIN_HOST = "cineplexbd.net";
 const ORIGIN_IP = "103.136.200.66";
 
+function normalizeOriginPath(path) {
+  let normalized = path.replace(/\/{2,}/g, "/");
+  normalized = normalized.replace(/^\/(?:uploads\/){2,}/i, "/uploads/");
+  return normalized;
+}
+
 async function fetchOrigin(path, request) {
-  const primary = new URL(path, "http://cineplexbd.net");
+  const primary = new URL(normalizeOriginPath(path), "http://cineplexbd.net");
   const headers = new Headers({
     "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
     "Accept": request.headers.get("Accept") || "image/*,*/*",
@@ -47,7 +53,20 @@ export default {
       path = path.slice("/cineplex-origin".length) || "/";
     }
 
+    path = normalizeOriginPath(path);
+
     try {
+      const cache = caches.default;
+      const cacheKey = new Request(new URL(path + incoming.search, "https://pinflix-origin-cache.invalid").toString());
+      if (request.method === "GET") {
+        const cached = await cache.match(cacheKey);
+        if (cached) {
+          const headers = new Headers(cached.headers);
+          headers.set("X-PinFlix-Origin-Cache", "HIT");
+          return new Response(cached.body, { status: cached.status, headers });
+        }
+      }
+
       const { response: upstream, transport } = await fetchOrigin(path + incoming.search, request);
       const headers = new Headers(cors);
       for (const name of ["content-type", "content-length", "etag", "last-modified", "location"]) {
@@ -58,10 +77,16 @@ export default {
       headers.set("X-Content-Type-Options", "nosniff");
       headers.set("X-Robots-Tag", "noindex");
       headers.set("X-PinFlix-Origin-Transport", transport);
-      return new Response(request.method === "HEAD" ? null : upstream.body, {
+      headers.set("X-PinFlix-Normalized-Path", path);
+
+      const outgoing = new Response(request.method === "HEAD" ? null : upstream.body, {
         status: upstream.status,
         headers,
       });
+      if (request.method === "GET" && upstream.ok) {
+        try { await cache.put(cacheKey, outgoing.clone()); } catch {}
+      }
+      return outgoing;
     } catch (error) {
       return Response.json({
         error: "Origin image unavailable",
