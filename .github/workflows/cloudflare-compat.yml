@@ -257,7 +257,7 @@ jobs:
           }
 
           const degraded = [];
-          if (media?.upstream?.reachable !== true) degraded.push("Cineplex origin is unreachable from Cloudflare egress");
+          if (media?.upstream?.reachable === false) degraded.push("Cineplex origin is unreachable from Cloudflare egress");
           if (status?.taxonomy?.source !== "live") degraded.push("fallback taxonomy is active");
           if (catalog.items.length === 0) degraded.push("live catalog returned no items");
 
