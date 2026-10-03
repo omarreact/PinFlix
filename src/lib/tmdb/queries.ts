@@ -17,6 +17,22 @@ export async function getTrendingTV(timeWindow: "day" | "week" = "week") {
   );
 }
 
+export async function getPopularMovies(page = 1) {
+  return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>(
+    "/movie/popular",
+    { language: "en-US", page: Math.max(1, Math.floor(page)) },
+    { revalidate: 1800 },
+  );
+}
+
+export async function getPopularTV(page = 1) {
+  return tmdbFetch<TMDBPaginatedResponse<TMDBTVShow>>(
+    "/tv/popular",
+    { language: "en-US", page: Math.max(1, Math.floor(page)) },
+    { revalidate: 1800 },
+  );
+}
+
 type MultiSearchItem = TMDBMedia | { id: number; media_type: "person" };
 
 export async function searchTMDB(query: string, page = 1): Promise<TMDBPaginatedResponse<TMDBMedia>> {
@@ -33,5 +49,5 @@ export async function searchTMDB(query: string, page = 1): Promise<TMDBPaginated
     (item): item is TMDBMedia => item.media_type === "movie" || item.media_type === "tv",
   );
 
-  return { ...response, results, total_results: results.length };
+  return { ...response, results };
 }
