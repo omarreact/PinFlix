@@ -1,35 +1,58 @@
 # PinFlix
 
-PinFlix is a Next.js entertainment interface for movies and web series.
+PinFlix is a Next.js movie and series interface with a cinematic dark UI and a decoupled catalog/playback architecture.
 
 ## Product scope
 
+- Discover home
 - Movies
-- Web series
+- Series
 - Search
-- Category browsing
-- Entertainment details
-- In-browser playback
-- Responsive mobile, desktop and TV-friendly navigation
+- Dynamic provider categories
+- Title details
+- My List stored on the viewer's device
+- In-browser HLS/native playback
+- Responsive mobile, desktop and TV-friendly controls
 
-The current UI follows a clean light-theme streaming layout with a fixed desktop sidebar, utility header, horizontal content rails and reusable poster cards.
+## Design system
 
-## Stack
+The current interface is adapted from the supplied LeoStream Pro HTML references:
 
-- Next.js 16 App Router
-- React 19
-- TypeScript
-- Tailwind CSS v4
-- hls.js
-- Cloudflare Workers / vinext deployment tooling
+- near-black base: `#030305`
+- surface: `#0f0f13`
+- indigo → purple primary gradient
+- floating glass navigation
+- Outfit typography
+- cinematic full-bleed hero
+- 2:3 poster cards with hover/focus metadata
+- pill filters and search
+- full-screen playback presentation
+- reduced-motion and keyboard focus support
 
-## Project structure
+## Architecture
+
+PinFlix keeps the web application, metadata resolution and media delivery separate:
+
+```text
+PinFlix UI
+    ↓
+catalog/provider adapter
+    ↓
+title metadata + provider ID
+    ↓
+playback resolver
+    ↓
+guarded media delivery / HLS
+```
+
+The UI does not need to know where an upstream media file lives. Catalog code returns normalized title information; playback resolution happens only when the viewer starts a title.
 
 ```text
 app/                              routes and API handlers
 src/components/                   reusable UI and player components
-src/lib/providers/cineplexbd/     Cineplex catalog and playback resolution
+src/lib/providers/cineplexbd/     catalog, parser and playback resolver
 src/lib/cineplex-playback-proxy.ts guarded Cineplex media proxy
+src/lib/saved.ts                  client-side My List persistence
 src/types/                        catalog and playback contracts
 ```
 
@@ -52,10 +75,10 @@ Cloudflare build:
 npm run build:vinext
 ```
 
-## Cleanup policy
+## Repository cleanup
 
-PinFlix keeps only product code related to the entertainment experience. Temporary NID tools, Direct Play experiments, Termux bridges and Android local-bridge prototypes have been removed from `main`.
+Temporary NID tools, Direct Play experiments, Termux bridges and Android local-bridge prototypes are not part of the PinFlix product and have been removed from `main`.
 
 ## Media boundary
 
-The application should only use media sources that the operator is authorized to access. Upstream availability, rights and regional routing remain the responsibility of the source provider.
+Use only media sources that the operator is authorized to access. Upstream availability, content rights and regional routing remain the responsibility of the source provider.
