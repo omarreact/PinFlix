@@ -8,12 +8,19 @@ import type { Entertainment } from "@/src/types/catalog";
 import { TMDBMediaGrid } from "@/src/components/tmdb/media-grid";
 import type { TMDBMedia } from "@/src/lib/tmdb/types";
 
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Request failed with HTTP ${response.status}`);
+  return response.json() as Promise<T>;
+}
+
 export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [entertainment, setEntertainment] = useState<Entertainment[]>([]);
   const [tmdb, setTmdb] = useState<TMDBMedia[]>([]);
   const [loading, setLoading] = useState(false);
   const normalized = query.trim();
+  const resultCount = entertainment.length + tmdb.length;
 
   useEffect(() => {
     const initial = new URLSearchParams(window.location.search).get("q")?.trim() ?? "";
@@ -31,18 +38,18 @@ export default function SearchPage() {
     let cancelled = false;
     const debounceId = window.setTimeout(() => {
       Promise.allSettled([
-        fetch(`/api/search?q=${encodeURIComponent(normalized)}`).then((response) => response.json()),
-        fetch(`/api/tmdb/search?q=${encodeURIComponent(normalized)}`).then((response) => response.json()),
+        fetchJson<{ entertainment?: Entertainment[] }>(`/api/search?q=${encodeURIComponent(normalized)}`),
+        fetchJson<{ results?: TMDBMedia[] }>(`/api/tmdb/search?q=${encodeURIComponent(normalized)}`),
       ]).then(([catalogResult, tmdbResult]) => {
         if (cancelled) return;
         setEntertainment(
           catalogResult.status === "fulfilled"
-            ? (catalogResult.value as { entertainment?: Entertainment[] }).entertainment ?? []
+            ? catalogResult.value.entertainment ?? []
             : [],
         );
         setTmdb(
           tmdbResult.status === "fulfilled"
-            ? (tmdbResult.value as { results?: TMDBMedia[] }).results ?? []
+            ? tmdbResult.value.results ?? []
             : [],
         );
         setLoading(false);
@@ -101,8 +108,9 @@ export default function SearchPage() {
       ) : (
         <section>
           <h2 className="mb-5 text-xl font-bold text-white">
-            Results <span className="text-sm font-normal text-zinc-500">({entertainment.length})</span>
+            Results <span className="text-sm font-normal text-zinc-500">({resultCount})</span>
           </h2>
+
           {entertainment.length > 0 ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
               {entertainment.map((item) => <EntertainmentCard key={item.id} item={item} />)}
@@ -110,7 +118,7 @@ export default function SearchPage() {
           ) : null}
 
           {tmdb.length > 0 ? (
-            <div className="mt-10">
+            <div className={entertainment.length > 0 ? "mt-10" : ""}>
               <p className="mb-4 text-xs font-bold uppercase tracking-[.2em] text-brand">TMDB discovery</p>
               <TMDBMediaGrid items={tmdb} />
             </div>
