@@ -5,10 +5,13 @@ import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { EntertainmentCard } from "@/src/components/entertainment/card";
 import type { Entertainment } from "@/src/types/catalog";
+import { TMDBMediaGrid } from "@/src/components/tmdb/media-grid";
+import type { TMDBMedia } from "@/src/lib/tmdb/types";
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [entertainment, setEntertainment] = useState<Entertainment[]>([]);
+  const [tmdb, setTmdb] = useState<TMDBMedia[]>([]);
   const [loading, setLoading] = useState(false);
   const normalized = query.trim();
 
@@ -27,19 +30,29 @@ export default function SearchPage() {
 
     let cancelled = false;
     const debounceId = window.setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(normalized)}`)
-        .then((response) => response.json())
-        .then((data: { entertainment?: Entertainment[] }) => {
-          if (cancelled) return;
-          setEntertainment(data.entertainment ?? []);
+      Promise.allSettled([
+        fetch(`/api/search?q=${encodeURIComponent(normalized)}`).then((response) => response.json()),
+        fetch(`/api/tmdb/search?q=${encodeURIComponent(normalized)}`).then((response) => response.json()),
+      ]).then(([catalogResult, tmdbResult]) => {
+        if (cancelled) return;
+        setEntertainment(
+          catalogResult.status === "fulfilled"
+            ? (catalogResult.value as { entertainment?: Entertainment[] }).entertainment ?? []
+            : [],
+        );
+        setTmdb(
+          tmdbResult.status === "fulfilled"
+            ? (tmdbResult.value as { results?: TMDBMedia[] }).results ?? []
+            : [],
+        );
+        setLoading(false);
+      }).catch(() => {
+        if (!cancelled) {
+          setEntertainment([]);
+          setTmdb([]);
           setLoading(false);
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setEntertainment([]);
-            setLoading(false);
-          }
-        });
+        }
+      });
     }, 300);
 
     return () => {
@@ -64,7 +77,10 @@ export default function SearchPage() {
               const value = event.target.value;
               setQuery(value);
               setLoading(Boolean(value.trim()));
-              if (!value.trim()) setEntertainment([]);
+              if (!value.trim()) {
+                setEntertainment([]);
+                setTmdb([]);
+              }
             }}
             placeholder="Search titles"
             className="min-w-0 flex-1 bg-transparent py-4 text-white placeholder:text-zinc-600"
@@ -91,11 +107,18 @@ export default function SearchPage() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
               {entertainment.map((item) => <EntertainmentCard key={item.id} item={item} />)}
             </div>
-          ) : (
+          ) : null}
+
+          {tmdb.length > 0 ? (
+            <div className="mt-10">
+              <p className="mb-4 text-xs font-bold uppercase tracking-[.2em] text-brand">TMDB discovery</p>
+              <TMDBMediaGrid items={tmdb} />
+            </div>
+          ) : entertainment.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-12 text-center text-zinc-500">
               No titles found. Try a different spelling.
             </div>
-          )}
+          ) : null}
         </section>
       )}
     </div>
