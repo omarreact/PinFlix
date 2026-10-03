@@ -4,9 +4,15 @@ import { AppShell } from "@/src/components/app-shell";
 
 export const metadata: Metadata = {
   title: "PinFlix — Movies & Web Series",
-  description: "Browse and watch the latest CineplexBD movies and web series in PinFlix.",
+  description: "Discover movies and web series in a fast, modern PinFlix experience.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body><AppShell>{children}</AppShell></body></html>;
+  return (
+    <html lang="en">
+      <body>
+        <AppShell>{children}</AppShell>
+      </body>
+    </html>
+  );
 }
