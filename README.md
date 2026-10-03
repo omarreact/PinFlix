@@ -75,6 +75,19 @@ Cloudflare build:
 npm run build:vinext
 ```
 
+## Production deployment
+
+PinFlix production is Cloudflare-only.
+
+- Production application: Cloudflare Worker `pinflix`
+- Production domain: `pinflix.pincodeit.com`
+- Media/catalog edge: Cloudflare Worker `pinflix-media-edge`
+- Static assets: Cloudflare Worker `pinflix-assets`
+- Source of truth: GitHub `main`
+- Vercel is not a deployment target for this application.
+
+Do not add Vercel configuration or Vercel deployment workflows to this repository.
+
 ## Repository cleanup
 
 Temporary NID tools, Direct Play experiments, Termux bridges and Android local-bridge prototypes are not part of the PinFlix product and have been removed from `main`.
