@@ -1,10 +1,20 @@
 import Link from "next/link";
-import { Info, Play } from "lucide-react";
+import { Info, Play, Search } from "lucide-react";
 import { SavedToggle } from "@/src/components/saved-toggle";
+import { getTMDBImageUrl } from "@/src/lib/tmdb/images";
+import { getMediaTitle, getMediaType, getMediaYear, type TMDBMedia } from "@/src/lib/tmdb/types";
 import type { Entertainment } from "@/src/types/catalog";
 
-export function HomeHero({ item }: { item?: Entertainment }) {
-  const image = item?.backdrop || item?.poster || "";
+export function HomeHero({ item, discovery }: { item?: Entertainment; discovery?: TMDBMedia }) {
+  const discoveryTitle = discovery ? getMediaTitle(discovery) : "";
+  const discoveryImage = discovery
+    ? getTMDBImageUrl(discovery.backdrop_path || discovery.poster_path, "original") || ""
+    : "";
+  const image = item?.backdrop || item?.poster || discoveryImage;
+  const title = item?.title || discoveryTitle || "Cinematic streaming, beautifully simplified";
+  const overview = item?.synopsis || discovery?.overview || "Discover movies and series through a fast, cinematic interface with a playback layer kept separate from catalog metadata.";
+  const year = item?.year ? String(item.year) : discovery ? getMediaYear(discovery) : "";
+  const kind = item?.kind || (discovery ? getMediaType(discovery) : undefined);
 
   return (
     <section className="relative flex min-h-[78vh] items-end overflow-hidden md:min-h-[86vh]">
@@ -22,28 +32,28 @@ export function HomeHero({ item }: { item?: Entertainment }) {
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-md">
             <span className="h-2 w-2 rounded-full bg-brand shadow-[0_0_14px_rgba(168,85,247,.9)]" />
             <span className="text-[11px] font-bold uppercase tracking-[.18em] text-zinc-300">
-              {item ? "Featured premiere" : "PinFlix"}
+              {item ? "Featured premiere" : discovery ? "TMDB discovery" : "PinFlix"}
             </span>
           </div>
 
           <h1 className="text-gradient max-w-3xl text-5xl font-black leading-[.95] tracking-[-.055em] sm:text-6xl md:text-7xl lg:text-8xl">
-            {item?.title || "Cinematic streaming, beautifully simplified"}
+            {title}
           </h1>
 
           <div className="mt-5 flex flex-wrap items-center gap-2 text-sm font-medium text-zinc-300">
-            {item?.year && <span>{item.year}</span>}
+            {year && <span>{year}</span>}
             {item?.genres.slice(0, 3).map((genre) => (
               <span key={genre} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur">{genre}</span>
             ))}
-            {item?.kind && (
+            {kind && (
               <span className="rounded-full border border-brand/30 bg-brand/15 px-3 py-1 font-bold text-accent">
-                {item.kind === "show" ? "Series" : "Movie"}
+                {kind === "show" || kind === "tv" ? "Series" : "Movie"}
               </span>
             )}
           </div>
 
           <p className="mt-5 max-w-2xl text-base font-light leading-7 text-zinc-300 md:text-lg">
-            {item?.synopsis || "Discover movies and series through a fast, cinematic interface with a playback layer kept separate from catalog metadata."}
+            {overview}
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
@@ -73,6 +83,19 @@ export function HomeHero({ item }: { item?: Entertainment }) {
                 >
                   <Info size={18} />
                   Details
+                </Link>
+              </>
+            ) : discovery ? (
+              <>
+                <Link
+                  href={`/search?q=${encodeURIComponent(discoveryTitle)}`}
+                  className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white"
+                >
+                  <Search size={18} />
+                  Search PinFlix
+                </Link>
+                <Link href={kind === "tv" ? "/series" : "/movies"} className="tv-focus rounded-full border border-white/10 bg-white/5 px-7 py-3 font-semibold">
+                  Browse {kind === "tv" ? "series" : "movies"}
                 </Link>
               </>
             ) : (
