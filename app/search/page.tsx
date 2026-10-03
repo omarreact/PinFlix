@@ -13,9 +13,22 @@ export default function SearchPage() {
   const normalized = query.trim();
 
   useEffect(() => {
-    if (!normalized) return;
+    const initial = new URLSearchParams(window.location.search).get("q")?.trim() ?? "";
+    if (initial) {
+      setQuery(initial);
+      setLoading(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!normalized) {
+      setEntertainment([]);
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
+    setLoading(true);
     const debounceId = window.setTimeout(() => {
       fetch(`/api/search?q=${encodeURIComponent(normalized)}`)
         .then((response) => response.json())
@@ -30,7 +43,7 @@ export default function SearchPage() {
             setLoading(false);
           }
         });
-    }, 350);
+    }, 300);
 
     return () => {
       cancelled = true;
@@ -40,55 +53,45 @@ export default function SearchPage() {
 
   return (
     <div className="space-y-8">
-      <section>
-        <Link href="/" className="tv-focus inline-flex min-h-11 items-center rounded-xl text-sm font-semibold text-muted hover:text-brand">← Home</Link>
-        <h1 className="mt-4 text-3xl font-black tracking-[-.03em] text-slate-950 sm:text-4xl">Search PinFlix</h1>
-        <p className="mt-2 text-sm text-muted">Find movies and web series by title.</p>
+      <section className="animate-slide-up">
+        <Link href="/" className="tv-focus inline-flex min-h-11 items-center rounded-full text-sm font-semibold text-zinc-400 hover:text-white">← Discover</Link>
+        <h1 className="mt-4 text-4xl font-black tracking-[-.04em] text-gradient md:text-5xl">Search PinFlix</h1>
+        <p className="mt-3 text-sm text-zinc-400">Search movies and series by title.</p>
 
-        <label className="mt-6 flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-white px-4 shadow-sm focus-within:border-brand focus-within:ring-4 focus-within:ring-violet-100">
-          <Search size={20} className="shrink-0 text-muted" />
+        <label className="glass-panel mt-6 flex min-h-14 max-w-3xl items-center gap-3 rounded-full px-5 focus-within:border-brand/60">
+          <Search size={20} className="shrink-0 text-zinc-500" />
           <input
             autoFocus
             value={query}
-            onChange={(event) => {
-              const value = event.target.value;
-              const hasQuery = Boolean(value.trim());
-              setQuery(value);
-              setLoading(hasQuery);
-              if (!hasQuery) setEntertainment([]);
-            }}
-            placeholder="Search movies and web series..."
-            className="min-w-0 flex-1 bg-transparent py-4 text-slate-950 placeholder:text-slate-400"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search titles"
+            className="min-w-0 flex-1 bg-transparent py-4 text-white placeholder:text-zinc-600"
           />
         </label>
       </section>
 
       {!normalized ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center text-sm text-muted">
+        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-12 text-center text-zinc-500">
           Start typing to search the catalog.
         </div>
       ) : loading ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-          {Array.from({ length: 10 }).map((_, index) => (
-            <div key={index} className="aspect-[2/3] animate-pulse rounded-2xl bg-slate-200" />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
+          {Array.from({ length: 12 }).map((_, index) => (
+            <div key={index} className="aspect-[2/3] animate-pulse rounded-2xl bg-surface" />
           ))}
         </div>
       ) : (
         <section>
-          <h2 className="mb-4 text-xl font-black text-slate-950">
-            Results <span className="text-sm font-medium text-muted">({entertainment.length})</span>
+          <h2 className="mb-5 text-xl font-bold text-white">
+            Results <span className="text-sm font-normal text-zinc-500">({entertainment.length})</span>
           </h2>
           {entertainment.length > 0 ? (
-            <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-              {entertainment.map((item) => (
-                <div key={item.id} className="[&>a]:w-full">
-                  <EntertainmentCard item={item} />
-                </div>
-              ))}
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
+              {entertainment.map((item) => <EntertainmentCard key={item.id} item={item} />)}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center text-sm text-muted">
-              No matching titles found. Try a different spelling.
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-12 text-center text-zinc-500">
+              No titles found. Try a different spelling.
             </div>
           )}
         </section>
