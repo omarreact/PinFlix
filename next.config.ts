@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
         hostname: "image.tmdb.org",
         pathname: "/t/p/**",
       },
+      {
+        protocol: "https",
+        hostname: "www.themoviedb.org",
+        pathname: "/assets/**",
+      },
     ],
   },
   async rewrites() {
