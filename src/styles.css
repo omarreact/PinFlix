@@ -129,6 +129,17 @@ img { display: block; }
     radial-gradient(circle at 75% 15%, rgba(129,140,248,.28), transparent 32%),
     linear-gradient(160deg, #1e1b4b, #4c1d95 58%, #0f0f13);
 }
+@keyframes hero-drift {
+  0%, 100% { transform: scale(1.025) translate3d(0, 0, 0); }
+  50% { transform: scale(1.055) translate3d(0, -0.6%, 0); }
+}
+@keyframes ambient-breathe {
+  0%, 100% { opacity: .72; transform: translate(-50%, -50%) scale(.96); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.04); }
+}
+.hero-media { animation: hero-drift 12s ease-in-out infinite; }
+.ambient-pulse { animation: ambient-breathe 5.5s ease-in-out infinite; }
+
 @keyframes slide-up-fade {
   from { opacity: 0; transform: translateY(24px); }
   to { opacity: 1; transform: translateY(0); }
