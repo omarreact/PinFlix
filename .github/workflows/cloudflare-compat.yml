@@ -78,7 +78,7 @@ jobs:
               {
                 type: "plain_text",
                 name: "CINEPLEX_CATALOG_RELAY_URL",
-                text: "https://pinflix-media-edge.farukkhanone.workers.dev/catalog"
+                text: "https://media.pincodeit.com/catalog"
               }
             ],
             annotations: {
@@ -181,21 +181,21 @@ jobs:
           grep -q "Missing upstream url param" /tmp/proxy-response.json
           echo "Local Workers runtime smoke test passed."
 
-      - name: Probe deployed Cloudflare workers.dev runtime
+      - name: Probe deployed Cloudflare production runtime
         shell: bash
         run: |
           set -uo pipefail
 
-          MEDIA_HTTP="$(curl --show-error --silent --max-time 15 --output /tmp/pinflix-media-health.json --write-out "%{http_code}" https://pinflix-media-edge.farukkhanone.workers.dev/health || true)"
-          STATUS_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-cineplex-status.json --write-out "%{http_code}" https://pinflix.farukkhanone.workers.dev/api/cineplexbd/status || true)"
-          CATALOG_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-catalog.json --write-out "%{http_code}" "https://pinflix.farukkhanone.workers.dev/api/cineplexbd/catalog?category=cineplex-movies-english&page=1" || true)"
+          MEDIA_HTTP="$(curl --show-error --silent --max-time 15 --output /tmp/pinflix-media-health.json --write-out "%{http_code}" https://media.pincodeit.com/health || true)"
+          STATUS_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-cineplex-status.json --write-out "%{http_code}" https://pinflix.pincodeit.com/api/cineplexbd/status || true)"
+          CATALOG_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-catalog.json --write-out "%{http_code}" "https://pinflix.pincodeit.com/api/cineplexbd/catalog?category=cineplex-movies-english&page=1" || true)"
 
           MEDIA_BODY="$(cat /tmp/pinflix-media-health.json 2>/dev/null || true)"
           STATUS_BODY="$(cat /tmp/pinflix-cineplex-status.json 2>/dev/null || true)"
           CATALOG_BODY="$(cat /tmp/pinflix-catalog.json 2>/dev/null || true)"
 
           {
-            echo "## Cloudflare workers.dev smoke report"
+            echo "## Cloudflare production smoke report"
             echo
             echo "- media HTTP: $MEDIA_HTTP"
             echo "- status HTTP: $STATUS_HTTP"
@@ -263,7 +263,7 @@ jobs:
 
           if [[ -s /tmp/pinflix-poster-path.txt ]]; then
             POSTER_PATH="$(cat /tmp/pinflix-poster-path.txt)"
-            POSTER_HTTP="$(curl --show-error --silent --max-time 20 --head --output /tmp/pinflix-poster-headers.txt --write-out "%{http_code}" "https://pinflix.farukkhanone.workers.dev$POSTER_PATH" || true)"
+            POSTER_HTTP="$(curl --show-error --silent --max-time 20 --head --output /tmp/pinflix-poster-headers.txt --write-out "%{http_code}" "https://pinflix.pincodeit.com$POSTER_PATH" || true)"
             echo "- poster HTTP: $POSTER_HTTP" >> "$GITHUB_STEP_SUMMARY"
             if [[ "$POSTER_HTTP" != 2* && "$POSTER_HTTP" != 3* ]]; then
               echo "Poster proxy check failed with HTTP $POSTER_HTTP" >&2
