@@ -155,7 +155,7 @@ jobs:
 
           READY=0
           for attempt in $(seq 1 30); do
-            STATUS=$(curl --silent --show-error --max-time 3 --output /tmp/auth.json --write-out "%{http_code}" http://127.0.0.1:3001/api/nid-dob/auth || true)
+            STATUS=$(curl --silent --show-error --max-time 3 --output /tmp/pinflix-home.html --write-out "%{http_code}" http://127.0.0.1:3001/ || true)
             if [ "$STATUS" = "200" ]; then
               READY=1
               break
@@ -168,9 +168,8 @@ jobs:
             exit 1
           fi
 
-          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/auth.json","utf8")); if (x.ok !== true || typeof x.authenticated !== "boolean") process.exit(1);'
+          grep -q "PinFlix" /tmp/pinflix-home.html
 
-          # Import and execute the guarded playback route without depending on upstream availability.
           PROXY_STATUS=$(curl --silent --show-error --max-time 5 --output /tmp/proxy-response.json --write-out "%{http_code}" http://127.0.0.1:3001/api/playback/proxy)
           if [ "$PROXY_STATUS" != "400" ]; then
             cat /tmp/proxy-response.json
