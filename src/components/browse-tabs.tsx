@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/src/lib/utils";
 
 const tabs = [
-  { id: "all", label: "All", href: "/" },
+  { id: "all", label: "Discover", href: "/" },
   { id: "movies", label: "Movies", href: "/movies" },
   { id: "series", label: "Web Series", href: "/series" },
 ];
@@ -22,7 +22,6 @@ export function BrowseTabs({ active }: { active?: string }) {
 
   return (
     <section>
-      <h2 className="mb-4 text-xl font-bold tracking-tight md:text-2xl">Browse PinFlix</h2>
       <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1">
         {tabs.map((tab) => {
           const isActive = current === tab.id;
@@ -31,10 +30,10 @@ export function BrowseTabs({ active }: { active?: string }) {
               key={tab.id}
               href={tab.href}
               className={cn(
-                "tv-focus whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition",
+                "tv-focus whitespace-nowrap rounded-full border px-5 py-2.5 text-sm font-semibold shadow-sm",
                 isActive
-                  ? "bg-white text-black"
-                  : "bg-panel text-muted hover:bg-elevated hover:text-fg",
+                  ? "border-brand bg-brand text-white"
+                  : "border-line bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950",
               )}
             >
               {tab.label}
