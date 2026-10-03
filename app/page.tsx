@@ -37,7 +37,13 @@ export default async function HomePage() {
           <div className="glass-panel rounded-2xl p-7 text-zinc-400">
             <p className="font-bold text-white">Catalog temporarily unavailable</p>
             <p className="mt-2 max-w-2xl text-sm leading-6">
-              PinFlix could not refresh the catalog right now. The interface remains available; try again shortly.
+              PinFlix could not reach the CineplexBD catalog from this network right now. Browse
+              Movies and Series categories (taxonomy still loads from the verified fallback), then
+              refresh shortly. Status:{" "}
+              <a className="text-accent underline-offset-2 hover:underline" href="/api/cineplexbd/status">
+                /api/cineplexbd/status
+              </a>
+              .
             </p>
           </div>
         )}
