@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BackLink } from "@/src/components/catalog-sections";
+import { ListVideo } from "lucide-react";
 import { WatchPlayer } from "@/src/components/watch-player";
 import * as cineplexbd from "@/src/lib/providers/cineplexbd";
 
@@ -48,73 +48,82 @@ export default async function WatchPage({
   const episode = navigation
     ? Math.min(requestedEpisode, Math.max(1, navigation.episodes))
     : requestedEpisode;
+  const nextHref =
+    navigation && episode < navigation.episodes
+      ? seriesHref(item.id, season, episode + 1)
+      : undefined;
+  const subtitle = isSeries ? `Season ${season} · Episode ${episode}` : item.year ? String(item.year) : undefined;
 
   return (
-    <div className="space-y-6">
-      <BackLink href={`/entertainment/${item.slug}`}>Title details</BackLink>
-
-      {navigation && (navigation.seasons.length > 1 || navigation.episodes > 1) && (
-        <section className="space-y-4 rounded-xl border border-border bg-surface p-4">
-          {navigation.seasons.length > 1 && (
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[.16em] text-muted">Season</p>
-              <div className="flex flex-wrap gap-2">
-                {navigation.seasons.map((value) => (
-                  <Link
-                    key={value}
-                    href={seriesHref(item.id, value, 1)}
-                    className={`tv-focus rounded-lg border px-3 py-2 text-sm font-semibold ${
-                      value === season
-                        ? "border-brand bg-brand text-black"
-                        : "border-line bg-elevated text-muted hover:text-fg"
-                    }`}
-                  >
-                    Season {value}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {navigation.episodes > 1 && (
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[.16em] text-muted">Episode</p>
-              <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">
-                {Array.from({ length: navigation.episodes }, (_, index) => index + 1).map((value) => (
-                  <Link
-                    key={value}
-                    href={seriesHref(item.id, season, value)}
-                    className={`tv-focus grid min-h-10 min-w-10 place-items-center rounded-lg border px-3 text-sm font-semibold ${
-                      value === episode
-                        ? "border-brand bg-brand text-black"
-                        : "border-line bg-elevated text-muted hover:text-fg"
-                    }`}
-                  >
-                    {value}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
+    <div className="min-h-screen bg-bg text-white">
       <WatchPlayer
         mediaId={item.id}
-        posterLabel={item.kind === "movie" ? "🎬" : "📺"}
+        title={item.title}
+        subtitle={subtitle}
+        backHref={`/entertainment/${item.slug}`}
+        nextHref={nextHref}
         season={isSeries ? season : undefined}
         episode={isSeries ? episode : undefined}
       />
 
-      <div>
-        <p className="text-sm font-bold uppercase tracking-[.18em] text-brand">Now playing</p>
-        <h1 className="mt-2 text-3xl font-black">{item.title}</h1>
-        {isSeries && (
-          <p className="mt-2 text-sm font-semibold text-muted">
-            Season {season} · Episode {episode}
-          </p>
+      <div className="mx-auto max-w-[1400px] space-y-8 px-5 py-8 sm:px-8 md:px-12 md:py-12">
+        {navigation && (navigation.seasons.length > 1 || navigation.episodes > 1) && (
+          <section className="glass-panel rounded-3xl p-5 sm:p-6">
+            <div className="mb-5 flex items-center gap-2">
+              <ListVideo size={18} className="text-accent" />
+              <h2 className="font-bold">Episodes</h2>
+            </div>
+
+            {navigation.seasons.length > 1 && (
+              <div>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-[.18em] text-zinc-500">Season</p>
+                <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-2">
+                  {navigation.seasons.map((value) => (
+                    <Link
+                      key={value}
+                      href={seriesHref(item.id, value, 1)}
+                      className={`tv-focus shrink-0 rounded-full border px-4 py-2.5 text-sm font-semibold ${
+                        value === season
+                          ? "border-transparent accent-gradient text-white"
+                          : "border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      Season {value}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {navigation.episodes > 1 && (
+              <div className={navigation.seasons.length > 1 ? "mt-5" : ""}>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-[.18em] text-zinc-500">Episode</p>
+                <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-2">
+                  {Array.from({ length: navigation.episodes }, (_, index) => index + 1).map((value) => (
+                    <Link
+                      key={value}
+                      href={seriesHref(item.id, season, value)}
+                      className={`tv-focus grid h-11 min-w-11 shrink-0 place-items-center rounded-full border px-3 text-sm font-semibold ${
+                        value === episode
+                          ? "border-transparent accent-gradient text-white"
+                          : "border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {value}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
         )}
-        {item.synopsis && <p className="mt-2 text-muted">{item.synopsis}</p>}
+
+        <section className="max-w-4xl">
+          <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">Now playing</p>
+          <h1 className="text-gradient mt-2 text-3xl font-black tracking-[-.04em] sm:text-4xl">{item.title}</h1>
+          {subtitle && <p className="mt-2 text-sm font-semibold text-zinc-400">{subtitle}</p>}
+          {item.synopsis && <p className="mt-4 text-sm font-light leading-7 text-zinc-400 sm:text-base">{item.synopsis}</p>}
+        </section>
       </div>
     </div>
   );
