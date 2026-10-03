@@ -36,10 +36,11 @@ export default async function HomePage() {
   }
 
   const hasTMDBDiscovery = tmdbMovies.length > 0 || tmdbTV.length > 0;
+  const discoveryHero = featured ? undefined : tmdbMovies[0] ?? tmdbTV[0];
 
   return (
     <div>
-      <HomeHero item={featured} />
+      <HomeHero item={featured} discovery={discoveryHero} />
 
       <div className="relative z-20 mx-auto -mt-8 max-w-[1400px] space-y-12 px-6 pb-24 md:-mt-14 md:px-12">
         <Suspense fallback={null}>
