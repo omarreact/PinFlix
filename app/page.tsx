@@ -12,34 +12,36 @@ export default async function HomePage() {
     cineplexbd.getLatestPage("show", 1),
   ]);
 
-  const movieRail = latestMovies.items.slice(0, 14);
-  const seriesRail = latestSeries.items.slice(0, 14);
+  const movieRail = latestMovies.items.slice(0, 12);
+  const seriesRail = latestSeries.items.slice(0, 12);
   const featured = movieRail[0] ?? seriesRail[0];
 
   return (
-    <div className="space-y-9 sm:space-y-12">
+    <div>
       <HomeHero item={featured} />
 
-      <Suspense fallback={null}>
-        <BrowseTabs active="all" />
-      </Suspense>
+      <div className="relative z-20 mx-auto -mt-8 max-w-[1400px] space-y-12 px-6 pb-24 md:-mt-14 md:px-12">
+        <Suspense fallback={null}>
+          <BrowseTabs active="all" />
+        </Suspense>
 
-      {movieRail.length > 0 && (
-        <EntertainmentRail title="Fresh movies" items={movieRail} href="/movies" />
-      )}
+        {movieRail.length > 0 && (
+          <EntertainmentRail title="Trending movies" items={movieRail} href="/movies" />
+        )}
 
-      {seriesRail.length > 0 && (
-        <EntertainmentRail title="Web series to watch" items={seriesRail} href="/series" />
-      )}
+        {seriesRail.length > 0 && (
+          <EntertainmentRail title="Series to watch" items={seriesRail} href="/series" />
+        )}
 
-      {!featured && (
-        <div className="soft-card rounded-2xl p-6 text-muted">
-          <p className="font-bold text-slate-900">Catalog temporarily unavailable</p>
-          <p className="mt-2 max-w-2xl text-sm leading-6">
-            PinFlix could not refresh the entertainment catalog right now. Try again shortly.
-          </p>
-        </div>
-      )}
+        {!featured && (
+          <div className="glass-panel rounded-2xl p-7 text-zinc-400">
+            <p className="font-bold text-white">Catalog temporarily unavailable</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6">
+              PinFlix could not refresh the catalog right now. The interface remains available; try again shortly.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
