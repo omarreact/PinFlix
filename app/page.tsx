@@ -3,6 +3,9 @@ import { EntertainmentRail } from "@/src/components/catalog-sections";
 import { HomeHero } from "@/src/components/home-hero";
 import { BrowseTabs } from "@/src/components/browse-tabs";
 import * as cineplexbd from "@/src/lib/providers/cineplexbd";
+import { TMDBMediaRow } from "@/src/components/tmdb/media-row";
+import { isTMDBConfigured } from "@/src/lib/tmdb/client";
+import { getTrendingMovies, getTrendingTV } from "@/src/lib/tmdb/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +18,22 @@ export default async function HomePage() {
   const movieRail = latestMovies.items.slice(0, 12);
   const seriesRail = latestSeries.items.slice(0, 12);
   const featured = movieRail[0] ?? seriesRail[0];
+
+  let tmdbMovies: Awaited<ReturnType<typeof getTrendingMovies>>["results"] = [];
+  let tmdbTV: Awaited<ReturnType<typeof getTrendingTV>>["results"] = [];
+
+  if (isTMDBConfigured()) {
+    const [movies, tv] = await Promise.allSettled([
+      getTrendingMovies("week"),
+      getTrendingTV("week"),
+    ]);
+    if (movies.status === "fulfilled") {
+      tmdbMovies = movies.value.results.map((item) => ({ ...item, media_type: "movie" as const }));
+    }
+    if (tv.status === "fulfilled") {
+      tmdbTV = tv.value.results.map((item) => ({ ...item, media_type: "tv" as const }));
+    }
+  }
 
   return (
     <div>
@@ -32,6 +51,9 @@ export default async function HomePage() {
         {seriesRail.length > 0 && (
           <EntertainmentRail title="Series to watch" items={seriesRail} href="/series" />
         )}
+
+        <TMDBMediaRow title="Trending Movies" items={tmdbMovies} />
+        <TMDBMediaRow title="Trending Series" items={tmdbTV} />
 
         {!featured && (
           <div className="glass-panel rounded-2xl p-7 text-zinc-400">
