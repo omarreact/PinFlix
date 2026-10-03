@@ -78,7 +78,7 @@ jobs:
               {
                 type: "plain_text",
                 name: "CINEPLEX_CATALOG_RELAY_URL",
-                text: "https://pinflix-media-edge.farukkhanone.workers.dev/catalog"
+                text: "https://media.pincodeit.com/catalog"
               }
             ],
             annotations: {
@@ -91,14 +91,13 @@ jobs:
           // before the vinext request handler runs.
           const entryPath = path.join(root, "index.js");
           let entry = fs.readFileSync(entryPath, "utf8");
-          const exportMarker =
-            'var Ng=jg??{};export{Ng as default,Bo as i,zo as n,Ro as r,Vo as t};';
-          const wrappedExport =
-            'var Ng=jg??{},Pg={...Ng,async fetch(e,t,n){let r=new URL(e.url);if((r.pathname.startsWith("/_next/static/")||r.pathname==="/vinext-client-entry-manifest.json")&&t?.ASSETS)return t.ASSETS.fetch(e);return Ng.fetch(e,t,n)}};export{Pg as default,Bo as i,zo as n,Ro as r,Vo as t};';
-          if (!entry.includes(exportMarker)) {
-            throw new Error("Unable to patch vinext asset routing: export marker changed.");
+          const exportPattern = /var ([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\?\?\{\};export\{\1 as default,([^}]+)\};/;
+          if (!exportPattern.test(entry)) {
+            throw new Error("Unable to patch vinext asset routing: export structure changed.");
           }
-          entry = entry.replace(exportMarker, wrappedExport);
+          entry = entry.replace(exportPattern, (_match, original, handler, exports) =>
+            `var ${original}=${handler}??{},PinFlixAssetRouter={...${original},async fetch(e,t,n){let r=new URL(e.url);if((r.pathname.startsWith("/_next/static/")||r.pathname==="/vinext-client-entry-manifest.json")&&t?.ASSETS)return t.ASSETS.fetch(e);return ${original}.fetch(e,t,n)}};export{PinFlixAssetRouter as default,${exports}};`
+          );
           fs.writeFileSync(entryPath, entry);
 
           const chunks = [];

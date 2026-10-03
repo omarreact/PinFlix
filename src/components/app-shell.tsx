@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clapperboard, Film, Home, Search } from "lucide-react";
+import { Clapperboard, Film, Home, Play, Search } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 
 const nav = [
   { href: "/", label: "Home", icon: Home },
   { href: "/movies", label: "Movies", icon: Film },
   { href: "/series", label: "Series", icon: Clapperboard },
+  { href: "/play", label: "Direct Play", icon: Play },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
