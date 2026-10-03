@@ -47,7 +47,16 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
         <EntertainmentGrid items={items} />
       ) : (
         <div className="glass-panel rounded-2xl p-7 text-sm text-zinc-400">
-          No movies are available for this page right now. Try another category or refresh.
+          <p className="font-semibold text-zinc-200">No movies loaded for this view</p>
+          <p className="mt-2 leading-6">
+            The CineplexBD catalog is temporarily unreachable from this network. Categories still
+            work from the verified offline index — try another category, refresh in a minute, or
+            check{" "}
+            <a className="text-accent underline-offset-2 hover:underline" href="/api/health">
+              /api/health
+            </a>
+            .
+          </p>
         </div>
       )}
 
