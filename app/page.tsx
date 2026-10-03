@@ -35,6 +35,8 @@ export default async function HomePage() {
     }
   }
 
+  const hasTMDBDiscovery = tmdbMovies.length > 0 || tmdbTV.length > 0;
+
   return (
     <div>
       <HomeHero item={featured} />
@@ -57,13 +59,14 @@ export default async function HomePage() {
 
         {!featured && (
           <div className="glass-panel rounded-2xl p-7 text-zinc-400">
-            <p className="font-bold text-white">Catalog temporarily unavailable</p>
+            <p className="font-bold text-white">Playback catalog temporarily unavailable</p>
             <p className="mt-2 max-w-2xl text-sm leading-6">
-              PinFlix could not reach the CineplexBD catalog from this network right now. Browse
-              Movies and Series categories (taxonomy still loads from the verified fallback), then
-              refresh shortly. Status:{" "}
-              <a className="text-accent underline-offset-2 hover:underline" href="/api/cineplexbd/status">
-                /api/cineplexbd/status
+              {hasTMDBDiscovery
+                ? "TMDB discovery remains available above while the playback catalog source is offline."
+                : "PinFlix could not refresh its playback catalog right now. Try again shortly."}{" "}
+              Status:{" "}
+              <a className="text-accent underline-offset-2 hover:underline" href="/api/health">
+                /api/health
               </a>
               .
             </p>
