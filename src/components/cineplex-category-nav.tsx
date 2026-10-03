@@ -7,7 +7,7 @@ const groupLabels: Record<string, string> = {
   "animations-shows": "Animations & Shows",
   "regional-special": "Regional & Special",
   "web-series-sports": "Web Series & Sports",
-  "top-watch": "Top Watch",
+  "top-watch": "Popular",
 };
 
 export function CineplexCategoryNav({
@@ -26,16 +26,30 @@ export function CineplexCategoryNav({
     grouped.set(category.group, current);
   }
 
-  return <div className="space-y-5">
-    {[...grouped.entries()].map(([group, items]) => <section key={group} className="space-y-2">
-      <h2 className="text-xs font-black uppercase tracking-[.18em] text-brand">{groupLabels[group] ?? group}</h2>
-      <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible">
-        {items.map((category) => <Link
-          key={category.id}
-          href={`${basePath}?provider=cineplexbd&category=${encodeURIComponent(category.id)}`}
-          className={`tv-focus whitespace-nowrap rounded-xl border px-4 py-2 text-sm font-semibold transition ${activeId === category.id ? "border-brand bg-brand text-black" : "border-line bg-surface text-muted hover:text-fg"}`}
-        >{category.label}</Link>)}
-      </div>
-    </section>)}
-  </div>;
+  return (
+    <div className="space-y-5">
+      {[...grouped.entries()].map(([group, items]) => (
+        <section key={group} className="space-y-2.5">
+          <h2 className="text-xs font-extrabold uppercase tracking-[.18em] text-slate-500">
+            {groupLabels[group] ?? group}
+          </h2>
+          <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible">
+            {items.map((category) => (
+              <Link
+                key={category.id}
+                href={`${basePath}?category=${encodeURIComponent(category.id)}`}
+                className={`tv-focus whitespace-nowrap rounded-full border px-4 py-2.5 text-sm font-semibold shadow-sm ${
+                  activeId === category.id
+                    ? "border-brand bg-brand text-white"
+                    : "border-line bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950"
+                }`}
+              >
+                {category.label}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
 }
