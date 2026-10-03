@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: cloudflare-compat-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   compatibility:
     runs-on: ubuntu-latest
