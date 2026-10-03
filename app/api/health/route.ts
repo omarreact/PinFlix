@@ -1,5 +1,6 @@
 import { fallbackCineplexCategories } from "@/src/lib/providers/cineplexbd/categories";
 import { probeCineplexConnectivity } from "@/src/lib/providers/cineplexbd/api";
+import { isTMDBConfigured } from "@/src/lib/tmdb/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,20 +13,24 @@ export async function GET() {
   const tvCategories = fallbackCineplexCategories.filter(
     (item) => item.endpoint === "tcategory.php",
   );
+  const tmdbConfigured = isTMDBConfigured();
 
   return Response.json(
     {
       ok: true,
       degraded: !connectivity.reachable,
       service: "pinflix",
-      provider: "cineplexbd",
-      catalog: {
+      discovery: {
+        tmdbConfigured,
+      },
+      playbackCatalog: {
+        provider: "cineplexbd",
         fallbackReady: true,
         movieCategories: movieCategories.length,
         tvCategories: tvCategories.length,
         totalCategories: fallbackCineplexCategories.length,
+        connectivity,
       },
-      connectivity,
     },
     { headers: { "Cache-Control": "no-store" } },
   );
