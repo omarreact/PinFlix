@@ -1,53 +1,35 @@
 import Link from "next/link";
-import { Play } from "lucide-react";
+import { PlayCircle } from "lucide-react";
 import type { Entertainment } from "@/src/types/catalog";
-import { Card } from "@/src/components/ui/card";
 
 export function EntertainmentCard({ item }: { item: Entertainment }) {
-  const meta = [item.year ? String(item.year) : "", item.genres[0] || ""].filter(Boolean).join(" · ");
-
   return (
     <Link
       href={`/entertainment/${item.slug}`}
-      className="tv-focus group block w-[155px] shrink-0 sm:w-[175px] lg:w-[190px]"
+      className="movie-card tv-focus group relative block aspect-[2/3] min-w-0 overflow-hidden rounded-2xl border border-white/5 bg-surface"
       aria-label={`View ${item.title}`}
     >
-      <Card interactive className="overflow-visible border-0 bg-transparent p-0 shadow-none">
-        <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-line bg-slate-100 shadow-sm">
-          {item.poster ? (
-            <img
-              src={item.poster}
-              alt=""
-              className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.035]"
-            />
-          ) : (
-            <div className="grid h-full place-items-center text-4xl text-muted" aria-hidden>🎬</div>
-          )}
-
-          <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
-            <span className="rounded-full bg-white/92 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-700 shadow-sm backdrop-blur">
-              {item.kind === "show" ? "Series" : "Movie"}
-            </span>
-            {item.rating !== undefined && (
-              <span className="rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
-                ★ {item.rating}
-              </span>
-            )}
-          </div>
-
-          <div className="absolute inset-0 flex items-end bg-gradient-to-t from-slate-950/70 via-transparent to-transparent p-3 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
-            <div className="flex w-full items-center justify-between gap-2 text-white">
-              <span className="text-xs font-semibold">{item.year || "Play"}</span>
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-white text-slate-950 shadow-lg">
-                <Play size={15} fill="currentColor" />
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <h3 className="mt-3 line-clamp-2 text-sm font-bold leading-5 text-slate-900">{item.title}</h3>
-        {meta && <p className="mt-1 truncate text-xs text-muted">{meta}</p>}
-      </Card>
+      {item.poster ? (
+        <img src={item.poster} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
+      ) : (
+        <div className="poster-fallback grid h-full place-items-center p-5 text-center text-lg font-bold text-white/70">{item.title}</div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/25 to-transparent opacity-75" />
+      <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+        <span className="rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-zinc-200 backdrop-blur-md">
+          {item.kind === "show" ? "Series" : "Movie"}
+        </span>
+        {item.rating !== undefined && (
+          <span className="rounded-full border border-brand/30 bg-brand/20 px-2.5 py-1 text-[10px] font-bold text-accent backdrop-blur-md">★ {item.rating}</span>
+        )}
+      </div>
+      <div className="meta-overlay absolute inset-0 flex flex-col justify-end p-4">
+        <PlayCircle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white drop-shadow-2xl" size={50} fill="rgba(255,255,255,.15)" />
+        <h3 className="line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-md sm:text-base">{item.title}</h3>
+        <p className="mt-1.5 text-[11px] font-medium text-accent">
+          {[item.year ? String(item.year) : "", item.genres[0] || ""].filter(Boolean).join(" · ") || "PinFlix"}
+        </p>
+      </div>
     </Link>
   );
 }
