@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Info, Play } from "lucide-react";
+import { SavedToggle } from "@/src/components/saved-toggle";
 import type { Entertainment } from "@/src/types/catalog";
 
 export function HomeHero({ item }: { item?: Entertainment }) {
@@ -8,11 +9,11 @@ export function HomeHero({ item }: { item?: Entertainment }) {
   return (
     <section className="relative flex min-h-[78vh] items-end overflow-hidden md:min-h-[86vh]">
       {image ? (
-        <img src={image} alt="" className="absolute inset-0 h-full w-full scale-[1.025] object-cover object-center opacity-60" />
+        <img src={image} alt="" className="hero-media absolute inset-0 h-full w-full scale-[1.025] object-cover object-center opacity-60" />
       ) : (
         <div className="poster-fallback absolute inset-0" />
       )}
-      <div className="ambient-glow left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
+      <div className="ambient-glow ambient-pulse left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
       <div className="hero-vignette absolute inset-0" />
       <div className="hero-side-fade absolute inset-0" />
 
@@ -55,9 +56,20 @@ export function HomeHero({ item }: { item?: Entertainment }) {
                   <Play size={18} fill="currentColor" />
                   Watch now
                 </Link>
+                <SavedToggle
+                  item={{
+                    id: item.id,
+                    slug: item.slug,
+                    title: item.title,
+                    kind: item.kind,
+                    poster: item.poster,
+                    year: item.year,
+                    genres: item.genres,
+                  }}
+                />
                 <Link
                   href={`/entertainment/${item.slug}`}
-                  className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-7 py-3 font-semibold text-white backdrop-blur hover:bg-white/10"
+                  className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 font-semibold text-white backdrop-blur hover:bg-white/10"
                 >
                   <Info size={18} />
                   Details
