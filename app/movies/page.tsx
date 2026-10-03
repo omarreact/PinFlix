@@ -32,25 +32,21 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[.18em] text-brand">Movies</p>
-        <h1 className="mt-2 text-3xl font-black">{title}</h1>
-        <p className="mt-2 text-muted">
-          Live CineplexBD catalog. Newly uploaded titles are requested fresh when you open or refresh this page.
+      <section>
+        <p className="text-xs font-extrabold uppercase tracking-[.2em] text-brand">Movies</p>
+        <h1 className="mt-2 text-3xl font-black tracking-[-.03em] text-slate-950 sm:text-4xl">{title}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+          Browse the latest titles and move through Cineplex categories without leaving the catalog.
         </p>
-      </div>
+      </section>
 
-      <CineplexCategoryNav
-        categories={categories}
-        activeId={activeCategory?.id}
-        basePath="/movies"
-      />
+      <CineplexCategoryNav categories={categories} activeId={activeCategory?.id} basePath="/movies" />
 
       {items.length > 0 ? (
         <EntertainmentGrid items={items} />
       ) : (
-        <div className="rounded-2xl border border-line bg-surface p-6 text-muted">
-          CineplexBD did not return movies for this page right now. Try another category or refresh.
+        <div className="soft-card rounded-2xl p-6 text-sm text-muted">
+          No movies are available for this page right now. Try another category or refresh.
         </div>
       )}
 
@@ -59,18 +55,18 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
           <div>
             {page > 1 && (
               <Link
-                className="tv-focus rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold"
+                className="tv-focus rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm"
                 href={pageHref(page - 1, activeCategory?.id)}
               >
                 ← Previous
               </Link>
             )}
           </div>
-          <span className="text-sm text-muted">Page {page}</span>
+          <span className="text-sm font-medium text-muted">Page {page}</span>
           <div>
             {hasNext && (
               <Link
-                className="tv-focus rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold"
+                className="tv-focus rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm"
                 href={pageHref(page + 1, activeCategory?.id)}
               >
                 Next →
@@ -79,10 +75,6 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
           </div>
         </div>
       )}
-
-      <p className="text-center text-xs text-subtle">
-        Availability depends on the upstream CineplexBD service and the viewer&apos;s network.
-      </p>
     </div>
   );
 }
