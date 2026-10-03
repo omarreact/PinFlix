@@ -1,0 +1,1 @@
+import{o as e}from"./cineplexbd-CbC_ibxf.js";var t=`force-dynamic`,n=`nodejs`;async function r(t){let n=new URL(t.url).searchParams.get(`q`)?.trim()??``;if(!n)return Response.json({entertainment:[]},{headers:{"Cache-Control":`no-store`}});let r=await e(n);return Response.json({entertainment:r},{headers:{"Cache-Control":`no-store`}})}export{r as GET,t as dynamic,n as runtime};

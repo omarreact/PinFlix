@@ -1,0 +1,1 @@
+function e(){try{let e=JSON.parse(window.localStorage.getItem(`pinflix_saved_v1`)??`[]`);return Array.isArray(e)?e:[]}catch{return[]}}function t(e){window.localStorage.setItem(`pinflix_saved_v1`,JSON.stringify(e)),window.dispatchEvent(new CustomEvent(`pinflix:saved`))}export{t as n,e as t};

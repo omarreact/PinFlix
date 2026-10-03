@@ -1,0 +1,1 @@
+import{t as e}from"./framework~index~page~layout~loading~page~not-found~page~page~page~page~app-route-handler-di~dsqi6kxm-B4RHnzFo.js";var t=e();function n(){return(0,t.jsx)(`div`,{className:`grid min-h-[60vh] place-items-center text-muted`,children:`Loading PinFlix…`})}export{n as default};

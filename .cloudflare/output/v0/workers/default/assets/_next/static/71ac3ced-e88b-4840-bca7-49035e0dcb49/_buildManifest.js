@@ -1,0 +1,1 @@
+self.__BUILD_MANIFEST = {"__rewrites":{"beforeFiles":[],"afterFiles":[{"source":"/cineplex-vod/:path*","requiresServerEvaluation":true},{"source":"/cineplex-origin/:path*","requiresServerEvaluation":true}],"fallback":[]},"sortedPages":[]};self.__BUILD_MANIFEST_CB && self.__BUILD_MANIFEST_CB()
