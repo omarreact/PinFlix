@@ -1,24 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #080a0f;
-  --color-surface: #11151d;
-  --color-elevated: #171d28;
-  --color-panel: #1d2532;
-  --color-fg: #f8fafc;
-  --color-ink: #f8fafc;
-  --color-muted: #9aa5b5;
-  --color-subtle: #687386;
-  --color-accent: #22c55e;
-  --color-brand: #10b981;
-  --color-brand-2: #34d399;
-  --color-coral: #ff5a5f;
-  --color-success: #35d07f;
-  --color-warning: #f5bd4f;
-  --color-danger: #ff6868;
-  --color-border: #293342;
-  --color-line: #293342;
-  --color-ring: #6ee7b7;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-elevated: #f1f5f9;
+  --color-panel: #eef2f7;
+  --color-fg: #0f172a;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-subtle: #94a3b8;
+  --color-accent: #2563eb;
+  --color-brand: #7c3aed;
+  --color-brand-2: #8b5cf6;
+  --color-coral: #f97316;
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger: #dc2626;
+  --color-border: #e2e8f0;
+  --color-line: #e2e8f0;
+  --color-ring: #7c3aed;
   --radius-xs: 0.375rem;
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
@@ -27,22 +27,67 @@
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-:root { color-scheme: dark; }
+:root { color-scheme: light; }
 * { box-sizing: border-box; }
 html { background: var(--color-bg); }
-body { margin: 0; background: var(--color-bg); color: var(--color-fg); font-family: var(--font-sans); }
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
 a { color: inherit; text-decoration: none; }
-button, a, input { outline: none; }
+button, a, input, select { outline: none; }
 button, a { -webkit-tap-highlight-color: transparent; }
-.tv-focus { scroll-margin: 5rem; transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
-.tv-focus:focus-visible { outline: 3px solid var(--color-ring); outline-offset: 3px; box-shadow: 0 0 0 3px var(--color-bg); transform: scale(1.06); }
-.motion-surface { transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
-.motion-surface:hover { transform: translateY(-2px); }
+img { display: block; }
+
+.tv-focus {
+  scroll-margin: 5rem;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease,
+    box-shadow 160ms ease;
+}
+.tv-focus:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px #ffffff;
+}
+.motion-surface {
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+.motion-surface:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.10);
+}
+.soft-card {
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+}
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { scrollbar-width: none; }
-.hero-gradient { background: linear-gradient(90deg, var(--color-bg) 0%, rgba(8,10,15,.86) 38%, rgba(8,10,15,.18) 100%); }
+.hero-gradient {
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.92) 38%, rgba(255,255,255,.20) 72%, rgba(255,255,255,0) 100%);
+}
+
+@media (max-width: 767px) {
+  .hero-gradient {
+    background: linear-gradient(0deg, #ffffff 0%, rgba(255,255,255,.95) 42%, rgba(255,255,255,.10) 100%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
-  .tv-focus:focus-visible { transform: none; }
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
   .motion-surface:hover { transform: none; }
 }
