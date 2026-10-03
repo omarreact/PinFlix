@@ -105,6 +105,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className={cn(pathname === "/" ? "min-h-screen" : "mx-auto min-h-screen max-w-[1400px] px-5 pb-24 pt-32 sm:px-8 md:px-12")}>
         {children}
       </main>
+
+      <footer className="border-t border-white/5 px-5 py-8 text-center text-xs text-zinc-600">
+        <p>
+          Discovery metadata may be provided by TMDB.{" "}
+          <Link href="/credits" className="tv-focus rounded underline-offset-4 hover:text-zinc-300 hover:underline">
+            Credits & attribution
+          </Link>
+        </p>
+      </footer>
     </div>
   );
 }
