@@ -5,47 +5,26 @@ import type { Entertainment } from "@/src/types/catalog";
 
 export function EntertainmentGrid({ items }: { items: Entertainment[] }) {
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-      {items.map((item) => (
-        <div key={item.id} className="min-w-0 [&>a]:w-full">
-          <EntertainmentCard item={item} />
-        </div>
-      ))}
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
+      {items.map((item) => <EntertainmentCard key={item.id} item={item} />)}
     </div>
   );
 }
 
-export function EntertainmentRail({
-  title,
-  items,
-  href,
-}: {
-  title: string;
-  items: Entertainment[];
-  href?: string;
-}) {
+export function EntertainmentRail({ title, items, href }: { title: string; items: Entertainment[]; href?: string }) {
   return (
-    <section>
+    <section className="animate-slide-up">
       <SectionHeader title={title} href={href} />
-      <div className="hide-scrollbar flex gap-3 overflow-x-auto pb-3 sm:gap-4">
-        {items.map((item) => <EntertainmentCard key={item.id} item={item} />)}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 md:gap-6">
+        {items.slice(0, 12).map((item) => <EntertainmentCard key={item.id} item={item} />)}
       </div>
     </section>
   );
 }
 
-export function BackLink({
-  href = "/",
-  children = "Back",
-}: {
-  href?: string;
-  children?: React.ReactNode;
-}) {
+export function BackLink({ href = "/", children = "Back" }: { href?: string; children?: React.ReactNode }) {
   return (
-    <Link
-      href={href}
-      className="tv-focus inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-muted hover:text-slate-950"
-    >
+    <Link href={href} className="tv-focus inline-flex min-h-11 items-center rounded-full border border-white/10 bg-white/5 px-4 text-sm font-semibold text-zinc-300 hover:bg-white/10 hover:text-white">
       ← {children}
     </Link>
   );
