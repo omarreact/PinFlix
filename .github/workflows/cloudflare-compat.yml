@@ -73,11 +73,16 @@ jobs:
             compatibility_date: "2026-10-02",
             compatibility_flags: ["nodejs_compat"],
             observability: { enabled: true },
+            keep_bindings: ["secret_text"],
             bindings: [
               {
                 type: "service",
                 name: "ASSETS",
                 service: "pinflix-assets"
+              },
+              {
+                type: "images",
+                name: "IMAGES"
               },
               {
                 type: "plain_text",
@@ -181,6 +186,13 @@ jobs:
             exit 1
           fi
           grep -q "Missing upstream url param" /tmp/proxy-response.json
+          TMDB_LOCAL_STATUS=$(curl --silent --show-error --max-time 5 --output /tmp/tmdb-local.json --write-out "%{http_code}" "http://127.0.0.1:3001/api/tmdb/search?q=Avatar" || true)
+          if [ "$TMDB_LOCAL_STATUS" != "200" ]; then
+            cat /tmp/tmdb-local.json
+            cat /tmp/pinflix-vinext.log
+            exit 1
+          fi
+          node -e 'const j=require("/tmp/tmdb-local.json"); if (j.configured !== false || !Array.isArray(j.results)) process.exit(1)'
           echo "Local Workers runtime smoke test passed."
 
       - name: Probe deployed Cloudflare workers.dev runtime
