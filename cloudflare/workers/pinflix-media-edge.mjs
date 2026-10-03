@@ -298,9 +298,6 @@ async function fetchCatalogRace(target, request, timeoutMs) {
       });
     }));
 
-    if (target.protocol === "http:") {
-      racers.push(run("tcp-socket", () => socketHttpFetch(target, request, timeoutMs)));
-    }
   }
 
   try {
@@ -446,7 +443,7 @@ export default {
         const { response, transport, attempts } = await fetchCatalogRace(
           catalog,
           request,
-          Math.min(CATALOG_TIMEOUT_MS, 3500),
+          Math.min(CATALOG_TIMEOUT_MS, 2500),
         );
 
         if (response.status === 403 || response.status >= 500) {
