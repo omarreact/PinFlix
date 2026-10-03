@@ -8,7 +8,9 @@ export function SavedToggle({ item }: { item: SavedTitle }) {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setSaved(readSavedTitles().some((entry) => entry.id === item.id));
+    const nextSaved = readSavedTitles().some((entry) => entry.id === item.id);
+    const timer = window.setTimeout(() => setSaved(nextSaved), 0);
+    return () => window.clearTimeout(timer);
   }, [item.id]);
 
   function toggle() {
