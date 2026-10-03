@@ -7,7 +7,8 @@ import { cn } from "@/src/lib/utils";
 const tabs = [
   { id: "all", label: "Discover", href: "/" },
   { id: "movies", label: "Movies", href: "/movies" },
-  { id: "series", label: "Web Series", href: "/series" },
+  { id: "series", label: "Series", href: "/series" },
+  { id: "saved", label: "My List", href: "/saved" },
 ];
 
 export function BrowseTabs({ active }: { active?: string }) {
@@ -18,29 +19,26 @@ export function BrowseTabs({ active }: { active?: string }) {
       ? "movies"
       : pathname.startsWith("/series")
         ? "series"
-        : "all");
+        : pathname.startsWith("/saved")
+          ? "saved"
+          : "all");
 
   return (
-    <section>
-      <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1">
-        {tabs.map((tab) => {
-          const isActive = current === tab.id;
-          return (
-            <Link
-              key={tab.id}
-              href={tab.href}
-              className={cn(
-                "tv-focus whitespace-nowrap rounded-full border px-5 py-2.5 text-sm font-semibold shadow-sm",
-                isActive
-                  ? "border-brand bg-brand text-white"
-                  : "border-line bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950",
-              )}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
-      </div>
-    </section>
+    <div className="hide-scrollbar flex gap-2 overflow-x-auto py-1">
+      {tabs.map((tab) => (
+        <Link
+          key={tab.id}
+          href={tab.href}
+          className={cn(
+            "tv-focus shrink-0 rounded-full border px-5 py-2.5 text-sm font-semibold",
+            current === tab.id
+              ? "border-transparent accent-gradient text-white shadow-[0_0_18px_rgba(168,85,247,.22)]"
+              : "border-white/5 bg-surface/70 text-zinc-400 hover:bg-white/10 hover:text-white",
+          )}
+        >
+          {tab.label}
+        </Link>
+      ))}
+    </div>
   );
 }
