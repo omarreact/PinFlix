@@ -35,3 +35,7 @@ The service rewrites HLS segment, child-playlist, key, map, subtitle, and media 
 Playback remains in the PinFlix web player. The Android app is not opened for each video.
 
 Modern browsers may ask once for local-network access. That browser permission cannot be bypassed by the website.
+
+## Build artifact
+
+GitHub Actions builds `app-debug.apk` as the `pinflix-bridge-debug` artifact after bridge changes on `main`.
