@@ -255,6 +255,67 @@ async function socketHttpFetch(target, request, timeoutMs) {
   }
 }
 
+async function fetchCatalogRace(target, request, timeoutMs) {
+  const attempts = [];
+  const badResponses = [];
+
+  const run = async (transport, task) => {
+    try {
+      const response = await task();
+      attempts.push({ transport, status: response.status });
+      if (response.status === 403 || response.status >= 500) {
+        badResponses.push({ transport, response });
+        throw new Error(`${transport} returned HTTP ${response.status}`);
+      }
+      return { response, transport, attempts };
+    } catch (error) {
+      if (!attempts.some((item) => item.transport === transport)) {
+        attempts.push({
+          transport,
+          error: error instanceof Error ? error.message : "network error",
+        });
+      }
+      throw error;
+    }
+  };
+
+  const fallbackIp = ORIGIN_IPS[target.hostname.toLowerCase()];
+  const racers = [
+    run("hostname", () => fetchCandidate(target, request, timeoutMs, { catalog: true })),
+  ];
+
+  if (fallbackIp) {
+    racers.push(run("ipv4-fallback", async () => {
+      const fallback = new URL(target.toString());
+      fallback.hostname = fallbackIp;
+      const headers = baseHeaders(request, target, { catalog: true });
+      headers.set("Host", target.host);
+      return fetch(fallback.toString(), {
+        method: request.method === "HEAD" ? "HEAD" : "GET",
+        headers,
+        redirect: "manual",
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    }));
+
+    if (target.protocol === "http:") {
+      racers.push(run("tcp-socket", () => socketHttpFetch(target, request, timeoutMs)));
+    }
+  }
+
+  try {
+    return await Promise.any(racers);
+  } catch {
+    if (badResponses.length) {
+      const preferred = badResponses.find((item) => item.response.status !== 403) || badResponses[0];
+      return { response: preferred.response, transport: preferred.transport, attempts };
+    }
+    const error = new Error("Catalog origin unavailable across all transports");
+    error.attempts = attempts;
+    throw error;
+  }
+}
+
 function catalogCacheKeys(incoming) {
   const encoded = encodeURIComponent(incoming.pathname + incoming.search);
   return {
@@ -382,11 +443,10 @@ export default {
       if (fresh) return fresh;
 
       try {
-        const { response, transport, attempts } = await fetchWithOriginFallback(
+        const { response, transport, attempts } = await fetchCatalogRace(
           catalog,
           request,
-          CATALOG_TIMEOUT_MS,
-          { catalog: true },
+          Math.min(CATALOG_TIMEOUT_MS, 3500),
         );
 
         if (response.status === 403 || response.status >= 500) {
