@@ -17,6 +17,9 @@ function toBrowserAssetUrl(url: string) {
   try {
     const parsed = new URL(absolute);
     if (parsed.hostname.toLowerCase() === "cineplexbd.net" && (!parsed.port || parsed.port === "80")) {
+      parsed.pathname = parsed.pathname
+        .replace(/\/{2,}/g, "/")
+        .replace(/^\/(?:uploads\/){2,}/i, "/uploads/");
       return `/cineplex-origin${parsed.pathname}${parsed.search}`;
     }
   } catch {

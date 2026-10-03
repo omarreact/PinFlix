@@ -1,3 +1,5 @@
+import { connect } from "cloudflare:sockets";
+
 const CATALOG_HOST = "cineplexbd.net";
 const ORIGIN_IPS = {
   "cineplexbd.net": "103.136.200.66",
@@ -7,6 +9,8 @@ const ORIGIN_IPS = {
 
 const CATALOG_TIMEOUT_MS = 5000;
 const MEDIA_TIMEOUT_MS = 20000;
+const CATALOG_FRESH_TTL_SECONDS = 120;
+const CATALOG_STALE_TTL_SECONDS = 86_400;
 
 function corsHeaders(request) {
   const origin = request.headers.get("Origin") || "";
@@ -99,6 +103,23 @@ async function fetchWithOriginFallback(target, request, timeoutMs, options = {})
       signal: AbortSignal.timeout(timeoutMs),
     });
     attempts.push({ transport: "ipv4-fallback", status: response.status, ip: fallbackIp });
+
+    if (options.catalog && (response.status === 403 || response.status >= 500) && target.protocol === "http:") {
+      try {
+        const socketResponse = await socketHttpFetch(target, request, Math.min(timeoutMs, 5000));
+        attempts.push({ transport: "tcp-socket", status: socketResponse.status, ip: fallbackIp });
+        if (socketResponse.status !== 403 && socketResponse.status < 500) {
+          return { response: socketResponse, transport: "tcp-socket", attempts, finalUrl: target };
+        }
+      } catch (socketError) {
+        attempts.push({
+          transport: "tcp-socket",
+          ip: fallbackIp,
+          error: socketError instanceof Error ? socketError.message : "socket error",
+        });
+      }
+    }
+
     return { response, transport: "ipv4-fallback", attempts, finalUrl: target };
   } catch (error) {
     attempts.push({
@@ -110,6 +131,175 @@ async function fetchWithOriginFallback(target, request, timeoutMs, options = {})
     err.attempts = attempts;
     throw err;
   }
+}
+
+
+function findHeaderBoundary(bytes) {
+  for (let i = 0; i <= bytes.length - 4; i += 1) {
+    if (bytes[i] === 13 && bytes[i + 1] === 10 && bytes[i + 2] === 13 && bytes[i + 3] === 10) return i;
+  }
+  return -1;
+}
+
+function concatBytes(chunks, total) {
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
+
+function decodeChunkedBody(bytes) {
+  const decoder = new TextDecoder();
+  const chunks = [];
+  let total = 0;
+  let offset = 0;
+
+  while (offset < bytes.length) {
+    let lineEnd = -1;
+    for (let i = offset; i < bytes.length - 1; i += 1) {
+      if (bytes[i] === 13 && bytes[i + 1] === 10) {
+        lineEnd = i;
+        break;
+      }
+    }
+    if (lineEnd < 0) throw new Error("Malformed chunked response.");
+
+    const sizeLine = decoder.decode(bytes.slice(offset, lineEnd)).split(";", 1)[0].trim();
+    const size = Number.parseInt(sizeLine, 16);
+    if (!Number.isFinite(size)) throw new Error("Invalid chunk size.");
+    offset = lineEnd + 2;
+    if (size === 0) break;
+    if (offset + size > bytes.length) throw new Error("Incomplete chunked response.");
+
+    const chunk = bytes.slice(offset, offset + size);
+    chunks.push(chunk);
+    total += chunk.byteLength;
+    offset += size + 2;
+  }
+
+  return concatBytes(chunks, total);
+}
+
+async function socketHttpFetch(target, request, timeoutMs) {
+  const hostname = target.hostname.toLowerCase();
+  const ip = ORIGIN_IPS[hostname];
+  if (!ip || target.protocol !== "http:") throw new Error("TCP fallback target is not supported.");
+
+  const socket = connect({ hostname: ip, port: Number(target.port || "80") }, { allowHalfOpen: true });
+  const writer = socket.writable.getWriter();
+  const headers = baseHeaders(request, target, { catalog: true });
+  const requestLines = [
+    `${request.method === "HEAD" ? "HEAD" : "GET"} ${target.pathname}${target.search} HTTP/1.1`,
+    `Host: ${target.host}`,
+  ];
+  for (const [name, value] of headers) {
+    if (name.toLowerCase() !== "host") requestLines.push(`${name}: ${value}`);
+  }
+  requestLines.push("Connection: close", "", "");
+
+  const timer = setTimeout(() => {
+    try { socket.close(); } catch {}
+  }, timeoutMs);
+
+  try {
+    await writer.write(new TextEncoder().encode(requestLines.join("\r\n")));
+    await writer.close();
+
+    const reader = socket.readable.getReader();
+    const chunks = [];
+    let total = 0;
+    const maxBytes = 4 * 1024 * 1024;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      chunks.push(value);
+      total += value.byteLength;
+      if (total > maxBytes) throw new Error("Catalog TCP response exceeded 4 MiB.");
+    }
+
+    const raw = concatBytes(chunks, total);
+    const boundary = findHeaderBoundary(raw);
+    if (boundary < 0) throw new Error("TCP fallback returned no HTTP headers.");
+
+    const headerText = new TextDecoder().decode(raw.slice(0, boundary));
+    const lines = headerText.split("\r\n");
+    const statusMatch = lines.shift()?.match(/^HTTP\/\d(?:\.\d)?\s+(\d{3})/i);
+    if (!statusMatch) throw new Error("TCP fallback returned an invalid HTTP status line.");
+
+    const responseHeaders = new Headers();
+    for (const line of lines) {
+      const colon = line.indexOf(":");
+      if (colon <= 0) continue;
+      responseHeaders.append(line.slice(0, colon).trim(), line.slice(colon + 1).trim());
+    }
+
+    let body = raw.slice(boundary + 4);
+    if ((responseHeaders.get("transfer-encoding") || "").toLowerCase().includes("chunked")) {
+      body = decodeChunkedBody(body);
+      responseHeaders.delete("transfer-encoding");
+      responseHeaders.set("content-length", String(body.byteLength));
+    }
+
+    return new Response(request.method === "HEAD" ? null : body, {
+      status: Number(statusMatch[1]),
+      headers: responseHeaders,
+    });
+  } finally {
+    clearTimeout(timer);
+    try { socket.close(); } catch {}
+  }
+}
+
+function catalogCacheKeys(incoming) {
+  const encoded = encodeURIComponent(incoming.pathname + incoming.search);
+  return {
+    fresh: new Request(`https://pinflix-cache.invalid/catalog/fresh/${encoded}`),
+    stale: new Request(`https://pinflix-cache.invalid/catalog/stale/${encoded}`),
+  };
+}
+
+async function cachedCatalogResponse(request, incoming, cors) {
+  if (request.method !== "GET") return null;
+  const hit = await caches.default.match(catalogCacheKeys(incoming).fresh);
+  if (!hit) return null;
+  const headers = new Headers(hit.headers);
+  for (const [key, value] of Object.entries(cors)) headers.set(key, value);
+  headers.set("X-PinFlix-Catalog-Cache", "HIT");
+  return new Response(hit.body, { status: hit.status, headers });
+}
+
+async function staleCatalogResponse(request, incoming, cors) {
+  if (request.method !== "GET") return null;
+  const hit = await caches.default.match(catalogCacheKeys(incoming).stale);
+  if (!hit) return null;
+  const headers = new Headers(hit.headers);
+  for (const [key, value] of Object.entries(cors)) headers.set(key, value);
+  headers.set("Cache-Control", "private, no-store");
+  headers.set("X-PinFlix-Catalog-Cache", "STALE");
+  headers.set("Warning", '110 - "Response is stale"');
+  return new Response(hit.body, { status: hit.status, headers });
+}
+
+async function storeCatalogResponse(incoming, response) {
+  if (!response.ok) return;
+  const keys = catalogCacheKeys(incoming);
+
+  const freshHeaders = new Headers(response.headers);
+  freshHeaders.set("Cache-Control", `public, max-age=${CATALOG_FRESH_TTL_SECONDS}`);
+  const staleHeaders = new Headers(response.headers);
+  staleHeaders.set("Cache-Control", `public, max-age=${CATALOG_STALE_TTL_SECONDS}`);
+
+  try {
+    await Promise.all([
+      caches.default.put(keys.fresh, new Response(response.clone().body, { status: response.status, headers: freshHeaders })),
+      caches.default.put(keys.stale, new Response(response.clone().body, { status: response.status, headers: staleHeaders })),
+    ]);
+  } catch {}
 }
 
 function copyHeaders(upstream, cors) {
@@ -188,21 +378,39 @@ export default {
 
     const catalog = catalogTarget(incoming);
     if (catalog) {
+      const fresh = await cachedCatalogResponse(request, incoming, cors);
+      if (fresh) return fresh;
+
       try {
-        const { response, transport } = await fetchWithOriginFallback(
+        const { response, transport, attempts } = await fetchWithOriginFallback(
           catalog,
           request,
           CATALOG_TIMEOUT_MS,
           { catalog: true },
         );
+
+        if (response.status === 403 || response.status >= 500) {
+          const stale = await staleCatalogResponse(request, incoming, cors);
+          if (stale) return stale;
+        }
+
         const headers = copyHeaders(response, cors);
-        headers.set("Cache-Control", "private, no-store");
+        headers.set("Cache-Control", response.ok ? "public, max-age=120" : "private, no-store");
         headers.set("X-PinFlix-Origin-Transport", transport);
-        return new Response(request.method === "HEAD" ? null : response.body, {
+        headers.set("X-PinFlix-Origin-Attempts", attempts.map((item) => item.transport).join(","));
+
+        const outgoing = new Response(request.method === "HEAD" ? null : response.body, {
           status: response.status,
           headers,
         });
+        if (request.method === "GET" && outgoing.ok) {
+          await storeCatalogResponse(incoming, outgoing.clone());
+        }
+        return outgoing;
       } catch (error) {
+        const stale = await staleCatalogResponse(request, incoming, cors);
+        if (stale) return stale;
+
         return Response.json({
           error: "Catalog upstream unavailable",
           detail: error instanceof Error ? error.message : "upstream error",
