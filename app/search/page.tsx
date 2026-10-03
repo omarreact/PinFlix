@@ -26,7 +26,6 @@ export default function SearchPage() {
     if (!normalized) return;
 
     let cancelled = false;
-    setLoading(true);
     const debounceId = window.setTimeout(() => {
       fetch(`/api/search?q=${encodeURIComponent(normalized)}`)
         .then((response) => response.json())
@@ -64,10 +63,8 @@ export default function SearchPage() {
             onChange={(event) => {
               const value = event.target.value;
               setQuery(value);
-              if (!value.trim()) {
-                setEntertainment([]);
-                setLoading(false);
-              }
+              setLoading(Boolean(value.trim()));
+              if (!value.trim()) setEntertainment([]);
             }}
             placeholder="Search titles"
             className="min-w-0 flex-1 bg-transparent py-4 text-white placeholder:text-zinc-600"
