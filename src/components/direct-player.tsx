@@ -1,18 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Copy, ExternalLink, Play } from "lucide-react";
+import { Copy, Play, RefreshCw } from "lucide-react";
 import type Hls from "hls.js";
+
+type Transport = "local-bridge" | "direct";
 
 type Selection = {
   url: string;
   hls: boolean;
   attempt: number;
-  relayed: boolean;
+  transport: Transport;
 };
 
-const MEDIA_EDGE_URL = "https://media.pincodeit.com/";
-const buttonClass = "tv-focus inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-panel px-4 py-2 text-sm font-semibold disabled:opacity-40";
+type BridgeState = "idle" | "checking" | "ready" | "missing";
+
+const LOCAL_BRIDGE_BASE = "http://127.0.0.1:8787";
+const buttonClass =
+  "tv-focus inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-panel px-4 py-2 text-sm font-semibold disabled:opacity-40";
 
 function parseVideoUrl(value: string) {
   const url = new URL(value.trim());
@@ -38,14 +43,33 @@ function isCineplexUrl(url: URL) {
   return false;
 }
 
-function toSecurePlaybackUrl(url: URL) {
-  if (!isCineplexUrl(url)) {
-    return { url: url.href, relayed: false };
-  }
+function toLocalBridgeUrl(url: URL) {
+  const bridge = new URL("/proxy", LOCAL_BRIDGE_BASE);
+  bridge.searchParams.set("url", url.href);
+  return bridge.toString();
+}
 
-  const relay = new URL(MEDIA_EDGE_URL);
-  relay.searchParams.set("url", url.href);
-  return { url: relay.toString(), relayed: true };
+async function bridgeIsReady(timeoutMs = 1800) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${LOCAL_BRIDGE_BASE}/health`, {
+      method: "GET",
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) return false;
+    const body = (await response.json()) as { ok?: boolean; service?: string };
+    return body.ok === true && body.service === "pinflix-bridge";
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 export function DirectPlayer() {
@@ -54,6 +78,7 @@ export function DirectPlayer() {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [notice, setNotice] = useState("Paste a video link to get started.");
   const [error, setError] = useState("");
+  const [bridgeState, setBridgeState] = useState<BridgeState>("idle");
   const videoRef = useRef<HTMLVideoElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -73,7 +98,7 @@ export function DirectPlayer() {
           if (disposed) return;
 
           if (!HlsPlayer.isSupported()) {
-            setError("This browser does not support HLS playback. Open the original link in VLC.");
+            setError("This browser does not support HLS playback.");
             return;
           }
 
@@ -86,8 +111,10 @@ export function DirectPlayer() {
 
             setError(
               data.type === HlsPlayer.ErrorTypes.NETWORK_ERROR
-                ? "The secure media relay could not load the playlist or one of its segments. Retry, or open the original link in VLC."
-                : "The browser could not decode this stream. Try opening the original link in VLC.",
+                ? selection!.transport === "local-bridge"
+                  ? "The PinFlix Bridge could not fetch the playlist or a video segment from this device network. Make sure the Bridge is running, then retry."
+                  : "The browser could not load the playlist or one of its segments."
+                : "The browser could not decode this stream.",
             );
             hls?.destroy();
           });
@@ -100,7 +127,7 @@ export function DirectPlayer() {
         }
       } catch {
         if (!disposed) {
-          setError("The player could not start. Retry or open the original link in VLC.");
+          setError("The player could not start. Retry the stream.");
         }
       }
     }
@@ -126,60 +153,68 @@ export function DirectPlayer() {
     }
   }
 
-  function play(event: FormEvent) {
+  async function checkBridge(showReadyNotice = false) {
+    setBridgeState("checking");
+    const ready = await bridgeIsReady();
+    setBridgeState(ready ? "ready" : "missing");
+
+    if (ready && showReadyNotice) {
+      setNotice("PinFlix Bridge is running on this device.");
+      setError("");
+    }
+
+    return ready;
+  }
+
+  async function play(event: FormEvent) {
     event.preventDefault();
     setError("");
 
     const original = currentUrl();
     if (!original) return;
 
-    const playback = toSecurePlaybackUrl(original);
-
-    if (
-      window.location.protocol === "https:" &&
-      original.protocol === "http:" &&
-      !playback.relayed
-    ) {
-      setSelection(null);
-      setError(
-        "This HTTP source cannot be embedded safely on an HTTPS page. PinFlix can automatically upgrade supported Cineplex links; use VLC for other HTTP-only sources.",
-      );
-      return;
-    }
-
     const hls =
       format === "hls" ||
       (format === "auto" && /\.m3u8$/i.test(original.pathname));
 
-    setNotice(
-      playback.relayed
-        ? "Loading through the secure PinFlix media relay…"
-        : "Loading video… Press play when the controls are ready.",
-    );
+    if (original.protocol === "http:" && isCineplexUrl(original)) {
+      setNotice("Connecting to the PinFlix Bridge on this device…");
 
+      const ready = await checkBridge();
+      if (!ready) {
+        setSelection(null);
+        setError(
+          "PinFlix Bridge is not reachable on this device. Open the installed PinFlix Bridge once, keep it running, then press Load video again.",
+        );
+        setNotice("The stream was not sent through Cloudflare. PinFlix is waiting for the local device bridge.");
+        return;
+      }
+
+      setNotice("Loading through your device network with PinFlix Bridge…");
+      setSelection({
+        url: toLocalBridgeUrl(original),
+        hls,
+        transport: "local-bridge",
+        attempt: Date.now(),
+      });
+      return;
+    }
+
+    if (window.location.protocol === "https:" && original.protocol === "http:") {
+      setSelection(null);
+      setError(
+        "This HTTP source is not in the PinFlix Bridge allowlist, so the HTTPS page will not load it directly.",
+      );
+      return;
+    }
+
+    setNotice("Loading video… Press play when the controls are ready.");
     setSelection({
-      url: playback.url,
+      url: original.href,
       hls,
-      relayed: playback.relayed,
+      transport: "direct",
       attempt: Date.now(),
     });
-  }
-
-  function openVlc() {
-    const url = currentUrl();
-    if (!url) return;
-
-    setNotice(
-      "Opening VLC. If it does not open, copy the original link and paste it into VLC’s Network Stream option.",
-    );
-
-    if (/Android/i.test(navigator.userAgent)) {
-      window.location.href = `intent://${url.href.split("://")[1]}#Intent;scheme=${url.protocol.slice(0, -1)};package=org.videolan.vlc;type=video/*;end`;
-    } else if (/iPad|iPhone|iPod/i.test(navigator.userAgent)) {
-      window.location.href = `vlc-x-callback://x-callback-url/stream?url=${encodeURIComponent(url.href)}`;
-    } else {
-      window.location.href = `vlc://${url.href}`;
-    }
   }
 
   async function copyLink() {
@@ -189,15 +224,22 @@ export function DirectPlayer() {
     try {
       if (!navigator.clipboard) throw new Error("Clipboard unavailable");
       await navigator.clipboard.writeText(url.href);
-      setNotice("Original link copied. In VLC, open Network Stream and paste it.");
+      setNotice("Original video link copied.");
     } catch {
       inputRef.current?.focus();
       inputRef.current?.select();
-      setNotice(
-        "The link is selected. Long-press or use your browser’s Copy command, then paste it into VLC’s Network Stream option.",
-      );
+      setNotice("The link is selected. Long-press or use your browser’s Copy command.");
     }
   }
+
+  const bridgeLabel =
+    bridgeState === "checking"
+      ? "Checking Bridge…"
+      : bridgeState === "ready"
+        ? "Bridge connected"
+        : bridgeState === "missing"
+          ? "Bridge offline"
+          : "Check Bridge";
 
   return (
     <section className="mx-auto max-w-4xl space-y-6">
@@ -205,11 +247,11 @@ export function DirectPlayer() {
         <p className="text-sm font-semibold text-brand">PinFlix player</p>
         <h1 className="mt-2 text-3xl font-bold">Direct Play</h1>
         <p className="mt-3 text-sm leading-6 text-muted">
-          Paste an HLS (.m3u8) or MP4 video link. Supported Cineplex HTTP links are automatically upgraded through the secure PinFlix media relay so they can play inside this HTTPS page.
+          Cineplex HTTP HLS streams use the local PinFlix Bridge so the request leaves from this device and the video still plays inside pinflix.pincodeit.com.
         </p>
       </div>
 
-      <form onSubmit={play} className="space-y-4 rounded-2xl border border-line bg-surface p-5">
+      <form onSubmit={(event) => void play(event)} className="space-y-4 rounded-2xl border border-line bg-surface p-5">
         <label htmlFor="video-url" className="block text-sm font-semibold">
           Video link
         </label>
@@ -252,12 +294,12 @@ export function DirectPlayer() {
 
           <button
             type="button"
-            onClick={openVlc}
-            disabled={!input.trim()}
+            onClick={() => void checkBridge(true)}
             className={buttonClass}
+            disabled={bridgeState === "checking"}
           >
-            <ExternalLink size={17} />
-            Open in VLC
+            <RefreshCw size={17} className={bridgeState === "checking" ? "animate-spin" : ""} />
+            {bridgeLabel}
           </button>
 
           <button
@@ -292,23 +334,25 @@ export function DirectPlayer() {
           aria-label="Direct video player"
           onLoadedMetadata={() =>
             setNotice(
-              selection?.relayed
-                ? "Video loaded securely through PinFlix. Press play to watch."
+              selection?.transport === "local-bridge"
+                ? "Video loaded through this device’s PinFlix Bridge. Press play to watch."
                 : "Video loaded. Press play to watch.",
             )
           }
           onPlaying={() => {
             setError("");
             setNotice(
-              selection?.relayed
-                ? "Playing through the secure PinFlix media relay."
+              selection?.transport === "local-bridge"
+                ? "Playing inside PinFlix through this device network."
                 : "Playing directly in PinFlix.",
             );
           }}
           onError={() => {
             if (selection) {
               setError(
-                "Video playback failed. The source may be unavailable, restricted, or unsupported by this browser. Try the original link in VLC.",
+                selection.transport === "local-bridge"
+                  ? "Playback failed through the local Bridge. Keep the Bridge running and retry."
+                  : "Video playback failed. The source may be unavailable or unsupported by this browser.",
               );
             }
           }}
@@ -316,7 +360,7 @@ export function DirectPlayer() {
       </div>
 
       <p className="text-sm leading-6 text-muted">
-        VLC remains available as a fallback. PinFlix keeps the original URL for VLC while supported Cineplex links use HTTPS relay playback inside the browser.
+        No VLC handoff and no external player is used. The companion Bridge only transports approved Cineplex media from your device network; playback remains in the PinFlix web player.
       </p>
     </section>
   );
