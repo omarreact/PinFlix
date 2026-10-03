@@ -14,18 +14,16 @@ export default function SearchPage() {
 
   useEffect(() => {
     const initial = new URLSearchParams(window.location.search).get("q")?.trim() ?? "";
-    if (initial) {
+    if (!initial) return;
+    const timer = window.setTimeout(() => {
       setQuery(initial);
       setLoading(true);
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    if (!normalized) {
-      setEntertainment([]);
-      setLoading(false);
-      return;
-    }
+    if (!normalized) return;
 
     let cancelled = false;
     setLoading(true);
@@ -63,7 +61,14 @@ export default function SearchPage() {
           <input
             autoFocus
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setQuery(value);
+              if (!value.trim()) {
+                setEntertainment([]);
+                setLoading(false);
+              }
+            }}
             placeholder="Search titles"
             className="min-w-0 flex-1 bg-transparent py-4 text-white placeholder:text-zinc-600"
           />
