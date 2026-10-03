@@ -28,29 +28,25 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
 
   const items = catalog?.items ?? [];
   const hasNext = catalog?.hasNextPage ?? false;
-  const title = activeCategory?.label ?? "Latest series & shows";
+  const title = activeCategory?.label ?? "Latest web series";
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[.18em] text-brand">TV & Web Series</p>
-        <h1 className="mt-2 text-3xl font-black">{title}</h1>
-        <p className="mt-2 text-muted">
-          Live CineplexBD series catalog, including web series, regional series, animation, shows, and supported sports collections.
+      <section>
+        <p className="text-xs font-extrabold uppercase tracking-[.2em] text-brand">Web Series</p>
+        <h1 className="mt-2 text-3xl font-black tracking-[-.03em] text-slate-950 sm:text-4xl">{title}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+          Explore web series, regional shows, animation and other episodic collections in one place.
         </p>
-      </div>
+      </section>
 
-      <CineplexCategoryNav
-        categories={categories}
-        activeId={activeCategory?.id}
-        basePath="/series"
-      />
+      <CineplexCategoryNav categories={categories} activeId={activeCategory?.id} basePath="/series" />
 
       {items.length > 0 ? (
         <EntertainmentGrid items={items} />
       ) : (
-        <div className="rounded-2xl border border-line bg-surface p-6 text-muted">
-          CineplexBD did not return series for this page right now. Try another category or refresh.
+        <div className="soft-card rounded-2xl p-6 text-sm text-muted">
+          No series are available for this page right now. Try another category or refresh.
         </div>
       )}
 
@@ -59,18 +55,18 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
           <div>
             {page > 1 && (
               <Link
-                className="tv-focus rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold"
+                className="tv-focus rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm"
                 href={pageHref(page - 1, activeCategory?.id)}
               >
                 ← Previous
               </Link>
             )}
           </div>
-          <span className="text-sm text-muted">Page {page}</span>
+          <span className="text-sm font-medium text-muted">Page {page}</span>
           <div>
             {hasNext && (
               <Link
-                className="tv-focus rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold"
+                className="tv-focus rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm"
                 href={pageHref(page + 1, activeCategory?.id)}
               >
                 Next →
@@ -79,10 +75,6 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
           </div>
         </div>
       )}
-
-      <p className="text-center text-xs text-subtle">
-        Availability depends on the upstream CineplexBD service and the viewer&apos;s network.
-      </p>
     </div>
   );
 }
