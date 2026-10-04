@@ -17,6 +17,10 @@ const SITE_BASE =
   process.env.MOVIEBOX_WEB_SITE_BASE?.trim().replace(/\/$/, "") ||
   "https://movie-box.co";
 
+const PLAYBACK_BASE =
+  process.env.MOVIEBOX_PLAYBACK_BASE?.trim().replace(/\/$/, "") ||
+  "https://mzfi.me";
+
 const REQUEST_TIMEOUT_MS = 5_000;
 const SEARCH_PAGE_SIZE = 20;
 
@@ -101,16 +105,16 @@ function guestClientToken() {
   return `${seconds},${digest}`;
 }
 
-function requestHeaders(hasBody = false) {
+function requestHeaders(hasBody = false, origin = SITE_BASE) {
   const headers = new Headers({
     Accept: "application/json",
-    "X-Client-Info": JSON.stringify({ timezone: "UTC" }),
+    "X-Client-Info": JSON.stringify({ timezone: "Asia/Dhaka" }),
     "X-Request-Lang": "en",
     "X-Client-Token": guestClientToken(),
     "X-Vip-Restrict": "1",
     "X-No-High-Risk-Restrict": "0",
-    Origin: SITE_BASE,
-    Referer: `${SITE_BASE}/`,
+    Origin: origin,
+    Referer: `${origin}/`,
   });
 
   if (hasBody) headers.set("Content-Type", "application/json");
@@ -120,11 +124,12 @@ function requestHeaders(hasBody = false) {
 async function fetchJson<T>(
   url: URL,
   init: RequestInit = {},
+  origin = SITE_BASE,
 ): Promise<T> {
   const hasBody = Boolean(init.body);
   const response = await fetch(url, {
     ...init,
-    headers: requestHeaders(hasBody),
+    headers: requestHeaders(hasBody, origin),
     cache: "no-store",
     redirect: "manual",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -479,11 +484,12 @@ function mapUnlockedSource(entry: MovieBoxPlaybackEntry): StreamSource | null {
   // direct HLS/MP4 sources are eligible for fallback playback.
   if (format === "DASH" || /\.mpd(?:$|[?#])/i.test(url)) return null;
 
+  const resolution = Number(entry.resolutions);
   return {
     url,
     quality: playbackQuality(entry),
     protocol: isHls ? "hls" : "native",
-    priority: 20,
+    priority: Number.isFinite(resolution) ? resolution : 0,
   };
 }
 
@@ -512,7 +518,7 @@ export async function resolveStreams(
       ? Number(options.episode)
       : 0;
 
-  const url = new URL("/wefeed-h5api-bff/subject/play", SITE_BASE);
+  const url = new URL("/wefeed-h5api-bff/subject/play", PLAYBACK_BASE);
   url.searchParams.set("subjectId", parsed.subjectId);
   url.searchParams.set("se", String(season));
   url.searchParams.set("ep", String(episode));
@@ -521,7 +527,11 @@ export async function resolveStreams(
   url.searchParams.set("supportCodecs[h264]", "1");
 
   try {
-    const response = await fetchJson<MovieBoxPlaybackResponse>(url);
+    const response = await fetchJson<MovieBoxPlaybackResponse>(
+      url,
+      {},
+      PLAYBACK_BASE,
+    );
     if (response.code !== 0 || response.data?.hasResource === false) return [];
 
     const candidates = [
@@ -536,7 +546,8 @@ export async function resolveStreams(
         if (!source || seen.has(source.url)) return false;
         seen.add(source.url);
         return true;
-      });
+      })
+      .sort((left, right) => right.priority - left.priority);
   } catch (error) {
     console.error("MovieBox web playback error:", error);
     return [];
