@@ -11,6 +11,8 @@ PinFlix is a Next.js movie and series interface with a cinematic dark UI and a d
 - Dynamic provider categories
 - Title details
 - My List stored on the viewer's device
+- MovieBox home/editorial rails and catalog browsing
+- MovieBox cast, dubs, trailers, recommendations and subtitle discovery
 - In-browser HLS/native playback
 - Responsive mobile, desktop and TV-friendly controls
 
@@ -47,14 +49,14 @@ guarded media delivery / HLS
 
 The UI does not need to know where an upstream media file lives. Catalog code returns normalized title information; playback resolution happens only when the viewer starts a title.
 
-The UI and API routes consume a provider-neutral contract with MovieBox as the active catalog and playback provider. PinFlix uses the verified MovieBox web search/detail/trending flow and only exposes playback sources that MovieBox explicitly returns as unlocked direct HLS/MP4 media. Protected/VIP-locked DASH authorization material is not replayed or proxied.
+The UI and API routes consume a provider-neutral contract with MovieBox as the single content source. Home banners and rails, browse catalogs, search, title details, ratings, cast, dubs, trailers, recommendations, seasons/episodes, subtitle discovery and playback resolution all come from the verified MovieBox web flow. PinFlix only exposes playback sources that MovieBox explicitly returns as unlocked direct HLS/MP4 media. Protected/VIP-locked DASH authorization material is not replayed or proxied.
 
 ```text
 app/                              routes and API handlers
 src/components/                   reusable UI and player components
 src/lib/providers/contracts.ts    provider-neutral catalog/playback contract
 src/lib/providers/catalog.ts      active MovieBox provider adapter used by the UI
-src/lib/providers/moviebox/       MovieBox web/provider integration
+src/lib/providers/moviebox/       MovieBox home/catalog/detail/playback integration
 src/lib/saved.ts                  client-side My List persistence
 src/types/                        catalog and playback contracts
 ```
@@ -96,6 +98,6 @@ Temporary NID tools, Direct Play experiments, Termux bridges and Android local-b
 
 ## Media boundary
 
-CineplexBD has been removed from PinFlix. MovieBox is the only playback provider behind the catalog adapter. PinFlix accepts only direct sources that the provider marks as unlocked; it does not replay protected provider cookies, VIP authorization headers, DRM keys or signing secrets.
+CineplexBD and TMDB have been removed from the active PinFlix data path. MovieBox is the only discovery, metadata and playback provider behind the catalog adapter. PinFlix accepts only direct sources that the provider marks as unlocked; it does not replay protected provider cookies, VIP authorization headers, DRM keys or signing secrets.
 
 Use only media sources that the operator is authorized to access. Upstream availability, content rights and regional routing remain the responsibility of the source provider.
