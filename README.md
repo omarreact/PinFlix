@@ -47,14 +47,14 @@ guarded media delivery / HLS
 
 The UI does not need to know where an upstream media file lives. Catalog code returns normalized title information; playback resolution happens only when the viewer starts a title.
 
-The UI and API routes consume a provider-neutral contract with MovieBox as the active catalog and playback provider. PinFlix uses the verified MovieBox web search/detail/trending flow and only exposes playback sources that MovieBox explicitly returns as unlocked direct HLS/MP4 media. Protected/VIP-locked DASH authorization material is not replayed or proxied.
+The UI and API routes consume a provider-neutral contract with MovieBox as the single user-facing data source. PinFlix reads MovieBox home/editorial collections, movie and series catalogs, search, title details, public taxonomy, season navigation and available playback through the verified MovieBox web surfaces. TMDB and CineplexBD are not used by the current catalog UI. Playback is limited to direct HLS/MP4 sources that MovieBox explicitly returns as unlocked; protected/VIP-locked authorization material is not replayed or proxied.
 
 ```text
 app/                              routes and API handlers
 src/components/                   reusable UI and player components
 src/lib/providers/contracts.ts    provider-neutral catalog/playback contract
 src/lib/providers/catalog.ts      active MovieBox provider adapter used by the UI
-src/lib/providers/moviebox/       MovieBox web/provider integration
+src/lib/providers/moviebox/       MovieBox web/provider + public catalog integration
 src/lib/saved.ts                  client-side My List persistence
 src/types/                        catalog and playback contracts
 ```

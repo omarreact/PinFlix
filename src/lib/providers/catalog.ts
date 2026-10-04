@@ -1,6 +1,10 @@
 import "server-only";
 
 import * as movieboxWeb from "./moviebox/web";
+import {
+  getPublicCategories,
+  getPublicCategoryPage,
+} from "./moviebox/public-web";
 import type {
   PinFlixProvider,
   ProviderCatalogPage,
@@ -10,11 +14,12 @@ import type {
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
 
 /**
- * PinFlix production catalog/playback provider.
+ * MovieBox is the single source behind the PinFlix catalog contract.
  *
- * CineplexBD has been removed. MovieBox web search, detail resolution,
- * trending catalog and explicitly unlocked playback sources are now the
- * only provider path behind the provider-neutral UI contract.
+ * Structured MovieBox web endpoints are preferred for search/trending/details
+ * and public first-party MovieBox pages supply editorial collections and a
+ * resilient catalog fallback. Playback remains restricted to direct sources
+ * explicitly returned as unlocked by MovieBox.
  */
 export const catalogProvider: PinFlixProvider = {
   name: "moviebox",
@@ -31,12 +36,12 @@ export const catalogProvider: PinFlixProvider = {
     return movieboxWeb.getLatestPage(kind, page);
   },
 
-  async getCategories(_kind) {
-    return [];
+  getCategories(kind) {
+    return getPublicCategories(kind);
   },
 
-  async getCategoryPage(_categoryId, _page = 1) {
-    return null;
+  getCategoryPage(categoryId, page = 1) {
+    return getPublicCategoryPage(categoryId, page);
   },
 
   getDetails(id) {
