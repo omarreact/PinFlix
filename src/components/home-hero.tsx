@@ -1,20 +1,16 @@
 import Link from "next/link";
-import { Info, Play, Search } from "lucide-react";
+import { Info, Play } from "lucide-react";
 import { SavedToggle } from "@/src/components/saved-toggle";
-import { getTMDBImageUrl } from "@/src/lib/tmdb/images";
-import { getMediaTitle, getMediaType, getMediaYear, type TMDBMedia } from "@/src/lib/tmdb/types";
 import type { Entertainment } from "@/src/types/catalog";
 
-export function HomeHero({ item, discovery }: { item?: Entertainment; discovery?: TMDBMedia }) {
-  const discoveryTitle = discovery ? getMediaTitle(discovery) : "";
-  const discoveryImage = discovery
-    ? getTMDBImageUrl(discovery.backdrop_path || discovery.poster_path, "original") || ""
-    : "";
-  const image = item?.backdrop || item?.poster || discoveryImage;
-  const title = item?.title || discoveryTitle || "Cinematic streaming, beautifully simplified";
-  const overview = item?.synopsis || discovery?.overview || "Discover movies and series through a fast, cinematic interface with a playback layer kept separate from catalog metadata.";
-  const year = item?.year ? String(item.year) : discovery ? getMediaYear(discovery) : "";
-  const kind = item?.kind || (discovery ? getMediaType(discovery) : undefined);
+export function HomeHero({ item }: { item?: Entertainment }) {
+  const image = item?.backdrop || item?.poster || "";
+  const title = item?.title || "Cinematic streaming, beautifully simplified";
+  const overview =
+    item?.synopsis ||
+    "Browse movies and series directly from MovieBox through the PinFlix interface.";
+  const year = item?.year ? String(item.year) : "";
+  const kind = item?.kind;
 
   return (
     <section className="relative flex min-h-[78vh] items-end overflow-hidden md:min-h-[86vh]">
@@ -32,7 +28,7 @@ export function HomeHero({ item, discovery }: { item?: Entertainment; discovery?
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-md">
             <span className="h-2 w-2 rounded-full bg-brand shadow-[0_0_14px_rgba(168,85,247,.9)]" />
             <span className="text-[11px] font-bold uppercase tracking-[.18em] text-zinc-300">
-              {item ? "Featured premiere" : discovery ? "TMDB discovery" : "PinFlix"}
+              {item ? "MovieBox featured" : "PinFlix"}
             </span>
           </div>
 
@@ -47,7 +43,12 @@ export function HomeHero({ item, discovery }: { item?: Entertainment; discovery?
             ))}
             {kind && (
               <span className="rounded-full border border-brand/30 bg-brand/15 px-3 py-1 font-bold text-accent">
-                {kind === "show" || kind === "tv" ? "Series" : "Movie"}
+                {kind === "show" ? "Series" : "Movie"}
+              </span>
+            )}
+            {item?.corner && (
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur">
+                {item.corner}
               </span>
             )}
           </div>
@@ -59,13 +60,15 @@ export function HomeHero({ item, discovery }: { item?: Entertainment; discovery?
           <div className="mt-8 flex flex-wrap gap-3">
             {item ? (
               <>
-                <Link
-                  href={`/watch/${item.id}`}
-                  className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white shadow-[0_0_30px_rgba(168,85,247,.22)] hover:shadow-[0_0_38px_rgba(168,85,247,.46)]"
-                >
-                  <Play size={18} fill="currentColor" />
-                  Watch now
-                </Link>
+                {item.playable !== false && (
+                  <Link
+                    href={`/watch/${item.id}`}
+                    className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white shadow-[0_0_30px_rgba(168,85,247,.22)] hover:shadow-[0_0_38px_rgba(168,85,247,.46)]"
+                  >
+                    <Play size={18} fill="currentColor" />
+                    Watch now
+                  </Link>
+                )}
                 <SavedToggle
                   item={{
                     id: item.id,
@@ -83,23 +86,6 @@ export function HomeHero({ item, discovery }: { item?: Entertainment; discovery?
                 >
                   <Info size={18} />
                   Details
-                </Link>
-              </>
-            ) : discovery ? (
-              <>
-                <Link
-                  href={`/entertainment/tmdb-${getMediaType(discovery)}-${discovery.id}`}
-                  className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white"
-                >
-                  <Info size={18} />
-                  Details
-                </Link>
-                <Link
-                  href={`/search?q=${encodeURIComponent(discoveryTitle)}`}
-                  className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-7 py-3 font-semibold"
-                >
-                  <Search size={18} />
-                  Search PinFlix
                 </Link>
               </>
             ) : (
