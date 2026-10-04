@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { PlayCircle } from "lucide-react";
+import { Clock3, PlayCircle } from "lucide-react";
 import type { Entertainment } from "@/src/types/catalog";
 
 export function EntertainmentCard({ item }: { item: Entertainment }) {
+  const playable = item.playable !== false;
+
   return (
     <Link
       href={`/entertainment/${item.id}`}
@@ -19,15 +21,27 @@ export function EntertainmentCard({ item }: { item: Entertainment }) {
         <span className="rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-zinc-200 backdrop-blur-md">
           {item.kind === "show" ? "Series" : "Movie"}
         </span>
+        {item.corner && (
+          <span className="rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[10px] font-bold text-zinc-200 backdrop-blur-md">
+            {item.corner}
+          </span>
+        )}
         {item.rating !== undefined && (
           <span className="rounded-full border border-brand/30 bg-brand/20 px-2.5 py-1 text-[10px] font-bold text-accent backdrop-blur-md">★ {item.rating}</span>
         )}
       </div>
       <div className="meta-overlay absolute inset-0 flex flex-col justify-end p-4">
-        <PlayCircle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white drop-shadow-2xl" size={50} fill="rgba(255,255,255,.15)" />
+        {playable ? (
+          <PlayCircle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white drop-shadow-2xl" size={50} fill="rgba(255,255,255,.15)" />
+        ) : (
+          <div className="absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
+            <Clock3 size={14} />
+            Coming soon
+          </div>
+        )}
         <h3 className="line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-md sm:text-base">{item.title}</h3>
         <p className="mt-1.5 text-[11px] font-medium text-accent">
-          {[item.year ? String(item.year) : "", item.genres[0] || ""].filter(Boolean).join(" · ") || "PinFlix"}
+          {[item.year ? String(item.year) : "", item.genres[0] || "", item.country || ""].filter(Boolean).join(" · ") || "MovieBox"}
         </p>
       </div>
     </Link>
