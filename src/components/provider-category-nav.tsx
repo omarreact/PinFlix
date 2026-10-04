@@ -3,6 +3,7 @@ import type { ProviderCategory } from "@/src/lib/providers/contracts";
 
 const groupLabels: Record<string, string> = {
   movies: "Movies",
+  series: "Series",
   "hindi-dubbed": "Hindi Dubbed",
   "animations-shows": "Animations & Shows",
   "regional-special": "Regional & Special",
