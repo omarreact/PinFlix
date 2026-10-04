@@ -297,15 +297,19 @@ function categoryLabel(
   }
 }
 
-function encodeCategoryHref(href: string) {
-  return `mbcat-${Buffer.from(href, "utf8").toString("base64url")}`;
+function encodeCategoryHref(kind: "movie" | "show", href: string) {
+  const prefix = kind === "show" ? "s" : "m";
+  return `mbcat-${prefix}-${Buffer.from(href, "utf8").toString("base64url")}`;
 }
 
 function decodeCategoryHref(id: string) {
-  const match = id.match(/^mbcat-(.+)$/);
+  const match = id.match(/^mbcat-([ms])-(.+)$/);
   if (!match) return null;
   try {
-    return Buffer.from(match[1], "base64url").toString("utf8");
+    return {
+      kind: match[1] === "s" ? "show" as const : "movie" as const,
+      href: Buffer.from(match[2], "base64url").toString("utf8"),
+    };
   } catch {
     return null;
   }
@@ -356,7 +360,7 @@ export async function getPublicCategories(
 
       seen.add(href);
       categories.push({
-        id: encodeCategoryHref(url.pathname + url.search),
+        id: encodeCategoryHref(kind, url.pathname + url.search),
         provider: "moviebox",
         label,
         group: "moviebox-collections",
@@ -372,12 +376,12 @@ export async function getPublicCategories(
 
 export async function getPublicCategoryPage(
   categoryId: string,
-  kind: "movie" | "show",
   page = 1,
 ) {
-  const href = decodeCategoryHref(categoryId);
-  if (!href) return null;
+  const decoded = decodeCategoryHref(categoryId);
+  if (!decoded) return null;
 
+  const { href, kind } = decoded;
   const safePage = Math.max(1, Math.floor(page));
   let url: URL;
   try {
