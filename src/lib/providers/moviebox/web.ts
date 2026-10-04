@@ -3,6 +3,11 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
 import type { SeriesNavigation } from "../contracts";
+import {
+  getPublicCatalogPage,
+  getPublicDetails,
+  parsePublicProviderId,
+} from "./public-web";
 
 const API_BASE =
   process.env.MOVIEBOX_WEB_API_BASE?.trim().replace(/\/$/, "") ||
@@ -276,8 +281,9 @@ export async function getLatestPage(
     };
   } catch (error) {
     console.error(`MovieBox trending ${kind} error:`, error);
-    return { items: [], page: safePage, hasNextPage: false };
   }
+
+  return getPublicCatalogPage(kind, safePage);
 }
 
 export async function probeMovieBoxConnectivity(timeoutMs = 2_500) {
@@ -316,6 +322,10 @@ export async function probeMovieBoxConnectivity(timeoutMs = 2_500) {
 }
 
 export async function getDetails(id: string): Promise<Entertainment | null> {
+  if (parsePublicProviderId(id)) {
+    return getPublicDetails(id);
+  }
+
   const parsed = parseProviderId(id);
   if (!parsed) return null;
 
@@ -360,12 +370,23 @@ export async function getSeriesNavigation(
   id: string,
   requestedSeason = 1,
 ): Promise<SeriesNavigation> {
-  const parsed = parseProviderId(id);
   const fallbackSeason =
     Number.isInteger(requestedSeason) && requestedSeason > 0
       ? requestedSeason
       : 1;
 
+  if (parsePublicProviderId(id)) {
+    const publicDetails = await getPublicDetails(id);
+    const structured = publicDetails
+      ? await findStructuredMatch(publicDetails)
+      : null;
+    if (!structured) {
+      return { seasons: [fallbackSeason], season: fallbackSeason, episodes: 1 };
+    }
+    return getSeriesNavigation(structured.id, fallbackSeason);
+  }
+
+  const parsed = parseProviderId(id);
   if (!parsed) {
     return { seasons: [fallbackSeason], season: fallbackSeason, episodes: 1 };
   }
@@ -391,6 +412,45 @@ export async function getSeriesNavigation(
   } catch {
     return { seasons: [fallbackSeason], season: fallbackSeason, episodes: 1 };
   }
+}
+
+function normalizeTitle(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\[[^\]]+\]/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function findStructuredMatch(
+  publicDetails: Entertainment,
+): Promise<Entertainment | null> {
+  const candidates = await search(publicDetails.title, 1);
+  const target = normalizeTitle(publicDetails.title);
+
+  const exact = candidates.find((candidate) => {
+    if (candidate.kind !== publicDetails.kind) return false;
+    if (normalizeTitle(candidate.title) !== target) return false;
+    if (candidate.year && publicDetails.year) {
+      return Math.abs(candidate.year - publicDetails.year) <= 1;
+    }
+    return true;
+  });
+  if (exact) return exact;
+
+  return (
+    candidates.find((candidate) => {
+      if (candidate.kind !== publicDetails.kind) return false;
+      const candidateTitle = normalizeTitle(candidate.title);
+      return (
+        candidateTitle.includes(target) ||
+        target.includes(candidateTitle)
+      );
+    }) ?? null
+  );
 }
 
 function playbackQuality(entry: MovieBoxPlaybackEntry) {
@@ -431,6 +491,15 @@ export async function resolveStreams(
   id: string,
   options: { season?: number; episode?: number } = {},
 ): Promise<StreamSource[]> {
+  if (parsePublicProviderId(id)) {
+    const publicDetails = await getPublicDetails(id);
+    const structured = publicDetails
+      ? await findStructuredMatch(publicDetails)
+      : null;
+    if (!structured) return [];
+    return resolveStreams(structured.id, options);
+  }
+
   const parsed = parseProviderId(id);
   if (!parsed) return [];
 
@@ -475,5 +544,5 @@ export async function resolveStreams(
 }
 
 export function canHandleId(id: string) {
-  return parseProviderId(id) !== null;
+  return parseProviderId(id) !== null || parsePublicProviderId(id) !== null;
 }
