@@ -1,22 +1,27 @@
 # MovieBox integration status
 
-MovieBox is the active PinFlix catalog and playback provider.
+MovieBox is the single user-facing PinFlix catalog, metadata and playback provider.
 
-## Implemented
+## Catalog and discovery
 
-- Provider-neutral `PinFlixProvider` contract for catalog, details, series navigation and playback resolution.
-- MovieBox web search via `/wefeed-h5api-bff/subject/search`.
-- MovieBox trending catalog via `/wefeed-h5api-bff/subject/trending`.
-- MovieBox detail lookup via `/wefeed-h5api-bff/detail?detailPath=...`.
-- MovieBox playback lookup via `/wefeed-h5api-bff/subject/play`.
-- Movie and TV normalization into the PinFlix `Entertainment` model.
-- Season/episode navigation from MovieBox detail metadata.
-- Direct playback for provider responses explicitly marked unlocked.
-- TMDB remains the public metadata/discovery layer and resolves playable MovieBox matches by title/type/year.
+PinFlix uses the current MovieBox web surfaces for:
 
-## Playback boundary
+- homepage/editorial rails;
+- movie catalog;
+- series catalog;
+- dynamic public collections/ranking lists;
+- search;
+- title detail pages;
+- content type, year, rating, genres, synopsis and artwork;
+- public country, duration, language/dub/sub labels and cast metadata when exposed;
+- public taxonomy including content types, genres, countries, years, language variants and sort modes;
+- series season/episode navigation when returned by MovieBox detail metadata.
 
-PinFlix accepts direct MovieBox HLS/MP4 sources only when the provider response explicitly marks them as unlocked.
+The public catalog fallback reads first-party `movie-box.co` pages and normalizes them into PinFlix IDs. Structured MovieBox web endpoints remain preferred when they return usable data.
+
+## Playback
+
+Playback lookup uses the MovieBox web playback response. PinFlix accepts only direct media sources that are explicitly returned as unlocked.
 
 PinFlix does not:
 
@@ -26,20 +31,22 @@ PinFlix does not:
 - proxy DRM keys or signing secrets;
 - convert locked DASH responses into unauthorized browser playback.
 
-## Production provider
+## PinFlix flow
 
 ```text
-TMDB discovery / PinFlix UI
-        ↓
-MovieBox catalog search
-        ↓
-MovieBox subjectId + detailPath
-        ↓
-MovieBox detail / trending / play
-        ↓
-explicitly unlocked HLS or MP4
-        ↓
-PinFlix embedded player
+MovieBox home / movie / series / collections
+                    ↓
+             PinFlix catalog
+                    ↓
+MovieBox search + title/detail metadata
+                    ↓
+       MovieBox season navigation
+                    ↓
+          MovieBox playback lookup
+                    ↓
+ explicitly unlocked HLS / MP4 only
+                    ↓
+          PinFlix embedded player
 ```
 
-CineplexBD and its catalog APIs, proxy routes, Cloudflare relay workers and playback rewrites have been removed.
+CineplexBD and TMDB are not part of the current user-facing catalog pipeline.
