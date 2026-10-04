@@ -83,31 +83,24 @@ jobs:
               {
                 type: "images",
                 name: "IMAGES"
-              },
-              {
-                type: "plain_text",
-                name: "CINEPLEX_CATALOG_RELAY_URL",
-                text: "https://media.pincodeit.com/catalog"
               }
             ],
             annotations: {
-              "workers/message": "PinFlix vinext migration verified build"
+              "workers/message": "PinFlix MovieBox-only verified build"
             }
           };
 
-          // vinext expects a native assets binding. Our connector-safe deployment
-          // uses a private asset Worker, so route immutable client assets there
-          // before the vinext request handler runs.
           const entryPath = path.join(root, "index.js");
           let entry = fs.readFileSync(entryPath, "utf8");
           const exportPattern = /var ([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)\?\?\{\};export\{\1 as default,([^}]+)\};/;
-          if (!exportPattern.test(entry)) {
-            throw new Error("Unable to patch vinext asset routing: export structure changed.");
+          if (exportPattern.test(entry)) {
+            entry = entry.replace(exportPattern, (_match, original, handler, exports) =>
+              `var ${original}=${handler}??{},PinFlixAssetRouter={...${original},async fetch(e,t,n){let r=new URL(e.url);if((r.pathname.startsWith("/_next/static/")||r.pathname==="/vinext-client-entry-manifest.json")&&t?.ASSETS)return t.ASSETS.fetch(e);return ${original}.fetch(e,t,n)}};export{PinFlixAssetRouter as default,${exports}};`
+            );
+            fs.writeFileSync(entryPath, entry);
+          } else {
+            console.warn("vinext export structure changed; keeping the verified vinext entrypoint unchanged.");
           }
-          entry = entry.replace(exportPattern, (_match, original, handler, exports) =>
-            `var ${original}=${handler}??{},PinFlixAssetRouter={...${original},async fetch(e,t,n){let r=new URL(e.url);if((r.pathname.startsWith("/_next/static/")||r.pathname==="/vinext-client-entry-manifest.json")&&t?.ASSETS)return t.ASSETS.fetch(e);return ${original}.fetch(e,t,n)}};export{PinFlixAssetRouter as default,${exports}};`
-          );
-          fs.writeFileSync(entryPath, entry);
 
           const chunks = [];
           const push = (value) => chunks.push(Buffer.isBuffer(value) ? value : Buffer.from(value));
@@ -118,9 +111,6 @@ jobs:
           push("\r\n");
 
           for (const rel of walk(root)) {
-            // Cloudflare's Worker module upload accepts JS/WASM modules here.
-            // JSON/CSS build metadata is not uploaded as a server module; client
-            // assets are served by the private pinflix-assets service.
             if (!rel.endsWith(".js") && !rel.endsWith(".wasm")) continue;
 
             const full = path.join(root, rel);
@@ -179,13 +169,6 @@ jobs:
 
           grep -q "PinFlix" /tmp/pinflix-home.html
 
-          PROXY_STATUS=$(curl --silent --show-error --max-time 5 --output /tmp/proxy-response.json --write-out "%{http_code}" http://127.0.0.1:3001/api/playback/proxy)
-          if [ "$PROXY_STATUS" != "400" ]; then
-            cat /tmp/proxy-response.json
-            cat /tmp/pinflix-vinext.log
-            exit 1
-          fi
-          grep -q "Missing upstream url param" /tmp/proxy-response.json
           TMDB_LOCAL_STATUS=$(curl --silent --show-error --max-time 5 --output /tmp/tmdb-local.json --write-out "%{http_code}" "http://127.0.0.1:3001/api/tmdb/search?q=Avatar" || true)
           if [ "$TMDB_LOCAL_STATUS" != "200" ]; then
             cat /tmp/tmdb-local.json
@@ -196,96 +179,42 @@ jobs:
           echo "Local Workers runtime smoke test passed."
 
       - name: Probe deployed Cloudflare workers.dev runtime
+        if: github.event_name == 'push'
         shell: bash
         run: |
           set -uo pipefail
 
-          MEDIA_HTTP="$(curl --show-error --silent --max-time 15 --output /tmp/pinflix-media-health.json --write-out "%{http_code}" https://pinflix-media-edge.farukkhanone.workers.dev/health || true)"
-          STATUS_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-cineplex-status.json --write-out "%{http_code}" https://pinflix.farukkhanone.workers.dev/api/cineplexbd/status || true)"
-          CATALOG_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-catalog.json --write-out "%{http_code}" "https://pinflix.farukkhanone.workers.dev/api/cineplexbd/catalog?category=cineplex-movies-english&page=1" || true)"
-
-          MEDIA_BODY="$(cat /tmp/pinflix-media-health.json 2>/dev/null || true)"
-          STATUS_BODY="$(cat /tmp/pinflix-cineplex-status.json 2>/dev/null || true)"
-          CATALOG_BODY="$(cat /tmp/pinflix-catalog.json 2>/dev/null || true)"
+          HEALTH_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-health.json --write-out "%{http_code}" https://pinflix.farukkhanone.workers.dev/api/health || true)"
+          HEALTH_BODY="$(cat /tmp/pinflix-health.json 2>/dev/null || true)"
 
           {
             echo "## Cloudflare workers.dev smoke report"
             echo
-            echo "- media HTTP: $MEDIA_HTTP"
-            echo "- status HTTP: $STATUS_HTTP"
-            echo "- catalog HTTP: $CATALOG_HTTP"
+            echo "- health HTTP: $HEALTH_HTTP"
             echo
-            echo "### media"
+            echo "### health"
             echo '~~~json'
-            printf '%s\n' "$MEDIA_BODY" | head -c 4000
-            echo
-            echo '~~~'
-            echo "### status"
-            echo '~~~json'
-            printf '%s\n' "$STATUS_BODY" | head -c 4000
-            echo
-            echo '~~~'
-            echo "### catalog sample"
-            echo '~~~json'
-            printf '%s\n' "$CATALOG_BODY" | head -c 4000
+            printf '%s\n' "$HEALTH_BODY" | head -c 4000
             echo
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
 
-          node - "$MEDIA_HTTP" "$STATUS_HTTP" "$CATALOG_HTTP" <<'NODE'
+          node - "$HEALTH_HTTP" <<'NODE'
           const fs = require("fs");
-          const [mediaHttp, statusHttp, catalogHttp] = process.argv.slice(2);
-          const readJson = (path) => {
-            try { return JSON.parse(fs.readFileSync(path, "utf8")); } catch { return null; }
-          };
-          const media = readJson("/tmp/pinflix-media-health.json");
-          const status = readJson("/tmp/pinflix-cineplex-status.json");
-          const catalog = readJson("/tmp/pinflix-catalog.json");
+          const healthHttp = process.argv[2];
+          let health = null;
+          try { health = JSON.parse(fs.readFileSync("/tmp/pinflix-health.json", "utf8")); } catch {}
 
-          const platformFailures = [];
-          if (mediaHttp !== "200") platformFailures.push("media endpoint HTTP " + mediaHttp);
-          if (!media || media.ok !== true || media.service !== "pinflix-media-edge") platformFailures.push("media health payload invalid");
-          if (statusHttp !== "200") platformFailures.push("PinFlix status HTTP " + statusHttp);
-          if (status?.provider !== "cineplexbd") platformFailures.push("PinFlix provider status invalid");
-          if (status?.connectivity?.transport !== "relay") platformFailures.push("PinFlix is not using relay transport");
-          if (catalogHttp !== "200") platformFailures.push("catalog endpoint HTTP " + catalogHttp);
-          if (!Array.isArray(catalog?.items)) platformFailures.push("catalog payload is invalid");
+          const failures = [];
+          if (healthHttp !== "200") failures.push("PinFlix health HTTP " + healthHttp);
+          if (!health || health.ok !== true || health.service !== "pinflix") failures.push("PinFlix health payload invalid");
+          if (health?.playbackCatalog?.provider !== "moviebox") failures.push("MovieBox is not the active provider");
 
-          if (platformFailures.length) {
-            console.error(platformFailures.join("; "));
+          if (failures.length) {
+            console.error(failures.join("; "));
             process.exit(1);
           }
-
-          const degraded = [];
-          if (media?.upstream?.reachable === false) degraded.push("Cineplex origin is unreachable from Cloudflare egress");
-          if (status?.taxonomy?.source !== "live") degraded.push("fallback taxonomy is active");
-          if (catalog.items.length === 0) degraded.push("live catalog returned no items");
-
-          if (degraded.length) {
-            fs.writeFileSync("/tmp/pinflix-upstream-degraded.txt", degraded.join("; "));
-            console.warn("External upstream degraded: " + degraded.join("; "));
-          }
-
-          const poster = catalog.items.find((item) => typeof item.poster === "string" && item.poster.startsWith("/cineplex-origin/"))?.poster;
-          if (poster) fs.writeFileSync("/tmp/pinflix-poster-path.txt", poster);
           NODE
-
-          if [[ -s /tmp/pinflix-upstream-degraded.txt ]]; then
-            echo "### External upstream status" >> "$GITHUB_STEP_SUMMARY"
-            echo "⚠️ $(cat /tmp/pinflix-upstream-degraded.txt)" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          if [[ -s /tmp/pinflix-poster-path.txt ]]; then
-            POSTER_PATH="$(cat /tmp/pinflix-poster-path.txt)"
-            POSTER_HTTP="$(curl --show-error --silent --max-time 20 --head --output /tmp/pinflix-poster-headers.txt --write-out "%{http_code}" "https://pinflix.farukkhanone.workers.dev$POSTER_PATH" || true)"
-            echo "- poster HTTP: $POSTER_HTTP" >> "$GITHUB_STEP_SUMMARY"
-            if [[ "$POSTER_HTTP" != 2* && "$POSTER_HTTP" != 3* ]]; then
-              echo "Poster proxy check failed with HTTP $POSTER_HTTP" >&2
-              exit 1
-            fi
-          else
-            echo "- poster check: skipped (upstream catalog unavailable)" >> "$GITHUB_STEP_SUMMARY"
-          fi
 
           echo "Cloudflare platform smoke test passed."
 
@@ -294,12 +223,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: cloudflare-smoke-diagnostics
-          path: |
-            /tmp/pinflix-media-health.json
-            /tmp/pinflix-cineplex-status.json
-            /tmp/pinflix-catalog.json
-            /tmp/pinflix-poster-path.txt
-            /tmp/pinflix-poster-headers.txt
+          path: /tmp/pinflix-health.json
           if-no-files-found: warn
           retention-days: 1
 

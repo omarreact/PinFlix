@@ -11,7 +11,6 @@ export default defineConfig({
     env: {
       ASSETS: bindings.assets(),
       IMAGES: bindings.images(),
-      CINEPLEX_CATALOG_RELAY_URL: bindings.text("https://media.pincodeit.com/catalog"),
     },
   }),
 });

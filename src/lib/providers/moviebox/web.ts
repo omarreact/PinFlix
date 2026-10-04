@@ -26,7 +26,7 @@ type MovieBoxWebSubject = {
   duration?: number;
   genre?: string;
   cover?: { url?: string };
-  stills?: Array<{ url?: string }>;
+  stills?: { url?: string } | Array<{ url?: string }>;
   imdbRatingValue?: string | number;
   hasResource?: boolean;
   detailPath?: string;
@@ -65,6 +65,21 @@ type MovieBoxPlaybackResponse = {
     hls?: MovieBoxPlaybackEntry[];
     dash?: MovieBoxPlaybackEntry[];
     hasResource?: boolean;
+  };
+};
+
+type MovieBoxSubjectListResponse = {
+  code?: number;
+  message?: string;
+  data?: {
+    subjectList?: MovieBoxWebSubject[];
+    pager?: {
+      hasMore?: boolean;
+      nextPage?: number;
+      page?: number;
+      perPage?: number;
+      totalCount?: number;
+    };
   };
 };
 
@@ -175,8 +190,11 @@ function mapSubject(subject: MovieBoxWebSubject): Entertainment | null {
   const releaseYear = /^\d{4}/.exec(subject.releaseDate ?? "")?.[0];
   const rating = Number(subject.imdbRatingValue);
   const poster = subject.cover?.url?.trim() ?? "";
+  const stills = subject.stills;
   const backdrop =
-    subject.stills?.find((item) => item?.url)?.url?.trim() ||
+    (Array.isArray(stills)
+      ? stills.find((item) => item?.url)?.url?.trim()
+      : stills?.url?.trim()) ||
     poster;
 
   return {
@@ -231,6 +249,69 @@ export async function search(
   } catch (error) {
     console.error("MovieBox web search error:", error);
     return [];
+  }
+}
+
+export async function getLatestPage(
+  kind: "movie" | "show",
+  page = 1,
+): Promise<{ items: Entertainment[]; page: number; hasNextPage: boolean }> {
+  const safePage = Math.max(1, Math.floor(page));
+  const url = new URL("/wefeed-h5api-bff/subject/trending", API_BASE);
+  url.searchParams.set("page", String(safePage - 1));
+  url.searchParams.set("perPage", "36");
+
+  try {
+    const response = await fetchJson<MovieBoxSubjectListResponse>(url);
+    const expectedType = kind === "show" ? 2 : 1;
+    const items = (response.data?.subjectList ?? [])
+      .filter((subject) => subject.subjectType === expectedType)
+      .map(mapSubject)
+      .filter((item): item is Entertainment => Boolean(item));
+
+    return {
+      items,
+      page: safePage,
+      hasNextPage: response.data?.pager?.hasMore === true,
+    };
+  } catch (error) {
+    console.error(`MovieBox trending ${kind} error:`, error);
+    return { items: [], page: safePage, hasNextPage: false };
+  }
+}
+
+export async function probeMovieBoxConnectivity(timeoutMs = 2_500) {
+  const url = new URL("/wefeed-h5api-bff/subject/trending", API_BASE);
+  url.searchParams.set("page", "0");
+  url.searchParams.set("perPage", "1");
+  const startedAt = Date.now();
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: requestHeaders(false),
+      cache: "no-store",
+      redirect: "manual",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    return {
+      reachable: response.ok,
+      status: response.status,
+      latencyMs: Date.now() - startedAt,
+      outcome: response.ok ? "reachable" : "http_error",
+    } as const;
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    return {
+      reachable: false,
+      status: null,
+      latencyMs: Date.now() - startedAt,
+      outcome:
+        message.includes("timeout") || message.includes("aborted")
+          ? "timeout"
+          : "network_error",
+    } as const;
   }
 }
 

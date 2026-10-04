@@ -13,19 +13,17 @@ const nextConfig: NextConfig = {
         hostname: "www.themoviedb.org",
         pathname: "/assets/**",
       },
+      {
+        protocol: "https",
+        hostname: "pbcdnw.aoneroom.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "macdn.aoneroom.com",
+        pathname: "/**",
+      },
     ],
-  },
-  async rewrites() {
-    return [
-      {
-        source: "/cineplex-vod/:path*",
-        destination: "http://vod.cineplexbd.net:8081/:path*",
-      },
-      {
-        source: "/cineplex-origin/:path*",
-        destination: "http://cineplexbd.net/:path*",
-      },
-    ];
   },
 };
 
