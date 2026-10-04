@@ -5,7 +5,7 @@ import { BackLink } from "@/src/components/catalog-sections";
 import { SavedToggle } from "@/src/components/saved-toggle";
 import { getTMDBImageUrl } from "@/src/lib/tmdb/images";
 import { getMovieDetails, getTVDetails } from "@/src/lib/tmdb/queries";
-import { catalogProvider } from "@/src/lib/providers/catalog";
+import { catalogProvider } from "@/src/lib/providers/catalog";\nimport { findPlayableMatch } from "@/src/lib/providers/matching";
 import type { Entertainment } from "@/src/types/catalog";
 
 export const dynamic = "force-dynamic";
@@ -28,28 +28,6 @@ function parseTMDBSlug(slug: string) {
   return { type: match[1] as "movie" | "tv", id };
 }
 
-function normalizeTitle(value: string) {
-  return value
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-async function findPlayableMatch(title: string, kind: "movie" | "show") {
-  try {
-    const results = await catalogProvider.search(title, 1);
-    const target = normalizeTitle(title);
-    return results.find(
-      (candidate) =>
-        candidate.kind === kind &&
-        normalizeTitle(candidate.title) === target,
-    );
-  } catch {
-    return undefined;
-  }
-}
-
 async function getDetailState(slug: string): Promise<DetailState | null> {
   const tmdbRef = parseTMDBSlug(slug);
 
@@ -58,7 +36,15 @@ async function getDetailState(slug: string): Promise<DetailState | null> {
       if (tmdbRef.type === "movie") {
         const details = await getMovieDetails(tmdbRef.id);
         const title = details.title;
-        const playable = await findPlayableMatch(title, "movie");
+        const year = details.release_date?.slice(0, 4)
+          ? Number(details.release_date.slice(0, 4))
+          : undefined;
+        const playable = await findPlayableMatch(catalogProvider, {
+          title,
+          aliases: [details.original_title],
+          kind: "movie",
+          year,
+        });
 
         return {
           source: "tmdb",
@@ -71,9 +57,7 @@ async function getDetailState(slug: string): Promise<DetailState | null> {
             providerId: String(details.id),
             title,
             kind: "movie",
-            ...(details.release_date?.slice(0, 4)
-              ? { year: Number(details.release_date.slice(0, 4)) }
-              : {}),
+            ...(year !== undefined ? { year } : {}),
             ...(Number.isFinite(details.vote_average)
               ? { rating: Number(details.vote_average.toFixed(1)) }
               : {}),
@@ -90,7 +74,15 @@ async function getDetailState(slug: string): Promise<DetailState | null> {
 
       const details = await getTVDetails(tmdbRef.id);
       const title = details.name;
-      const playable = await findPlayableMatch(title, "show");
+      const year = details.first_air_date?.slice(0, 4)
+        ? Number(details.first_air_date.slice(0, 4))
+        : undefined;
+      const playable = await findPlayableMatch(catalogProvider, {
+        title,
+        aliases: [details.original_name],
+        kind: "show",
+        year,
+      });
 
       return {
         source: "tmdb",
@@ -104,9 +96,7 @@ async function getDetailState(slug: string): Promise<DetailState | null> {
           providerId: String(details.id),
           title,
           kind: "show",
-          ...(details.first_air_date?.slice(0, 4)
-            ? { year: Number(details.first_air_date.slice(0, 4)) }
-            : {}),
+          ...(year !== undefined ? { year } : {}),
           ...(Number.isFinite(details.vote_average)
             ? { rating: Number(details.vote_average.toFixed(1)) }
             : {}),
