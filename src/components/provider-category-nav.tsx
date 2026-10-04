@@ -8,6 +8,7 @@ const groupLabels: Record<string, string> = {
   "regional-special": "Regional & Special",
   "web-series-sports": "Web Series & Sports",
   "top-watch": "Popular",
+  "moviebox-collections": "MovieBox Collections",
 };
 
 export function ProviderCategoryNav({
