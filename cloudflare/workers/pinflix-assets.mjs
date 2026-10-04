@@ -47,9 +47,9 @@ function stableAssetIdentity(pathname) {
   if (dot <= 0) return null;
   const ext = file.slice(dot);
   const stem = file.slice(0, dot);
-  const stripped = stem.replace(/-[A-Za-z0-9_-]{6,}$/, "");
-  if (stripped === stem) return null;
-  return { dir, prefix: stripped + "-", ext };
+  const match = stem.match(/^(.*?)([-.])([A-Za-z0-9_-]{6,})$/);
+  if (!match) return null;
+  return { dir, prefix: match[1] + match[2], ext };
 }
 
 async function getBuildIndex() {
