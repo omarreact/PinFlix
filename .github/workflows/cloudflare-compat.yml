@@ -179,6 +179,7 @@ jobs:
           echo "Local Workers runtime smoke test passed."
 
       - name: Probe deployed Cloudflare workers.dev runtime
+        if: github.event_name == 'push'
         shell: bash
         run: |
           set -uo pipefail
