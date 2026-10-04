@@ -14,6 +14,11 @@ export type SubtitleTrack = {
   url: string;
 };
 
+export type CastCredit = {
+  name: string;
+  role?: string;
+};
+
 export type Entertainment = {
   id: string;
   slug: string;
@@ -21,11 +26,17 @@ export type Entertainment = {
   kind: "movie" | "show";
   year?: number;
   rating?: number;
+  ratingCount?: number;
   genres: string[];
   backdrop: string;
   poster: string;
   synopsis: string;
   episodes?: number;
+  durationMinutes?: number;
+  country?: string;
+  languages?: string[];
+  cast?: CastCredit[];
+  collections?: string[];
   provider?: string;
   providerId?: string;
   detailUrl?: string;
