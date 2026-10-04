@@ -1,45 +1,60 @@
 # MovieBox integration status
 
-MovieBox is the active PinFlix catalog and playback provider.
+MovieBox is the single active PinFlix content source.
 
-## Implemented
+## MovieBox data used by PinFlix
 
-- Provider-neutral `PinFlixProvider` contract for catalog, details, series navigation and playback resolution.
-- MovieBox web search via `/wefeed-h5api-bff/subject/search`.
-- MovieBox trending catalog via `/wefeed-h5api-bff/subject/trending`.
-- MovieBox detail lookup via `/wefeed-h5api-bff/detail?detailPath=...`.
-- MovieBox playback lookup via `/wefeed-h5api-bff/subject/play`.
-- Movie and TV normalization into the PinFlix `Entertainment` model.
-- Season/episode navigation from MovieBox detail metadata.
-- Direct playback for provider responses explicitly marked unlocked.
-- TMDB remains the public metadata/discovery layer and resolves playable MovieBox matches by title/type/year.
+- Home feed: `/wefeed-h5api-bff/home?host=movie-box.co`
+  - featured/banner subjects
+  - editorial subject rails
+  - coming-soon subjects
+  - rail identifiers used for browse categories
+- Trending/browse: `/wefeed-h5api-bff/subject/trending`
+- Rail pagination: `/wefeed-h5api-bff/ranking-list/content`
+- Search: `/wefeed-h5api-bff/subject/search`
+- Detail: `/wefeed-h5api-bff/detail?detailPath=...`
+  - synopsis, year, duration, genres and country
+  - IMDb rating/count
+  - cast and character names
+  - dubs/language variants
+  - trailer metadata
+  - season/episode structure and available resolutions
+- Recommendations: `/wefeed-h5api-bff/subject/detail-rec`
+- Playback: `/wefeed-h5api-bff/subject/play`
+- Subtitle discovery: `/wefeed-h5api-bff/subject/caption`
 
-## Playback boundary
+MovieBox response data is normalized into the PinFlix `Entertainment` and `StreamSource` models. MovieBox provider IDs preserve `subjectId` and `detailPath` so details, dubs, episodes, recommendations and playback remain connected without a second metadata service.
 
-PinFlix accepts direct MovieBox HLS/MP4 sources only when the provider response explicitly marks them as unlocked.
-
-PinFlix does not:
-
-- replay VIP authorization headers;
-- inject protected provider cookies;
-- decode hidden signed-cookie CDN paths;
-- proxy DRM keys or signing secrets;
-- convert locked DASH responses into unauthorized browser playback.
-
-## Production provider
+## PinFlix data path
 
 ```text
-TMDB discovery / PinFlix UI
-        ↓
-MovieBox catalog search
+MovieBox home / trending / search
         ↓
 MovieBox subjectId + detailPath
         ↓
-MovieBox detail / trending / play
+PinFlix catalog + detail UI
+        ↓
+MovieBox detail / recommendations / seasons / captions
+        ↓
+MovieBox play
         ↓
 explicitly unlocked HLS or MP4
         ↓
 PinFlix embedded player
 ```
 
-CineplexBD and its catalog APIs, proxy routes, Cloudflare relay workers and playback rewrites have been removed.
+TMDB and CineplexBD are not part of the active catalog or playback path.
+
+## Playback boundary
+
+PinFlix accepts a MovieBox playback entry only when:
+
+- it has a direct HTTPS URL;
+- MovieBox marks it `vipLocked: false`;
+- it does not require `signCookie`;
+- it does not require `signHeaderKey`;
+- it is a directly browser-playable HLS or MP4 source.
+
+PinFlix does not replay VIP authorization headers, inject protected cookies, decode hidden signed-cookie CDN paths, proxy DRM keys/signing secrets, or convert locked DASH responses into unauthorized playback.
+
+Subtitle URLs returned by MovieBox are delivered through a restricted subtitle endpoint that only accepts known HTTPS CDN domains and converts SRT timing syntax to WebVTT when required by the browser player.

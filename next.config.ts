@@ -5,17 +5,12 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "image.tmdb.org",
-        pathname: "/t/p/**",
-      },
-      {
-        protocol: "https",
-        hostname: "www.themoviedb.org",
-        pathname: "/assets/**",
-      },
-      {
-        protocol: "https",
         hostname: "pbcdnw.aoneroom.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "pbcdn.aoneroom.com",
         pathname: "/**",
       },
       {
