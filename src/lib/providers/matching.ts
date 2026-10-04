@@ -132,7 +132,7 @@ function buildQueries(input: PlaybackMatchInput) {
     ];
   });
 
-  return unique(simplified).slice(0, 6);
+  return unique(simplified).slice(0, 4);
 }
 
 export async function findPlayableMatch(
@@ -142,15 +142,15 @@ export async function findPlayableMatch(
   const targets = unique([input.title, ...(input.aliases ?? [])]);
   const candidates = new Map<string, Entertainment>();
 
-  for (const query of buildQueries(input)) {
-    try {
-      const results = await provider.search(query, 1);
-      for (const candidate of results) {
-        if (candidate.kind === input.kind) candidates.set(candidate.id, candidate);
-      }
-    } catch {
-      // Keep trying the remaining normalized queries. One provider search
-      // failure should not make a TMDB detail page fail.
+  const results = await Promise.allSettled(
+    buildQueries(input).map((query) => provider.search(query, 1)),
+  );
+
+  for (const result of results) {
+    if (result.status !== "fulfilled") continue;
+
+    for (const candidate of result.value) {
+      if (candidate.kind === input.kind) candidates.set(candidate.id, candidate);
     }
   }
 
