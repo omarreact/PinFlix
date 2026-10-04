@@ -41,11 +41,7 @@ export const catalogProvider: PinFlixProvider = {
   },
 
   getCategoryPage(categoryId, page = 1) {
-    return getPublicCategoryPage(
-      categoryId,
-      categoryId.toLowerCase().includes("series") ? "show" : "movie",
-      page,
-    );
+    return getPublicCategoryPage(categoryId, page);
   },
 
   getDetails(id) {
