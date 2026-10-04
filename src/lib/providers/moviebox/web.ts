@@ -553,22 +553,23 @@ export async function getHomeFeed(): Promise<ProviderHomeFeed> {
       getLatestPage("show", 1),
     ]);
 
-    const sections: ProviderHomeSection[] = [
+    const fallbackSections: ProviderHomeSection[] = [
       {
         id: "mb-trending-movies",
         label: "Trending Movies",
         items: movies.items,
         kind: "movie",
-        supportsPagination: movies.hasNextPage,
+        supportsPagination: false,
       },
       {
         id: "mb-trending-series",
         label: "Trending Series",
         items: shows.items,
         kind: "show",
-        supportsPagination: shows.hasNextPage,
+        supportsPagination: false,
       },
-    ].filter((section) => section.items.length > 0);
+    ];
+    const sections = fallbackSections.filter((section) => section.items.length > 0);
 
     return {
       featured: sections.flatMap((section) => section.items).find((item) => item.playable !== false),
@@ -751,7 +752,7 @@ export async function getRecommendations(
       .map((subject) => mapSubject(subject))
       .filter(
         (item): item is Entertainment =>
-          Boolean(item) && item.providerId !== parsed.subjectId,
+          item !== null && item.providerId !== parsed.subjectId,
       );
   } catch (error) {
     console.error("MovieBox recommendations error:", error);
