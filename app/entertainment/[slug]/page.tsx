@@ -5,7 +5,8 @@ import { BackLink } from "@/src/components/catalog-sections";
 import { SavedToggle } from "@/src/components/saved-toggle";
 import { getTMDBImageUrl } from "@/src/lib/tmdb/images";
 import { getMovieDetails, getTVDetails } from "@/src/lib/tmdb/queries";
-import { catalogProvider } from "@/src/lib/providers/catalog";\nimport { findPlayableMatch } from "@/src/lib/providers/matching";
+import { catalogProvider } from "@/src/lib/providers/catalog";
+import { findPlayableMatch } from "@/src/lib/providers/matching";
 import type { Entertainment } from "@/src/types/catalog";
 
 export const dynamic = "force-dynamic";
