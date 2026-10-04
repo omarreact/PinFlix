@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Star } from "lucide-react";
 import { getTMDBImageUrl } from "@/src/lib/tmdb/images";
 import { getMediaTitle, getMediaType, getMediaYear, type TMDBMedia } from "@/src/lib/tmdb/types";
@@ -9,7 +10,11 @@ export function TMDBMediaCard({ media, priority = false }: { media: TMDBMedia; p
   const type = getMediaType(media);
 
   return (
-    <article className="group min-w-0">
+    <Link
+      href={`/entertainment/tmdb-${type}-${media.id}`}
+      className="group block min-w-0"
+      aria-label={`View ${title}`}
+    >
       <div className="movie-card relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/5 bg-surface">
         {poster ? (
           <Image
@@ -38,6 +43,6 @@ export function TMDBMediaCard({ media, priority = false }: { media: TMDBMedia; p
         <h3 className="truncate text-sm font-bold text-white">{title}</h3>
         <p className="mt-1 text-xs text-zinc-500">{getMediaYear(media)} · {type === "tv" ? "Series" : "Movie"}</p>
       </div>
-    </article>
+    </Link>
   );
 }

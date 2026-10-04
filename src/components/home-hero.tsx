@@ -78,7 +78,7 @@ export function HomeHero({ item, discovery }: { item?: Entertainment; discovery?
                   }}
                 />
                 <Link
-                  href={`/entertainment/${item.slug}`}
+                  href={`/entertainment/${item.id}`}
                   className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 font-semibold text-white backdrop-blur hover:bg-white/10"
                 >
                   <Info size={18} />
@@ -88,14 +88,18 @@ export function HomeHero({ item, discovery }: { item?: Entertainment; discovery?
             ) : discovery ? (
               <>
                 <Link
-                  href={`/search?q=${encodeURIComponent(discoveryTitle)}`}
+                  href={`/entertainment/tmdb-${getMediaType(discovery)}-${discovery.id}`}
                   className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white"
+                >
+                  <Info size={18} />
+                  Details
+                </Link>
+                <Link
+                  href={`/search?q=${encodeURIComponent(discoveryTitle)}`}
+                  className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-7 py-3 font-semibold"
                 >
                   <Search size={18} />
                   Search PinFlix
-                </Link>
-                <Link href={kind === "tv" ? "/series" : "/movies"} className="tv-focus rounded-full border border-white/10 bg-white/5 px-7 py-3 font-semibold">
-                  Browse {kind === "tv" ? "series" : "movies"}
                 </Link>
               </>
             ) : (
