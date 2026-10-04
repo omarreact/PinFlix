@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ListVideo } from "lucide-react";
 import { WatchPlayer } from "@/src/components/watch-player";
-import * as cineplexbd from "@/src/lib/providers/cineplexbd";
+import { catalogProvider } from "@/src/lib/providers/catalog";
 
 type SearchParams = Promise<{
   season?: string;
@@ -33,15 +33,15 @@ export default async function WatchPage({
 }) {
   const [{ mediaId }, query] = await Promise.all([params, searchParams]);
 
-  if (!mediaId.startsWith("cb-")) notFound();
+  if (!catalogProvider.canHandleId(mediaId)) notFound();
 
-  const item = await cineplexbd.getDetails(mediaId);
+  const item = await catalogProvider.getDetails(mediaId);
   if (!item) notFound();
 
   const isSeries = item.kind === "show";
   const requestedSeason = positiveInteger(query.season, 1);
   const navigation = isSeries
-    ? await cineplexbd.getSeriesNavigation(item.id, requestedSeason)
+    ? await catalogProvider.getSeriesNavigation(item.id, requestedSeason)
     : null;
   const season = navigation?.season ?? requestedSeason;
   const requestedEpisode = positiveInteger(query.episode, 1);

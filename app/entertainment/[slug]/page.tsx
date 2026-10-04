@@ -3,15 +3,15 @@ import { notFound } from "next/navigation";
 import { Play } from "lucide-react";
 import { BackLink } from "@/src/components/catalog-sections";
 import { SavedToggle } from "@/src/components/saved-toggle";
-import * as cineplexbd from "@/src/lib/providers/cineplexbd";
+import { catalogProvider } from "@/src/lib/providers/catalog";
 
 export const dynamic = "force-dynamic";
 
 export default async function EntertainmentDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  if (!slug.startsWith("cb-")) notFound();
+  if (!catalogProvider.canHandleId(slug)) notFound();
 
-  const item = await cineplexbd.getDetails(slug);
+  const item = await catalogProvider.getDetails(slug);
   if (!item) notFound();
 
   const metadata = [

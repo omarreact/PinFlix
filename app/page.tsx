@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { EntertainmentRail } from "@/src/components/catalog-sections";
 import { HomeHero } from "@/src/components/home-hero";
 import { BrowseTabs } from "@/src/components/browse-tabs";
-import * as cineplexbd from "@/src/lib/providers/cineplexbd";
+import { catalogProvider } from "@/src/lib/providers/catalog";
 import { TMDBMediaRow } from "@/src/components/tmdb/media-row";
 import { isTMDBConfigured } from "@/src/lib/tmdb/client";
 import { getTrendingMovies, getTrendingTV } from "@/src/lib/tmdb/queries";
@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const [latestMovies, latestSeries] = await Promise.all([
-    cineplexbd.getLatestPage("movie", 1),
-    cineplexbd.getLatestPage("show", 1),
+    catalogProvider.getLatestPage("movie", 1),
+    catalogProvider.getLatestPage("show", 1),
   ]);
 
   const movieRail = latestMovies.items.slice(0, 12);

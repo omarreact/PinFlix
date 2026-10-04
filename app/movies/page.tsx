@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Film } from "lucide-react";
 import { EntertainmentGrid } from "@/src/components/catalog-sections";
-import { CineplexCategoryNav } from "@/src/components/cineplex-category-nav";
+import { ProviderCategoryNav } from "@/src/components/provider-category-nav";
 import { TMDBMediaGrid } from "@/src/components/tmdb/media-grid";
-import * as cineplexbd from "@/src/lib/providers/cineplexbd";
+import { catalogProvider } from "@/src/lib/providers/catalog";
 import { isTMDBConfigured } from "@/src/lib/tmdb/client";
 import { getPopularMovies } from "@/src/lib/tmdb/queries";
 
@@ -18,14 +18,14 @@ function pageHref(page: number, category?: string) {
 export default async function MoviesPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
-  const categories = await cineplexbd.getCineplexCategories("movie");
+  const categories = await catalogProvider.getCategories("movie");
   const activeCategory = params.category
     ? categories.find((category) => category.id === params.category)
     : undefined;
 
   const catalog = activeCategory
-    ? await cineplexbd.getCategoryPage(activeCategory.id, page)
-    : await cineplexbd.getLatestPage("movie", page);
+    ? await catalogProvider.getCategoryPage(activeCategory.id, page)
+    : await catalogProvider.getLatestPage("movie", page);
 
   const items = catalog?.items ?? [];
   const hasNext = catalog?.hasNextPage ?? false;
@@ -58,7 +58,7 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
         </p>
       </section>
 
-      <CineplexCategoryNav categories={categories} activeId={activeCategory?.id} basePath="/movies" />
+      <ProviderCategoryNav categories={categories} activeId={activeCategory?.id} basePath="/movies" />
 
       {items.length > 0 ? (
         <EntertainmentGrid items={items} />

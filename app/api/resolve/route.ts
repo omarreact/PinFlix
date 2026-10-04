@@ -1,4 +1,4 @@
-import * as cineplexbd from "@/src/lib/providers/cineplexbd";
+import { catalogProvider } from "@/src/lib/providers/catalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,11 +42,11 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const id = url.searchParams.get("id")?.trim() ?? "";
 
-  if (!id.startsWith("cb-")) {
-    return Response.json({ error: "Cineplex title ID required" }, { status: 400 });
+  if (!catalogProvider.canHandleId(id)) {
+    return Response.json({ error: "Unsupported provider title ID" }, { status: 400 });
   }
 
-  const streams = await cineplexbd.resolveStreams(id, {
+  const streams = await catalogProvider.resolveStreams(id, {
     season: optionalPositiveInteger(url.searchParams.get("season")),
     episode: optionalPositiveInteger(url.searchParams.get("episode")),
   });
@@ -56,13 +56,26 @@ export async function GET(request: Request) {
   }
 
   const sources = streams.flatMap((source, index) => {
-    const rewriteUrl = toCineplexRewriteUrl(source.url);
-    const proxyUrl = `/api/playback/proxy?url=${encodeURIComponent(source.url)}`;
     const base = {
       protocol: source.protocol,
       priority: source.priority,
-      subtitles: [],
+      subtitles: source.subtitles ?? [],
     };
+
+    // The existing guarded proxy is Cineplex-specific. Future providers must
+    // return a browser-authorized source URL or implement their own explicitly
+    // authorized transport instead of reusing Cineplex proxy behavior.
+    if (!id.startsWith("cb-")) {
+      return [{
+        ...base,
+        quality: source.quality,
+        sourceIndex: index,
+        url: source.url,
+      }];
+    }
+
+    const rewriteUrl = toCineplexRewriteUrl(source.url);
+    const proxyUrl = `/api/playback/proxy?url=${encodeURIComponent(source.url)}`;
 
     if (!rewriteUrl) {
       return [{

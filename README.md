@@ -47,10 +47,15 @@ guarded media delivery / HLS
 
 The UI does not need to know where an upstream media file lives. Catalog code returns normalized title information; playback resolution happens only when the viewer starts a title.
 
+The UI and API routes now consume a provider-neutral contract. The MovieBox client scaffold contains only the endpoint/request shapes supported by the supplied research and accepts only operator-provided authorized credentials. It intentionally does not decode, inject, or proxy protected provider authentication material. Activating MovieBox as the production playback provider still requires a verified authorized response schema and browser-playable playback contract.
+
 ```text
 app/                              routes and API handlers
 src/components/                   reusable UI and player components
-src/lib/providers/cineplexbd/     catalog, parser and playback resolver
+src/lib/providers/contracts.ts    provider-neutral catalog/playback contract
+src/lib/providers/catalog.ts      active provider adapter used by the UI
+src/lib/providers/cineplexbd/     current production catalog/playback adapter
+src/lib/providers/moviebox/       authorized MovieBox API client scaffold
 src/lib/cineplex-playback-proxy.ts guarded Cineplex media proxy
 src/lib/saved.ts                  client-side My List persistence
 src/types/                        catalog and playback contracts
