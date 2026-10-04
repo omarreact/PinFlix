@@ -3,132 +3,9 @@ import { notFound } from "next/navigation";
 import { Play, Search } from "lucide-react";
 import { BackLink } from "@/src/components/catalog-sections";
 import { SavedToggle } from "@/src/components/saved-toggle";
-import { getTMDBImageUrl } from "@/src/lib/tmdb/images";
-import { getMovieDetails, getTVDetails } from "@/src/lib/tmdb/queries";
 import { catalogProvider } from "@/src/lib/providers/catalog";
-import { findPlayableMatch } from "@/src/lib/providers/matching";
-import type { Entertainment } from "@/src/types/catalog";
 
 export const dynamic = "force-dynamic";
-
-type DetailState = {
-  item: Entertainment;
-  playableId?: string;
-  source: "catalog" | "tmdb";
-  runtime?: number;
-  seasons?: number;
-};
-
-function parseTMDBSlug(slug: string) {
-  const match = slug.match(/^tmdb-(movie|tv)-(\d+)$/);
-  if (!match) return null;
-
-  const id = Number(match[2]);
-  if (!Number.isSafeInteger(id) || id <= 0) return null;
-
-  return { type: match[1] as "movie" | "tv", id };
-}
-
-async function getDetailState(slug: string): Promise<DetailState | null> {
-  const tmdbRef = parseTMDBSlug(slug);
-
-  if (tmdbRef) {
-    try {
-      if (tmdbRef.type === "movie") {
-        const details = await getMovieDetails(tmdbRef.id);
-        const title = details.title;
-        const year = details.release_date?.slice(0, 4)
-          ? Number(details.release_date.slice(0, 4))
-          : undefined;
-        const playable = await findPlayableMatch(catalogProvider, {
-          title,
-          aliases: [details.original_title],
-          kind: "movie",
-          year,
-        });
-
-        return {
-          source: "tmdb",
-          playableId: playable?.id,
-          runtime: details.runtime ?? undefined,
-          item: {
-            id: slug,
-            slug,
-            provider: "tmdb",
-            providerId: String(details.id),
-            title,
-            kind: "movie",
-            ...(year !== undefined ? { year } : {}),
-            ...(Number.isFinite(details.vote_average)
-              ? { rating: Number(details.vote_average.toFixed(1)) }
-              : {}),
-            genres: details.genres.map((genre) => genre.name),
-            backdrop:
-              getTMDBImageUrl(details.backdrop_path, "original") ??
-              getTMDBImageUrl(details.poster_path, "original") ??
-              "",
-            poster: getTMDBImageUrl(details.poster_path, "w500") ?? "",
-            synopsis: details.overview ?? "",
-          },
-        };
-      }
-
-      const details = await getTVDetails(tmdbRef.id);
-      const title = details.name;
-      const year = details.first_air_date?.slice(0, 4)
-        ? Number(details.first_air_date.slice(0, 4))
-        : undefined;
-      const playable = await findPlayableMatch(catalogProvider, {
-        title,
-        aliases: [details.original_name],
-        kind: "show",
-        year,
-      });
-
-      return {
-        source: "tmdb",
-        playableId: playable?.id,
-        runtime: details.episode_run_time?.[0],
-        seasons: details.number_of_seasons,
-        item: {
-          id: slug,
-          slug,
-          provider: "tmdb",
-          providerId: String(details.id),
-          title,
-          kind: "show",
-          ...(year !== undefined ? { year } : {}),
-          ...(Number.isFinite(details.vote_average)
-            ? { rating: Number(details.vote_average.toFixed(1)) }
-            : {}),
-          genres: details.genres.map((genre) => genre.name),
-          backdrop:
-            getTMDBImageUrl(details.backdrop_path, "original") ??
-            getTMDBImageUrl(details.poster_path, "original") ??
-            "",
-          poster: getTMDBImageUrl(details.poster_path, "w500") ?? "",
-          synopsis: details.overview ?? "",
-          ...(details.number_of_episodes
-            ? { episodes: details.number_of_episodes }
-            : {}),
-        },
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  if (!catalogProvider.canHandleId(slug)) return null;
-
-  const item = await catalogProvider.getDetails(slug);
-  if (!item) return null;
-
-  return {
-    item,
-    playableId: item.id,
-    source: "catalog",
-  };
-}
 
 export default async function EntertainmentDetailPage({
   params,
@@ -136,20 +13,25 @@ export default async function EntertainmentDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const detail = await getDetailState(slug);
-  if (!detail) notFound();
 
-  const { item, playableId, source, runtime, seasons } = detail;
+  if (!catalogProvider.canHandleId(slug)) notFound();
+
+  const item = await catalogProvider.getDetails(slug);
+  if (!item) notFound();
 
   const metadata = [
     item.kind === "show" ? "Series" : "Movie",
     item.year !== undefined ? String(item.year) : "",
     item.rating !== undefined ? `★ ${item.rating}` : "",
-    runtime ? `${runtime} min` : "",
-    seasons ? `${seasons} season${seasons === 1 ? "" : "s"}` : "",
+    item.ratingCount ? `${item.ratingCount.toLocaleString()} ratings` : "",
+    item.durationMinutes ? `${item.durationMinutes} min` : "",
+    item.country ?? "",
     ...item.genres,
     item.episodes ? `${item.episodes} episodes` : "",
   ].filter(Boolean);
+
+  const languages = item.languages ?? [];
+  const cast = item.cast ?? [];
 
   return (
     <div className="space-y-5">
@@ -184,18 +66,28 @@ export default async function EntertainmentDetailPage({
 
             <div className="max-w-3xl">
               <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">
-                {source === "tmdb"
-                  ? `TMDB · ${item.kind === "show" ? "Series" : "Movie"}`
-                  : `PinFlix ${item.kind === "show" ? "Series" : "Movie"}`}
+                MovieBox · {item.kind === "show" ? "Series" : "Movie"}
               </p>
               <h1 className="text-gradient mt-2 text-4xl font-black tracking-[-.05em] sm:text-5xl md:text-6xl">
                 {item.title}
               </h1>
+
               {metadata.length > 0 && (
                 <p className="mt-4 text-sm font-medium text-zinc-300">
                   {metadata.join(" · ")}
                 </p>
               )}
+
+              {languages.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {languages.slice(0, 8).map((language) => (
+                    <span key={language} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-300">
+                      {language}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {item.synopsis && (
                 <p className="mt-5 max-w-2xl text-sm font-light leading-7 text-zinc-300 sm:text-base">
                   {item.synopsis}
@@ -203,23 +95,13 @@ export default async function EntertainmentDetailPage({
               )}
 
               <div className="mt-8 flex flex-wrap gap-3">
-                {playableId ? (
-                  <Link
-                    href={`/watch/${playableId}`}
-                    className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white shadow-[0_0_30px_rgba(168,85,247,.22)]"
-                  >
-                    <Play size={18} fill="currentColor" />
-                    Play
-                  </Link>
-                ) : (
-                  <Link
-                    href={`/search?q=${encodeURIComponent(item.title)}`}
-                    className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white shadow-[0_0_30px_rgba(168,85,247,.22)]"
-                  >
-                    <Search size={18} />
-                    Find playback
-                  </Link>
-                )}
+                <Link
+                  href={`/watch/${item.id}`}
+                  className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white shadow-[0_0_30px_rgba(168,85,247,.22)]"
+                >
+                  <Play size={18} fill="currentColor" />
+                  Play
+                </Link>
 
                 <SavedToggle
                   item={{
@@ -232,17 +114,33 @@ export default async function EntertainmentDetailPage({
                     genres: item.genres,
                   }}
                 />
-              </div>
 
-              {source === "tmdb" && !playableId && (
-                <p className="mt-4 text-xs leading-5 text-zinc-500">
-                  Details are available, but this title is not currently linked to a verified PinFlix playback source.
-                </p>
-              )}
+                <Link
+                  href={`/search?q=${encodeURIComponent(item.title)}`}
+                  className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 font-semibold text-white backdrop-blur hover:bg-white/10"
+                >
+                  <Search size={18} />
+                  Similar titles
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </section>
+
+      {cast.length > 0 && (
+        <section className="glass-panel rounded-3xl p-6 sm:p-8">
+          <h2 className="text-xl font-bold text-white">Cast</h2>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {cast.slice(0, 18).map((credit) => (
+              <div key={`${credit.name}-${credit.role ?? ""}`} className="rounded-2xl border border-white/5 bg-white/[.03] p-4">
+                <p className="font-semibold text-zinc-100">{credit.name}</p>
+                {credit.role && <p className="mt-1 text-xs text-zinc-500">{credit.role}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
