@@ -5,7 +5,7 @@ import type { Entertainment } from "@/src/types/catalog";
 export function EntertainmentCard({ item }: { item: Entertainment }) {
   return (
     <Link
-      href={`/entertainment/${item.slug}`}
+      href={`/entertainment/${item.id}`}
       className="movie-card tv-focus group relative block aspect-[2/3] min-w-0 overflow-hidden rounded-2xl border border-white/5 bg-surface"
       aria-label={`View ${item.title}`}
     >
