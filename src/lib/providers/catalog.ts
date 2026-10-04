@@ -5,16 +5,16 @@ import type {
   PinFlixProvider,
   ProviderCatalogPage,
   ProviderCategory,
+  ProviderHomeFeed,
+  ProviderHomeSection,
   SeriesNavigation,
 } from "./contracts";
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
 
 /**
- * PinFlix production catalog/playback provider.
- *
- * CineplexBD has been removed. MovieBox web search, detail resolution,
- * trending catalog and explicitly unlocked playback sources are now the
- * only provider path behind the provider-neutral UI contract.
+ * MovieBox is the single PinFlix catalog, discovery, detail and playback
+ * provider. The UI consumes this provider-neutral facade so upstream response
+ * shapes remain isolated from application components.
  */
 export const catalogProvider: PinFlixProvider = {
   name: "moviebox",
@@ -27,20 +27,28 @@ export const catalogProvider: PinFlixProvider = {
     return movieboxWeb.search(query, page);
   },
 
+  getHomeFeed() {
+    return movieboxWeb.getHomeFeed();
+  },
+
   getLatestPage(kind, page = 1) {
     return movieboxWeb.getLatestPage(kind, page);
   },
 
-  async getCategories(_kind) {
-    return [];
+  getCategories(kind) {
+    return movieboxWeb.getCategories(kind);
   },
 
-  async getCategoryPage(_categoryId, _page = 1) {
-    return null;
+  getCategoryPage(categoryId, page = 1) {
+    return movieboxWeb.getCategoryPage(categoryId, page);
   },
 
   getDetails(id) {
     return movieboxWeb.getDetails(id);
+  },
+
+  getRecommendations(id, page = 1) {
+    return movieboxWeb.getRecommendations(id, page);
   },
 
   getSeriesNavigation(id, requestedSeason = 1) {
@@ -58,5 +66,7 @@ export type {
   PinFlixProvider,
   ProviderCatalogPage,
   ProviderCategory,
+  ProviderHomeFeed,
+  ProviderHomeSection,
   SeriesNavigation,
 };
