@@ -108,9 +108,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <footer className="border-t border-white/5 px-5 py-8 text-center text-xs text-zinc-600">
         <p>
-          Discovery metadata may be provided by TMDB.{" "}
+          Catalog, metadata and available playback are resolved through MovieBox.{" "}
           <Link href="/credits" className="tv-focus rounded underline-offset-4 hover:text-zinc-300 hover:underline">
-            Credits & attribution
+            Source information
           </Link>
         </p>
       </footer>
