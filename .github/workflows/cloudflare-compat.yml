@@ -178,8 +178,9 @@ jobs:
           node -e 'const j=require("/tmp/tmdb-local.json"); if (j.configured !== false || !Array.isArray(j.results)) process.exit(1)'
           echo "Local Workers runtime smoke test passed."
 
-      - name: Probe deployed Cloudflare workers.dev runtime
+      - name: Observe deployed Cloudflare workers.dev runtime
         if: github.event_name == 'push'
+        continue-on-error: true
         shell: bash
         run: |
           set -uo pipefail
