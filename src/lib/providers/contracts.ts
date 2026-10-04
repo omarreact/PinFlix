@@ -18,6 +18,19 @@ export type ProviderCatalogPage = {
   hasNextPage: boolean;
 };
 
+export type ProviderHomeSection = {
+  id: string;
+  label: string;
+  items: Entertainment[];
+  kind: ProviderKind | "mixed";
+  supportsPagination: boolean;
+};
+
+export type ProviderHomeFeed = {
+  featured?: Entertainment;
+  sections: ProviderHomeSection[];
+};
+
 export type SeriesNavigation = {
   seasons: number[];
   season: number;
@@ -28,10 +41,12 @@ export interface PinFlixProvider {
   readonly name: string;
   canHandleId(id: string): boolean;
   search(query: string, page?: number): Promise<Entertainment[]>;
+  getHomeFeed(): Promise<ProviderHomeFeed>;
   getLatestPage(kind: ProviderKind, page?: number): Promise<ProviderCatalogPage>;
   getCategories(kind: ProviderKind): Promise<ProviderCategory[]>;
   getCategoryPage(categoryId: string, page?: number): Promise<ProviderCatalogPage | null>;
   getDetails(id: string): Promise<Entertainment | null>;
+  getRecommendations(id: string, page?: number): Promise<Entertainment[]>;
   getSeriesNavigation(id: string, requestedSeason?: number): Promise<SeriesNavigation>;
   resolveStreams(
     id: string,
