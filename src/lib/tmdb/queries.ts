@@ -1,5 +1,5 @@
 import { tmdbFetch } from "./client";
-import type { TMDBMedia, TMDBMovie, TMDBPaginatedResponse, TMDBTVShow } from "./types";
+import type { TMDBMedia, TMDBMovie, TMDBMovieDetails, TMDBPaginatedResponse, TMDBTVDetails, TMDBTVShow } from "./types";
 
 export async function getTrendingMovies(timeWindow: "day" | "week" = "week") {
   return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>(
@@ -50,4 +50,20 @@ export async function searchTMDB(query: string, page = 1): Promise<TMDBPaginated
   );
 
   return { ...response, results };
+}
+
+export async function getMovieDetails(id: number) {
+  return tmdbFetch<TMDBMovieDetails>(
+    `/movie/${id}`,
+    { language: "en-US" },
+    { revalidate: 1800 },
+  );
+}
+
+export async function getTVDetails(id: number) {
+  return tmdbFetch<TMDBTVDetails>(
+    `/tv/${id}`,
+    { language: "en-US" },
+    { revalidate: 1800 },
+  );
 }
