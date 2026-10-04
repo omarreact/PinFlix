@@ -1,6 +1,7 @@
 import "server-only";
 
 import * as cheerio from "cheerio";
+import type { AnyNode } from "domhandler";
 import type { Entertainment } from "@/src/types/catalog";
 import type { ProviderCategory } from "../contracts";
 
@@ -132,7 +133,7 @@ function languagesFromText(text: string) {
 
 function imageFromNode(
   $: cheerio.CheerioAPI,
-  node: cheerio.Element,
+  node: AnyNode,
 ) {
   const root = $(node);
   const image = root.is("img") ? root : root.find("img").first();
@@ -146,7 +147,7 @@ function imageFromNode(
 
 function titleFromNode(
   $: cheerio.CheerioAPI,
-  anchor: cheerio.Element,
+  anchor: AnyNode,
   slug: string,
 ) {
   const root = $(anchor);
@@ -165,7 +166,7 @@ function titleFromNode(
 
 function closestCard(
   $: cheerio.CheerioAPI,
-  anchor: cheerio.Element,
+  anchor: AnyNode,
 ) {
   const root = $(anchor);
   const candidates = root.parents("article,li,div").toArray();
@@ -274,7 +275,7 @@ export async function getPublicCatalogPage(
 
 function categoryLabel(
   $: cheerio.CheerioAPI,
-  anchor: cheerio.Element,
+  anchor: AnyNode,
   href: string,
 ) {
   const direct = normalizeWhitespace($(anchor).text());
@@ -540,7 +541,7 @@ export async function getPublicDetails(
 
 function sectionItems(
   $: cheerio.CheerioAPI,
-  section: cheerio.Element,
+  section: AnyNode,
 ) {
   const html = $.html(section);
   return parseCatalog(html);
