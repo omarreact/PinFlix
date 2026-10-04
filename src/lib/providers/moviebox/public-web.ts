@@ -337,7 +337,7 @@ export async function getPublicCategories(
     if (result.status !== "fulfilled") continue;
     const $ = cheerio.load(result.value);
 
-    $('a[href*="/ranking-list/"],a[href*="/web/category"]').each((_index, anchor) => {
+    $('a[href*="/ranking-list/"],a[href*="/web/category"],a[href^="/movie?"],a[href^="/tv-series?"],a[href^="/web/film?"]').each((_index, anchor) => {
       const href = $(anchor).attr("href")?.trim() ?? "";
       if (!href || seen.has(href)) return;
 
@@ -350,7 +350,10 @@ export async function getPublicCategories(
       if (url.origin !== SITE_BASE) return;
       if (
         !url.pathname.startsWith("/ranking-list/") &&
-        url.pathname !== "/web/category"
+        url.pathname !== "/web/category" &&
+        url.pathname !== "/web/film" &&
+        url.pathname !== "/movie" &&
+        url.pathname !== "/tv-series"
       ) {
         return;
       }
@@ -394,7 +397,10 @@ export async function getPublicCategoryPage(
   if (url.origin !== SITE_BASE) return null;
   if (
     !url.pathname.startsWith("/ranking-list/") &&
-    url.pathname !== "/web/category"
+    url.pathname !== "/web/category" &&
+    url.pathname !== "/web/film" &&
+    url.pathname !== "/movie" &&
+    url.pathname !== "/tv-series"
   ) {
     return null;
   }
