@@ -73,7 +73,6 @@ jobs:
             compatibility_date: "2026-10-02",
             compatibility_flags: ["nodejs_compat"],
             observability: { enabled: true },
-            keep_bindings: ["secret_text"],
             bindings: [
               {
                 type: "service",
@@ -169,14 +168,14 @@ jobs:
 
           grep -q "PinFlix" /tmp/pinflix-home.html
 
-          TMDB_LOCAL_STATUS=$(curl --silent --show-error --max-time 5 --output /tmp/tmdb-local.json --write-out "%{http_code}" "http://127.0.0.1:3001/api/tmdb/search?q=Avatar" || true)
-          if [ "$TMDB_LOCAL_STATUS" != "200" ]; then
-            cat /tmp/tmdb-local.json
+          SEARCH_LOCAL_STATUS=$(curl --silent --show-error --max-time 5 --output /tmp/search-local.json --write-out "%{http_code}" "http://127.0.0.1:3001/api/search" || true)
+          if [ "$SEARCH_LOCAL_STATUS" != "200" ]; then
+            cat /tmp/search-local.json
             cat /tmp/pinflix-vinext.log
             exit 1
           fi
-          node -e 'const j=require("/tmp/tmdb-local.json"); if (j.configured !== false || !Array.isArray(j.results)) process.exit(1)'
-          echo "Local Workers runtime smoke test passed."
+          node -e 'const j=require("/tmp/search-local.json"); if (!Array.isArray(j.entertainment)) process.exit(1)'
+          echo "Local MovieBox-only Workers runtime smoke test passed."
 
       - name: Observe deployed Cloudflare workers.dev runtime
         if: github.event_name == 'push'
@@ -209,7 +208,8 @@ jobs:
           const failures = [];
           if (healthHttp !== "200") failures.push("PinFlix health HTTP " + healthHttp);
           if (!health || health.ok !== true || health.service !== "pinflix") failures.push("PinFlix health payload invalid");
-          if (health?.playbackCatalog?.provider !== "moviebox") failures.push("MovieBox is not the active provider");
+          if (health?.catalog?.provider !== "moviebox") failures.push("MovieBox is not the active catalog provider");
+          if (health?.playback?.provider !== "moviebox") failures.push("MovieBox is not the active playback provider");
 
           if (failures.length) {
             console.error(failures.join("; "));
