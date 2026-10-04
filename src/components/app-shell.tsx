@@ -32,7 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="fixed inset-x-0 top-4 z-50 px-3 sm:px-5">
         <div className="glass-nav mx-auto flex min-h-[64px] w-full max-w-7xl items-center justify-between gap-3 rounded-full px-4 py-2.5 sm:px-6">
           <div className="flex min-w-0 items-center gap-4 lg:gap-8">
-            <Link href="/" className="tv-focus flex min-h-11 shrink-0 items-center gap-2 rounded-full font-black tracking-tight">
+            <Link href="/" className="media-focus flex min-h-11 shrink-0 items-center gap-2 rounded-full font-black tracking-tight">
               <PlayCircle className="text-brand" size={29} fill="currentColor" />
               <span className="text-xl sm:text-2xl">PIN<span className="font-light text-brand-2">FLIX</span></span>
             </Link>
@@ -44,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "tv-focus rounded-full px-1 py-2 text-sm font-semibold transition",
+                      "media-focus rounded-full px-1 py-2 text-sm font-semibold transition",
                       active ? "text-white" : "text-zinc-400 hover:text-white",
                     )}
                   >
@@ -70,7 +70,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link
               href="/saved"
               aria-label="Open My List"
-              className="tv-focus hidden h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-gradient-to-br from-brand/35 to-brand-2/35 text-white shadow-inner sm:grid"
+              className="media-focus hidden h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-gradient-to-br from-brand/35 to-brand-2/35 text-white shadow-inner sm:grid"
             >
               <UserRound size={17} />
             </Link>
@@ -90,7 +90,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={href}
                 href={href}
                 className={cn(
-                  "tv-focus flex min-h-9 items-center gap-1.5 rounded-full px-2.5 font-semibold",
+                  "media-focus flex min-h-9 items-center gap-1.5 rounded-full px-2.5 font-semibold",
                   active ? "bg-white/10 text-white" : "hover:text-white",
                 )}
               >
@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <footer className="border-t border-white/5 px-5 py-8 text-center text-xs text-zinc-600">
         <p>
           Catalog, metadata and available playback are resolved through MovieBox.{" "}
-          <Link href="/credits" className="tv-focus rounded underline-offset-4 hover:text-zinc-300 hover:underline">
+          <Link href="/credits" className="media-focus rounded underline-offset-4 hover:text-zinc-300 hover:underline">
             Source information
           </Link>
         </p>

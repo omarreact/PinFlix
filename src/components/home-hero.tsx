@@ -57,7 +57,7 @@ export function HomeHero({ item }: { item?: Entertainment }) {
               <>
                 <Link
                   href={`/watch/${item.id}`}
-                  className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white shadow-[0_0_30px_rgba(168,85,247,.22)] hover:shadow-[0_0_38px_rgba(168,85,247,.46)]"
+                  className="media-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white shadow-[0_0_30px_rgba(168,85,247,.22)] hover:shadow-[0_0_38px_rgba(168,85,247,.46)]"
                 >
                   <Play size={18} fill="currentColor" />
                   Watch now
@@ -75,7 +75,7 @@ export function HomeHero({ item }: { item?: Entertainment }) {
                 />
                 <Link
                   href={`/entertainment/${item.id}`}
-                  className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 font-semibold text-white backdrop-blur hover:bg-white/10"
+                  className="media-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 font-semibold text-white backdrop-blur hover:bg-white/10"
                 >
                   <Info size={18} />
                   Details
@@ -83,8 +83,8 @@ export function HomeHero({ item }: { item?: Entertainment }) {
               </>
             ) : (
               <>
-                <Link href="/movies" className="tv-focus accent-gradient rounded-full px-7 py-3 font-bold text-white">Browse movies</Link>
-                <Link href="/series" className="tv-focus rounded-full border border-white/10 bg-white/5 px-7 py-3 font-semibold">Browse series</Link>
+                <Link href="/movies" className="media-focus accent-gradient rounded-full px-7 py-3 font-bold text-white">Browse movies</Link>
+                <Link href="/series" className="media-focus rounded-full border border-white/10 bg-white/5 px-7 py-3 font-semibold">Browse series</Link>
               </>
             )}
           </div>

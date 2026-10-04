@@ -45,7 +45,7 @@ img { display: block; }
 
 ::selection { background: #a855f7; color: #fff; }
 
-.tv-focus {
+.media-focus {
   scroll-margin: 6rem;
   transition:
     transform 180ms ease,
@@ -55,7 +55,7 @@ img { display: block; }
     opacity 180ms ease,
     box-shadow 180ms ease;
 }
-.tv-focus:focus-visible {
+.media-focus:focus-visible {
   outline: 2px solid var(--color-ring);
   outline-offset: 3px;
 }

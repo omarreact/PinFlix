@@ -39,7 +39,7 @@ export function ProviderCategoryNav({
               <Link
                 key={category.id}
                 href={basePath + "?category=" + encodeURIComponent(category.id)}
-                className={`tv-focus shrink-0 whitespace-nowrap rounded-full border px-5 py-2.5 text-sm font-semibold transition ${
+                className={`media-focus shrink-0 whitespace-nowrap rounded-full border px-5 py-2.5 text-sm font-semibold transition ${
                   activeId === category.id
                     ? "border-transparent accent-gradient text-white shadow-[0_0_20px_rgba(168,85,247,.25)]"
                     : "border-white/5 bg-surface/70 text-zinc-400 hover:border-white/15 hover:bg-white/10 hover:text-white"

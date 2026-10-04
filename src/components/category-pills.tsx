@@ -40,7 +40,7 @@ export function CategoryPills({
             aria-selected={active}
             onClick={() => onChange(item.id)}
             className={cn(
-              "tv-focus shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition-colors",
+              "media-focus shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition-colors",
               active
                 ? "border-brand bg-brand text-black"
                 : "border-line bg-surface text-muted hover:border-panel hover:bg-elevated hover:text-fg",

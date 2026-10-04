@@ -240,7 +240,7 @@ export function WatchPlayer({
             {nextHref && (
               <Link
                 href={nextHref}
-                className="tv-focus hidden min-h-11 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/15 sm:inline-flex"
+                className="media-focus hidden min-h-11 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/15 sm:inline-flex"
               >
                 Next episode
                 <SkipForward size={16} />
@@ -249,7 +249,7 @@ export function WatchPlayer({
             <Link
               href={backHref}
               aria-label="Close player"
-              className="tv-focus grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-white/10 text-white backdrop-blur hover:bg-white/15"
+              className="media-focus grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-white/10 text-white backdrop-blur hover:bg-white/15"
             >
               <X size={20} />
             </Link>
@@ -281,7 +281,7 @@ export function WatchPlayer({
               <div className="mt-6 flex flex-wrap justify-center gap-3">
                 <button
                   type="button"
-                  className="tv-focus accent-gradient inline-flex min-h-11 items-center gap-2 rounded-full px-5 py-2.5 font-semibold"
+                  className="media-focus accent-gradient inline-flex min-h-11 items-center gap-2 rounded-full px-5 py-2.5 font-semibold"
                   onClick={() => { setError(""); setStatus("loading"); setSourcePosition(0); }}
                 >
                   <RefreshCw size={16} />
@@ -289,7 +289,7 @@ export function WatchPlayer({
                 </button>
                 <button
                   type="button"
-                  className="tv-focus min-h-11 rounded-full border border-white/10 bg-white/5 px-5 py-2.5 font-semibold text-zinc-300 hover:bg-white/10"
+                  className="media-focus min-h-11 rounded-full border border-white/10 bg-white/5 px-5 py-2.5 font-semibold text-zinc-300 hover:bg-white/10"
                   onClick={() => window.history.back()}
                 >
                   Back to catalog
@@ -304,7 +304,7 @@ export function WatchPlayer({
         <button
           type="button"
           aria-label={playing ? "Pause" : "Play"}
-          className="tv-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
+          className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
           onClick={() => void togglePlayback()}
         >
           {playing ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
@@ -313,7 +313,7 @@ export function WatchPlayer({
         <button
           type="button"
           aria-label={muted ? "Unmute" : "Mute"}
-          className="tv-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
+          className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
           onClick={() => setMuted((value) => !value)}
         >
           {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
@@ -325,7 +325,7 @@ export function WatchPlayer({
               type="button"
               aria-haspopup="menu"
               aria-expanded={qualityOpen}
-              className="tv-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
+              className="media-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
               onClick={() => { setQualityOpen((value) => !value); setSubtitleOpen(false); }}
             >
               {hlsLevels[selectedLevel]?.label ?? source?.quality ?? "Auto"}
@@ -338,7 +338,7 @@ export function WatchPlayer({
                     key={`${item.quality}-${item.sourceIndex}`}
                     type="button"
                     role="menuitem"
-                    className="tv-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
+                    className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
                     onClick={() => chooseSource(index)}
                   >
                     {item.quality}
@@ -349,7 +349,7 @@ export function WatchPlayer({
                     key={level.index}
                     type="button"
                     role="menuitem"
-                    className="tv-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
+                    className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
                     onClick={() => chooseLevel(level.index)}
                   >
                     {level.label}
@@ -367,7 +367,7 @@ export function WatchPlayer({
               aria-haspopup="menu"
               aria-expanded={subtitleOpen}
               aria-label={`Subtitles: ${selectedSubtitle === "off" ? "off" : selectedSubtitle}`}
-              className="tv-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
+              className="media-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
               onClick={() => { setSubtitleOpen((value) => !value); setQualityOpen(false); }}
             >
               <Captions size={18} />
@@ -379,7 +379,7 @@ export function WatchPlayer({
                   type="button"
                   role="menuitemradio"
                   aria-checked={selectedSubtitle === "off"}
-                  className="tv-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
+                  className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
                   onClick={() => chooseSubtitle("off")}
                 >
                   Off
@@ -390,7 +390,7 @@ export function WatchPlayer({
                     type="button"
                     role="menuitemradio"
                     aria-checked={selectedSubtitle === track.language}
-                    className="tv-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
+                    className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
                     onClick={() => chooseSubtitle(track.language)}
                   >
                     {track.label}
@@ -408,7 +408,7 @@ export function WatchPlayer({
         <button
           type="button"
           aria-label="Fullscreen"
-          className="tv-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
+          className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
           onClick={() => void videoRef.current?.requestFullscreen()}
         >
           <Maximize size={20} />
