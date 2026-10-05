@@ -53,6 +53,7 @@ jobs:
           const config = JSON.parse(fs.readFileSync("wrangler.deploy.jsonc", "utf8"));
           if (!config.assets?.directory) throw new Error("Cloudflare native static asset directory is missing.");
           if (config.assets.binding !== "ASSETS") throw new Error("ASSETS must be a native static assets binding.");
+          if (config.assets.run_worker_first !== false) throw new Error("Static assets must be served before the Worker.");
           if (config.services?.some?.((x) => x.binding === "ASSETS")) {
             throw new Error("ASSETS must not be a service binding.");
           }
