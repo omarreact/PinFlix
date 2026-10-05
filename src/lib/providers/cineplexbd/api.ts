@@ -1,3 +1,5 @@
+import { fetchCineplexOrigin } from "@/src/lib/cineplex-origin";
+
 export const CINEPLEX_BASE_URL = "http://cineplexbd.net";
 
 const headers = {
@@ -13,7 +15,7 @@ function toCineplexUrl(path: string) {
 
 export async function fetchHtml(path: string, revalidate = 0): Promise<string> {
   const url = toCineplexUrl(path);
-  const response = await fetch(url, revalidate > 0
+  const response = await fetchCineplexOrigin(url, revalidate > 0
     ? {
         headers,
         next: { revalidate },
@@ -30,7 +32,7 @@ export async function fetchHtml(path: string, revalidate = 0): Promise<string> {
 
 export async function fetchJson(path: string, revalidate = 0): Promise<unknown> {
   const url = toCineplexUrl(path);
-  const response = await fetch(url, revalidate > 0
+  const response = await fetchCineplexOrigin(url, revalidate > 0
     ? {
         headers,
         next: { revalidate },
@@ -49,7 +51,7 @@ export async function fetchJson(path: string, revalidate = 0): Promise<unknown> 
 export async function probeCineplexConnectivity() {
   const startedAt = Date.now();
   try {
-    const response = await fetch(CINEPLEX_BASE_URL, {
+    const response = await fetchCineplexOrigin(CINEPLEX_BASE_URL, {
       headers,
       cache: "no-store",
       redirect: "manual",
