@@ -1,184 +1,363 @@
-import { load } from "cheerio";
-import {
+import type {
   PinFlixProvider,
   ProviderCatalogPage,
   ProviderCategory,
-  SeriesNavigation,
   ProviderKind,
+  SeriesNavigation,
 } from "../contracts";
-import { Entertainment, StreamSource } from "@/src/types/catalog";
+import type { Entertainment, StreamSource } from "@/src/types/catalog";
+import { fetchHtml, fetchJson, CINEPLEX_BASE_URL } from "./api";
+import {
+  getCineplexCategories,
+  getCineplexCategory,
+  getCineplexTaxonomy,
+} from "./categories";
+import {
+  parseCatalog,
+  parseDetails,
+  parseEpisodeCount,
+  parseHasNextPage,
+  parsePlayerUrl,
+  parseSeasonNumbers,
+} from "./parser";
 
-const BASE_URL = "http://cineplexbd.net";
-
-const getProxiedImageUrl = (url?: string) => {
-  if (!url) return "";
-  const fullUrl = url.startsWith("http") ? url : `${BASE_URL}/${url.startsWith("/") ? url.slice(1) : url}`;
-  return `/api/proxy-image?url=${encodeURIComponent(fullUrl)}`;
+type ParsedProviderId = {
+  rawId: string;
+  kind: "movie" | "show";
 };
+
+type SeriesPlaybackOptions = {
+  season?: number;
+  episode?: number;
+};
+
+function parseProviderId(id: string): ParsedProviderId {
+  if (id.startsWith("cb-series-")) {
+    return { rawId: id.slice("cb-series-".length), kind: "show" };
+  }
+  if (id.startsWith("cb-movie-")) {
+    return { rawId: id.slice("cb-movie-".length), kind: "movie" };
+  }
+  if (id.startsWith("cb-")) {
+    return { rawId: id.slice("cb-".length), kind: "movie" };
+  }
+  return { rawId: id, kind: "movie" };
+}
+
+function safePositiveInteger(value: number | undefined, fallback: number) {
+  return Number.isInteger(value) && Number(value) > 0 ? Number(value) : fallback;
+}
+
+async function tryFetchHtml(paths: string[]) {
+  for (const path of paths) {
+    try {
+      return { html: await fetchHtml(path, 0), path };
+    } catch {
+      // Continue through the verified public CineplexBD route fallbacks.
+    }
+  }
+  return null;
+}
+
+async function tryFetchJson(paths: string[]) {
+  for (const path of paths) {
+    try {
+      return await fetchJson(path, 0);
+    } catch {
+      // Continue to the next public metadata route.
+    }
+  }
+  return undefined;
+}
+
+async function getLatestPage(
+  kind: ProviderKind,
+  page = 1,
+): Promise<ProviderCatalogPage> {
+  const safePage = Math.max(1, Math.floor(page));
+
+  if (kind === "movie") {
+    try {
+      const html = await fetchHtml(`/search.php?q=&page=${safePage}`, 0);
+      const all = parseCatalog(html);
+      const items = all.filter((item) => item.kind === "movie");
+      return {
+        items: items.length ? items : all,
+        page: safePage,
+        hasNextPage: parseHasNextPage(html),
+      };
+    } catch (error) {
+      console.error("CineplexBD movie catalog error:", error);
+      return { items: [], page: safePage, hasNextPage: false };
+    }
+  }
+
+  const [webSeries, recent] = await Promise.allSettled([
+    fetchHtml(
+      `/tcategory.php?category=${encodeURIComponent("Web Series")}&page=${safePage}`,
+      0,
+    ),
+    fetchHtml(`/search.php?q=&page=${safePage}`, 0),
+  ]);
+
+  const seen = new Set<string>();
+  const items = [
+    ...(webSeries.status === "fulfilled"
+      ? parseCatalog(webSeries.value, { forcedKind: "show" })
+      : []),
+    ...(recent.status === "fulfilled"
+      ? parseCatalog(recent.value).filter((item) => item.kind === "show")
+      : []),
+  ].filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+
+  return {
+    items,
+    page: safePage,
+    hasNextPage:
+      (webSeries.status === "fulfilled" && parseHasNextPage(webSeries.value)) ||
+      (recent.status === "fulfilled" && parseHasNextPage(recent.value)),
+  };
+}
+
+async function getDetails(id: string): Promise<Entertainment | null> {
+  const { rawId, kind } = parseProviderId(id);
+  if (!rawId) return null;
+
+  try {
+    const encodedId = encodeURIComponent(rawId);
+    const details =
+      kind === "show"
+        ? await tryFetchHtml([
+            `/watch.php?id=${encodedId}&season=1`,
+            `/watch.php?series_id=${encodedId}&season=1`,
+            `/tview.php?id=${encodedId}`,
+          ])
+        : await tryFetchHtml([`/view.php?id=${encodedId}`]);
+
+    if (!details) return null;
+
+    const metaJson = await tryFetchJson([
+      `/watch.php?id=${encodedId}&season=1&meta=1`,
+      `/watch.php?series_id=${encodedId}&season=1&meta=1`,
+    ]);
+
+    const partial = parseDetails(details.html, details.path, metaJson);
+
+    return {
+      id,
+      slug: id,
+      provider: "cineplexbd",
+      providerId: rawId,
+      detailUrl: details.path,
+      title:
+        partial.title ||
+        (kind === "show" ? "CineplexBD Series" : "CineplexBD Movie"),
+      kind,
+      ...(partial.year !== undefined ? { year: partial.year } : {}),
+      ...(partial.rating !== undefined ? { rating: partial.rating } : {}),
+      genres: partial.genres ?? [],
+      backdrop: partial.backdrop || partial.poster || "",
+      poster: partial.poster || "",
+      synopsis: partial.synopsis || "",
+      ...(partial.episodes !== undefined ? { episodes: partial.episodes } : {}),
+    };
+  } catch (error) {
+    console.error("CineplexBD details error:", error);
+    return null;
+  }
+}
+
+async function getSeriesNavigation(
+  id: string,
+  requestedSeason = 1,
+): Promise<SeriesNavigation> {
+  const { rawId, kind } = parseProviderId(id);
+  const fallbackSeason = safePositiveInteger(requestedSeason, 1);
+
+  if (!rawId || kind !== "show") {
+    return { seasons: [fallbackSeason], season: fallbackSeason, episodes: 1 };
+  }
+
+  const encodedId = encodeURIComponent(rawId);
+  const page = await tryFetchHtml([
+    `/watch.php?id=${encodedId}&season=${fallbackSeason}`,
+    `/watch.php?series_id=${encodedId}&season=${fallbackSeason}`,
+    `/tview.php?id=${encodedId}`,
+  ]);
+
+  const seasons = page ? parseSeasonNumbers(page.html) : [];
+  const season = seasons.includes(fallbackSeason)
+    ? fallbackSeason
+    : seasons[0] ?? fallbackSeason;
+
+  const metaJson = await tryFetchJson([
+    `/watch.php?id=${encodedId}&season=${season}&meta=1`,
+    `/watch.php?series_id=${encodedId}&season=${season}&meta=1`,
+  ]);
+
+  return {
+    seasons: seasons.length ? seasons : [season],
+    season,
+    episodes: parseEpisodeCount(metaJson, page?.html ?? ""),
+  };
+}
+
+async function resolveVideoUrl(
+  id: string,
+  options: SeriesPlaybackOptions = {},
+): Promise<string | null> {
+  const { rawId, kind } = parseProviderId(id);
+  const encodedId = encodeURIComponent(rawId);
+  const season = safePositiveInteger(options.season, 1);
+  const episode = safePositiveInteger(options.episode, 1);
+
+  if (kind === "show") {
+    const page = await tryFetchHtml([
+      `/watch.php?id=${encodedId}&season=${season}&ep=${episode}&autoplay=1`,
+      `/watch.php?series_id=${encodedId}&season=${season}&ep=${episode}&autoplay=1`,
+      `/watch.php?id=${encodedId}&season=${season}`,
+      `/watch.php?series_id=${encodedId}&season=${season}`,
+    ]);
+    return page ? parsePlayerUrl(page.html) : null;
+  }
+
+  // Movies commonly expose the actual player ID from view.php. Resolve it
+  // first, then retain player.php?id=<catalog id> as a compatibility fallback.
+  try {
+    const viewHtml = await fetchHtml(`/view.php?id=${encodedId}`, 0);
+    const playerMatch = viewHtml.match(/player\.php\?id=(\d+)/i);
+    if (playerMatch?.[1]) {
+      const playerHtml = await fetchHtml(
+        `/player.php?id=${encodeURIComponent(playerMatch[1])}`,
+        0,
+      );
+      const source = parsePlayerUrl(playerHtml);
+      if (source) return source;
+    }
+  } catch {
+    // Fall through to the direct player route.
+  }
+
+  try {
+    const playerHtml = await fetchHtml(`/player.php?id=${encodedId}`, 0);
+    return parsePlayerUrl(playerHtml);
+  } catch {
+    return null;
+  }
+}
+
+async function resolveStreams(
+  id: string,
+  options: SeriesPlaybackOptions = {},
+): Promise<StreamSource[]> {
+  try {
+    let videoUrl = await resolveVideoUrl(id, options);
+    if (!videoUrl) return [];
+
+    if (videoUrl.startsWith("/")) {
+      videoUrl = `${CINEPLEX_BASE_URL}${videoUrl}`;
+    }
+
+    const isHls = /\.m3u8(?:$|[?#])/i.test(videoUrl);
+
+    return [
+      {
+        url: `/api/proxy-video?url=${encodeURIComponent(videoUrl)}`,
+        quality: isHls ? "Cineplex HLS" : "Cineplex source",
+        protocol: isHls ? "hls" : "native",
+        priority: 1,
+      },
+    ];
+  } catch (error) {
+    console.error("CineplexBD stream resolution error:", error);
+    return [];
+  }
+}
+
+async function getCategories(kind: ProviderKind): Promise<ProviderCategory[]> {
+  const categories = await getCineplexCategories(kind === "movie" ? "movie" : "tv");
+  return categories.map((category) => ({
+    id: category.id,
+    provider: "cineplexbd",
+    label: category.label,
+    group: category.group,
+    kind: category.kind,
+    supportsPagination: category.supportsPagination,
+    supportedInPinflix: category.supportedInPinflix,
+  }));
+}
+
+async function getCategoryPage(
+  categoryId: string,
+  page = 1,
+): Promise<ProviderCatalogPage | null> {
+  const category = await getCineplexCategory(categoryId);
+  if (!category?.categoryValue) return null;
+
+  const safePage = Math.max(1, Math.floor(page));
+  const params = new URLSearchParams({
+    category: category.categoryValue,
+    page: String(safePage),
+  });
+
+  try {
+    const html = await fetchHtml(`/${category.endpoint}?${params.toString()}`, 0);
+    const forcedKind = category.endpoint === "category.php" ? "movie" : "show";
+    return {
+      items: parseCatalog(html, {
+        forcedKind,
+        category: category.id,
+      }),
+      page: safePage,
+      hasNextPage: parseHasNextPage(html),
+    };
+  } catch (error) {
+    console.error(`CineplexBD category error (${category.id}):`, error);
+    return { items: [], page: safePage, hasNextPage: false };
+  }
+}
 
 export const cineplexbdProvider: PinFlixProvider = {
   name: "cineplexbd",
 
   canHandleId(id: string) {
-    return id.startsWith("cb-");
+    return /^cb-(?:movie-|series-)?\d+$/.test(id);
   },
 
-  async search(query: string, page = 1): Promise<Entertainment[]> {
-    const url = `${BASE_URL}/search.php?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url);
-    const html = await res.text();
-    const $ = load(html);
-    
-    const items: Entertainment[] = [];
-    $("a[href*='view.php?id=']").each((_, el) => {
-      const href = $(el).attr("href");
-      const match = href?.match(/id=(\d+)/);
-      if (!match) return;
-      const id = `cb-${match[1]}`;
-      
-      const title = $(el).find("p.text-sm.font-bold, h3, h2").text().trim() || "Unknown Title";
-      const img = $(el).find("img").attr("src");
-      const poster = getProxiedImageUrl(img);
+  async search(query: string, page = 1) {
+    const normalized = query.trim();
+    if (!normalized) return [];
 
-      const yearText = $(el).find("span.text-gray-400").first().text().trim();
-      const year = parseInt(yearText, 10) || undefined;
-      
-      // Determine kind based on URL or title
-      // Usually cineplexbd has Series in the title or category
-      const kindText = $(el).text().toLowerCase();
-      const kind = (kindText.includes("series") || kindText.includes("season") || kindText.includes("episode")) ? "show" : "movie";
-      
-      items.push({
-        id,
-        slug: id,
-        title,
-        kind,
-        year,
-        poster,
-        backdrop: poster,
-        genres: [],
-        synopsis: "From CineplexBD",
-      });
-    });
-    
-    return items.filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
-  },
-
-  async getLatestPage(kind: ProviderKind, page = 1): Promise<ProviderCatalogPage> {
-    const url = `${BASE_URL}/category.php?page=${page}`;
-    const res = await fetch(url);
-    const html = await res.text();
-    const $ = load(html);
-    
-    const items: Entertainment[] = [];
-    $("a[href*='view.php?id=']").each((_, el) => {
-      const href = $(el).attr("href");
-      const match = href?.match(/id=(\d+)/);
-      if (!match) return;
-      const id = `cb-${match[1]}`;
-      
-      const title = $(el).find("p.text-sm.font-bold, h3, h2").text().trim() || "Unknown Title";
-      const img = $(el).find("img").attr("src");
-      const poster = getProxiedImageUrl(img);
-
-      const yearText = $(el).find("span.text-gray-400").first().text().trim();
-      const year = parseInt(yearText, 10) || undefined;
-      
-      const kindText = $(el).text().toLowerCase();
-      const kind = (kindText.includes("series") || kindText.includes("season") || kindText.includes("episode")) ? "show" : "movie";
-      
-      items.push({
-        id,
-        slug: id,
-        title,
-        kind,
-        year,
-        poster,
-        backdrop: poster,
-        genres: [],
-        synopsis: "From CineplexBD",
-      });
-    });
-    
-    const uniqueItems = items.filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
-    return {
-      items: uniqueItems,
-      page,
-      hasNextPage: uniqueItems.length > 0,
-    };
-  },
-
-  async getCategories(kind: ProviderKind): Promise<ProviderCategory[]> {
-    return [
-      { id: "cb-action", provider: "cineplexbd", label: "Action", group: "Genre", kind: "movie", supportsPagination: true, supportedInPinflix: true },
-      { id: "cb-comedy", provider: "cineplexbd", label: "Comedy", group: "Genre", kind: "movie", supportsPagination: true, supportedInPinflix: true },
-    ];
-  },
-
-  async getCategoryPage(categoryId: string, page = 1): Promise<ProviderCatalogPage> {
-    return this.getLatestPage("movie", page);
-  },
-
-  async getDetails(id: string): Promise<Entertainment | null> {
-    const rawId = id.replace("cb-", "");
-    const url = `${BASE_URL}/view.php?id=${rawId}`;
-    const res = await fetch(url);
-    const html = await res.text();
-    const $ = load(html);
-    
-    const title = $("h1").first().text().trim() || "CineplexBD Content";
-    
-    const img = $("img[src*='uploads/'], img[src*='tmdb.org']").first().attr("src");
-    const poster = getProxiedImageUrl(img);
-    
-    return {
-      id,
-      slug: id,
-      title,
-      kind: "movie",
-      poster,
-      backdrop: poster,
-      genres: [],
-      synopsis: "Playing from CineplexBD BDIX Server",
-    };
-  },
-
-  async getSeriesNavigation(id: string, requestedSeason = 1): Promise<SeriesNavigation> {
-    return {
-      seasons: [1],
-      season: 1,
-      episodes: 1,
-    };
-  },
-
-  async resolveStreams(id: string, options = {}): Promise<StreamSource[]> {
-    const rawId = id.replace("cb-", "");
-    
-    const viewRes = await fetch(`${BASE_URL}/view.php?id=${rawId}`);
-    const viewHtml = await viewRes.text();
-    const playerMatch = viewHtml.match(/player\.php\?id=(\d+)/i);
-    const playerId = playerMatch ? playerMatch[1] : rawId;
-    
-    const playerUrl = `${BASE_URL}/player.php?id=${playerId}`;
-    const res = await fetch(playerUrl);
-    const html = await res.text();
-    
-    const srcMatch = html.match(/videoSrc\s*=\s*["']([^"']+)["']/i) || html.match(/<source[^>]+src=["']([^"']+)["']/i);
-    if (!srcMatch) return [];
-    
-    let videoUrl = srcMatch[1];
-    if (!videoUrl.startsWith("http")) {
-      videoUrl = `${BASE_URL}${videoUrl.startsWith("/") ? "" : "/"}${videoUrl}`;
+    try {
+      const html = await fetchHtml(
+        `/search.php?q=${encodeURIComponent(normalized)}&page=${Math.max(1, page)}`,
+        0,
+      );
+      return parseCatalog(html);
+    } catch (error) {
+      console.error("CineplexBD search error:", error);
+      return [];
     }
-
-    // Proxy the video URL to avoid Mixed Content errors on HTTPS
-    const proxiedVideoUrl = `/api/proxy-video?url=${encodeURIComponent(videoUrl)}`;
-    
-    return [{
-      url: proxiedVideoUrl,
-      quality: "1080p",
-      protocol: videoUrl.includes(".m3u8") ? "hls" : "native",
-      priority: 1,
-    }];
   },
+
+  getLatestPage,
+  getCategories,
+  getCategoryPage,
+  getDetails,
+  getSeriesNavigation,
+  resolveStreams,
 };
+
+export async function getCineplexStatusSummary() {
+  const taxonomy = await getCineplexTaxonomy();
+  return {
+    provider: "cineplexbd",
+    taxonomySource: taxonomy.source,
+    categories: taxonomy.categories.length,
+    navigation: taxonomy.navigation.length,
+  };
+}
