@@ -38,8 +38,8 @@ export default async function HomePage() {
             <p className="font-bold text-white">CineplexBD catalog temporarily unavailable</p>
             <p className="mt-2 max-w-2xl text-sm leading-6">
               PinFlix could not refresh CineplexBD right now. Try again shortly or check{" "}
-              <a className="text-accent underline-offset-2 hover:underline" href="/api/health">
-                /api/health
+              <a className="text-accent underline-offset-2 hover:underline" href="/api/cineplexbd/status">
+                /api/cineplexbd/status
               </a>
               .
             </p>

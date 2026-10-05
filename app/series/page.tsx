@@ -50,8 +50,8 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
           <p className="font-semibold text-zinc-200">No CineplexBD titles loaded for this view</p>
           <p className="mt-2 leading-6">
             The CineplexBD catalog is temporarily unreachable. Try again shortly or check{" "}
-            <a className="text-accent underline-offset-2 hover:underline" href="/api/health">
-              /api/health
+            <a className="text-accent underline-offset-2 hover:underline" href="/api/cineplexbd/status">
+              /api/cineplexbd/status
             </a>
             .
           </p>
