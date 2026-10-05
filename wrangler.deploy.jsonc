@@ -3,7 +3,9 @@
   "name": "pinflix",
   "main": ".cloudflare/output/v0/workers/default/bundle/index.js",
   "compatibility_date": "2026-10-02",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "workers_dev": true,
   "preview_urls": true,
   "placement": {
@@ -29,5 +31,11 @@
       "enabled": true,
       "invocation_logs": true
     }
-  }
+  },
+  "services": [
+    {
+      "binding": "CINEPLEX_ORIGIN",
+      "service": "pinflix-origin-proxy"
+    }
+  ]
 }
