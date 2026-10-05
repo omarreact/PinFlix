@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <footer className="border-t border-white/5 px-5 py-8 text-center text-xs text-zinc-600">
         <p>
-          Catalog, metadata and available playback are resolved through MovieBox.{" "}
+          Catalog, metadata and available playback are resolved through CineplexBD.{" "}
           <Link href="/credits" className="media-focus rounded underline-offset-4 hover:text-zinc-300 hover:underline">
             Source information
           </Link>
