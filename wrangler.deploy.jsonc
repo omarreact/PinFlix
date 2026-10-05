@@ -34,8 +34,8 @@
   },
   "services": [
     {
-      "binding": "CINEPLEX_ORIGIN",
-      "service": "pinflix-origin-proxy"
+      "binding": "CINEPLEX_EDGE",
+      "service": "pinflix-media-edge"
     }
   ]
 }
