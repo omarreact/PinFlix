@@ -59,6 +59,7 @@ type MovieBoxWebDetail = {
 };
 
 type MovieBoxPlaybackEntry = {
+  id?: string;
   format?: string;
   url?: string;
   resolutions?: string | number;
@@ -89,6 +90,20 @@ type MovieBoxSubjectListResponse = {
       perPage?: number;
       totalCount?: number;
     };
+  };
+};
+
+type MovieBoxCaption = {
+  id?: string;
+  lan?: string;
+  lanName?: string;
+  url?: string;
+};
+
+type MovieBoxCaptionResponse = {
+  code?: number;
+  data?: {
+    list?: MovieBoxCaption[];
   };
 };
 
@@ -469,7 +484,7 @@ function playbackQuality(entry: MovieBoxPlaybackEntry) {
   return parts.join(" · ");
 }
 
-function mapUnlockedSource(entry: MovieBoxPlaybackEntry): StreamSource | null {
+function mapUnlockedSource(entry: MovieBoxPlaybackEntry): { source: StreamSource; id: string } | null {
   const url = entry.url?.trim();
   if (!url || entry.vipLocked !== false) return null;
 
@@ -486,10 +501,13 @@ function mapUnlockedSource(entry: MovieBoxPlaybackEntry): StreamSource | null {
 
   const resolution = Number(entry.resolutions);
   return {
-    url,
-    quality: playbackQuality(entry),
-    protocol: isHls ? "hls" : "native",
-    priority: Number.isFinite(resolution) ? resolution : 0,
+    source: {
+      url,
+      quality: playbackQuality(entry),
+      protocol: isHls ? "hls" : "native",
+      priority: Number.isFinite(resolution) ? resolution : 0,
+    },
+    id: entry.id ?? "",
   };
 }
 
@@ -540,14 +558,50 @@ export async function resolveStreams(
     ];
 
     const seen = new Set<string>();
-    return candidates
+    const validSources = candidates
       .map(mapUnlockedSource)
-      .filter((source): source is StreamSource => {
-        if (!source || seen.has(source.url)) return false;
-        seen.add(source.url);
+      .filter((mapped): mapped is { source: StreamSource; id: string } => {
+        if (!mapped || seen.has(mapped.source.url)) return false;
+        seen.add(mapped.source.url);
         return true;
       })
-      .sort((left, right) => right.priority - left.priority);
+      .sort((left, right) => right.source.priority - left.source.priority);
+
+    if (validSources.length > 0) {
+      // Fetch subtitles for the top stream
+      const topStream = validSources[0];
+      if (topStream.id) {
+        try {
+          const capUrl = new URL("/wefeed-h5api-bff/subject/caption", API_BASE);
+          capUrl.searchParams.set("format", "MP4");
+          capUrl.searchParams.set("id", topStream.id);
+          capUrl.searchParams.set("subjectId", parsed.subjectId);
+          capUrl.searchParams.set("detailPath", parsed.detailPath);
+          
+          const capResponse = await fetchJson<MovieBoxCaptionResponse>(capUrl);
+          if (capResponse.code === 0 && capResponse.data?.list) {
+            const subtitles = capResponse.data.list
+              .filter((c) => c.url && c.lanName)
+              .map((c) => ({
+                label: c.lanName || c.lan || "Unknown",
+                language: c.lan || "un",
+                url: c.url!,
+              }));
+              
+            if (subtitles.length > 0) {
+              // Apply subtitles to all sources (they usually share the same subtitles)
+              for (const s of validSources) {
+                s.source.subtitles = subtitles;
+              }
+            }
+          }
+        } catch (capError) {
+          console.error("MovieBox web caption error:", capError);
+        }
+      }
+    }
+
+    return validSources.map(s => s.source);
   } catch (error) {
     console.error("MovieBox web playback error:", error);
     return [];

@@ -5,6 +5,7 @@ import {
   getPublicCategories,
   getPublicCategoryPage,
 } from "./moviebox/public-web";
+import { cineplexbdProvider } from "./cineplexbd";
 import type {
   PinFlixProvider,
   ProviderCatalogPage,
@@ -13,46 +14,46 @@ import type {
 } from "./contracts";
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
 
-/**
- * MovieBox is the single source behind the PinFlix catalog contract.
- *
- * Structured MovieBox web endpoints are preferred for search/trending/details
- * and public first-party MovieBox pages supply editorial collections and a
- * resilient catalog fallback. Playback remains restricted to direct sources
- * explicitly returned as unlocked by MovieBox.
- */
 export const catalogProvider: PinFlixProvider = {
-  name: "moviebox",
+  name: "multiplex",
 
   canHandleId(id) {
-    return movieboxWeb.canHandleId(id);
+    return movieboxWeb.canHandleId(id) || cineplexbdProvider.canHandleId(id);
   },
 
-  search(query, page = 1) {
-    return movieboxWeb.search(query, page);
+  async search(query, page = 1) {
+    const [mb, cb] = await Promise.all([
+      movieboxWeb.search(query, page).catch(() => []),
+      cineplexbdProvider.search(query, page).catch(() => []),
+    ]);
+    return [...cb, ...mb];
   },
 
-  getLatestPage(kind, page = 1) {
-    return movieboxWeb.getLatestPage(kind, page);
+  async getLatestPage(kind, page = 1) {
+    // Prefer cineplexbd since moviebox search/latest might be broken due to token
+    return cineplexbdProvider.getLatestPage(kind, page).catch(() => movieboxWeb.getLatestPage(kind, page));
   },
 
-  getCategories(kind) {
-    return getPublicCategories(kind);
+  async getCategories(kind) {
+    return cineplexbdProvider.getCategories(kind);
   },
 
-  getCategoryPage(categoryId, page = 1) {
-    return getPublicCategoryPage(categoryId, page);
+  async getCategoryPage(categoryId, page = 1) {
+    return cineplexbdProvider.getCategoryPage(categoryId, page);
   },
 
-  getDetails(id) {
+  async getDetails(id) {
+    if (cineplexbdProvider.canHandleId(id)) return cineplexbdProvider.getDetails(id);
     return movieboxWeb.getDetails(id);
   },
 
-  getSeriesNavigation(id, requestedSeason = 1) {
+  async getSeriesNavigation(id, requestedSeason = 1) {
+    if (cineplexbdProvider.canHandleId(id)) return cineplexbdProvider.getSeriesNavigation(id, requestedSeason);
     return movieboxWeb.getSeriesNavigation(id, requestedSeason);
   },
 
-  resolveStreams(id, options = {}) {
+  async resolveStreams(id, options = {}) {
+    if (cineplexbdProvider.canHandleId(id)) return cineplexbdProvider.resolveStreams(id, options);
     return movieboxWeb.resolveStreams(id, options);
   },
 };

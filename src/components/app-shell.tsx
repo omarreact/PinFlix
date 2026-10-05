@@ -11,6 +11,7 @@ const nav = [
   { href: "/movies", label: "Movies" },
   { href: "/series", label: "Series" },
   { href: "/saved", label: "My List" },
+  { href: "/login", label: "Login" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

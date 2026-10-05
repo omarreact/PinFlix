@@ -31,6 +31,10 @@ export default async function HomePage() {
       <HomeHero item={featured} />
 
       <div className="relative z-20 mx-auto -mt-8 max-w-[1400px] space-y-12 px-6 pb-24 md:-mt-14 md:px-12">
+        <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Demo Mode active. Only add media you own, have licensed, or are authorized to distribute.
+        </div>
+
         <Suspense fallback={null}>
           <BrowseTabs active="all" />
         </Suspense>

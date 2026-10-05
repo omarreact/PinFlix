@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ReactDOM from "react-dom";
 import { ListVideo } from "lucide-react";
 import { WatchPlayer } from "@/src/components/watch-player";
 import { catalogProvider } from "@/src/lib/providers/catalog";
@@ -32,6 +33,9 @@ export default async function WatchPage({
   searchParams: SearchParams;
 }) {
   const [{ mediaId }, query] = await Promise.all([params, searchParams]);
+
+  ReactDOM.preconnect("https://bcdnxw.hakunaymatata.com", { crossOrigin: "anonymous" });
+  ReactDOM.preconnect("https://cacdn.hakunaymatata.com", { crossOrigin: "anonymous" });
 
   if (!catalogProvider.canHandleId(mediaId)) notFound();
 

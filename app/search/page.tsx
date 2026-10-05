@@ -16,6 +16,7 @@ export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [entertainment, setEntertainment] = useState<Entertainment[]>([]);
   const [loading, setLoading] = useState(false);
+  const [yearFilter, setYearFilter] = useState<string>("all");
   const normalized = query.trim();
 
   useEffect(() => {
@@ -90,14 +91,42 @@ export default function SearchPage() {
           ))}
         </div>
       ) : entertainment.length > 0 ? (
-        <section>
-          <h2 className="mb-5 text-xl font-bold text-white">
-            Results <span className="text-sm font-normal text-zinc-500">({entertainment.length})</span>
-          </h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
-            {entertainment.map((item) => <EntertainmentCard key={item.id} item={item} />)}
-          </div>
-        </section>
+        (() => {
+          const availableYears = Array.from(new Set(entertainment.map(e => e.year).filter(Boolean))).sort((a, b) => Number(b) - Number(a));
+          const filtered = entertainment.filter(item => yearFilter === "all" || item.year?.toString() === yearFilter);
+          
+          return (
+            <section>
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">
+                  Results <span className="text-sm font-normal text-zinc-500">({filtered.length})</span>
+                </h2>
+                {availableYears.length > 0 && (
+                  <select 
+                    value={yearFilter} 
+                    onChange={(e) => setYearFilter(e.target.value)}
+                    className="rounded-lg border border-white/10 bg-surface px-3 py-1.5 text-sm text-white"
+                  >
+                    <option value="all">All Years</option>
+                    {availableYears.map(year => (
+                      <option key={year} value={year?.toString()}>{year}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              
+              {filtered.length > 0 ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
+                  {filtered.map((item) => <EntertainmentCard key={item.id} item={item} />)}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-12 text-center text-zinc-500">
+                  No titles found for year {yearFilter}.
+                </div>
+              )}
+            </section>
+          );
+        })()
       ) : (
         <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-12 text-center text-zinc-500">
           No MovieBox titles found. Try a different spelling.
