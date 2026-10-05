@@ -54,8 +54,9 @@ export async function GET(req: NextRequest) {
         "Access-Control-Allow-Origin": "*",
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Video proxy error:", error);
-    return new Response(`Proxy Error: ${error.message}`, { status: 500 });
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(`Proxy Error: ${message}`, { status: 500 });
   }
 }
