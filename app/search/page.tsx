@@ -60,8 +60,8 @@ export default function SearchPage() {
     <div className="space-y-8">
       <section className="animate-slide-up">
         <Link href="/" className="tv-focus inline-flex min-h-11 items-center rounded-full text-sm font-semibold text-zinc-400 hover:text-white">← Discover</Link>
-        <h1 className="mt-4 text-4xl font-black tracking-[-.04em] text-gradient md:text-5xl">Search MovieBox</h1>
-        <p className="mt-3 text-sm text-zinc-400">Search MovieBox movies and series directly from PinFlix.</p>
+        <h1 className="mt-4 text-4xl font-black tracking-[-.04em] text-gradient md:text-5xl">Search CineplexBD</h1>
+        <p className="mt-3 text-sm text-zinc-400">Search CineplexBD movies and series directly from PinFlix.</p>
 
         <label className="glass-panel mt-6 flex min-h-14 max-w-3xl items-center gap-3 rounded-full px-5 focus-within:border-brand/60">
           <Search size={20} className="shrink-0 text-zinc-500" />
@@ -74,7 +74,7 @@ export default function SearchPage() {
               setLoading(Boolean(value.trim()));
               if (!value.trim()) setEntertainment([]);
             }}
-            placeholder="Search MovieBox titles"
+            placeholder="Search CineplexBD titles"
             className="min-w-0 flex-1 bg-transparent py-4 text-white placeholder:text-zinc-600"
           />
         </label>
@@ -82,7 +82,7 @@ export default function SearchPage() {
 
       {!normalized ? (
         <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-12 text-center text-zinc-500">
-          Start typing to search MovieBox.
+          Start typing to search CineplexBD.
         </div>
       ) : loading ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
@@ -129,7 +129,7 @@ export default function SearchPage() {
         })()
       ) : (
         <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-12 text-center text-zinc-500">
-          No MovieBox titles found. Try a different spelling.
+          No CineplexBD titles found. Try a different spelling.
         </div>
       )}
     </div>
