@@ -14,47 +14,32 @@ PinFlix is a Next.js movie and series interface with a cinematic dark UI and a d
 - In-browser HLS/native playback
 - Responsive mobile, desktop and TV-friendly controls
 
-## Design system
-
-The current interface is adapted from the supplied LeoStream Pro HTML references:
-
-- near-black base: `#030305`
-- surface: `#0f0f13`
-- indigo → purple primary gradient
-- floating glass navigation
-- Outfit typography
-- cinematic full-bleed hero
-- 2:3 poster cards with hover/focus metadata
-- pill filters and search
-- full-screen playback presentation
-- reduced-motion and keyboard focus support
-
 ## Architecture
 
-PinFlix keeps the web application, metadata resolution and media delivery separate:
+PinFlix uses **CineplexBD as its only active catalog and playback provider**.
 
 ```text
 PinFlix UI
     ↓
-catalog/provider adapter
+CineplexBD provider adapter
     ↓
-title metadata + provider ID
+catalog/search/title metadata
     ↓
 playback resolver
     ↓
-guarded media delivery / HLS
+HTTPS media gateway where required
+    ↓
+PinFlix HLS/native player
 ```
 
-The UI does not need to know where an upstream media file lives. Catalog code returns normalized title information; playback resolution happens only when the viewer starts a title.
-
-The UI and API routes consume a provider-neutral contract with MovieBox as the single user-facing data source. PinFlix reads MovieBox home/editorial collections, movie and series catalogs, search, title details, public taxonomy, season navigation and available playback through the verified MovieBox web surfaces. TMDB and CineplexBD are not used by the current catalog UI. Playback is limited to direct HLS/MP4 sources that MovieBox explicitly returns as unlocked; protected/VIP-locked authorization material is not replayed or proxied.
+The UI consumes normalized provider-neutral title and stream contracts, but no MovieBox provider is active or included in the production catalog pipeline.
 
 ```text
 app/                              routes and API handlers
 src/components/                   reusable UI and player components
 src/lib/providers/contracts.ts    provider-neutral catalog/playback contract
-src/lib/providers/catalog.ts      active MovieBox provider adapter used by the UI
-src/lib/providers/moviebox/       MovieBox web/provider + public catalog integration
+src/lib/providers/catalog.ts      active CineplexBD provider binding
+src/lib/providers/cineplexbd/     CineplexBD catalog/playback adapter
 src/lib/saved.ts                  client-side My List persistence
 src/types/                        catalog and playback contracts
 ```
@@ -90,12 +75,8 @@ PinFlix production is Cloudflare-only.
 
 Do not add Vercel configuration or Vercel deployment workflows to this repository.
 
-## Repository cleanup
-
-Temporary NID tools, Direct Play experiments, Termux bridges and Android local-bridge prototypes are not part of the PinFlix product and have been removed from `main`.
-
 ## Media boundary
 
-CineplexBD has been removed from PinFlix. MovieBox is the only playback provider behind the catalog adapter. PinFlix accepts only direct sources that the provider marks as unlocked; it does not replay protected provider cookies, VIP authorization headers, DRM keys or signing secrets.
+CineplexBD is the only configured catalog/playback provider. Do not add MovieBox or additional source providers unless the project owner explicitly changes this decision.
 
-Use only media sources that the operator is authorized to access. Upstream availability, content rights and regional routing remain the responsibility of the source provider.
+Use media only where the operator is authorized to access and relay it. Upstream availability, content rights and regional routing remain the responsibility of the source provider.
