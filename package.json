@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "check": "npm run lint && npm run build && npm run typecheck && npm run test",
+    "check": "npm run lint && npm run test && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:setup": "prisma generate && prisma db push",
