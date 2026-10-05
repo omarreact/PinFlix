@@ -33,11 +33,11 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
       <section className="animate-slide-up">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold uppercase tracking-[.16em] text-accent">
           <Film size={14} />
-          MovieBox catalog
+          CineplexBD catalog
         </div>
         <h1 className="text-4xl font-black tracking-[-.04em] text-gradient md:text-5xl">{heading}</h1>
         <p className="mt-3 max-w-2xl text-sm font-light leading-6 text-zinc-400">
-          Browse movie titles and editorial collections directly from MovieBox.
+          Browse movie titles and editorial collections directly from CineplexBD.
         </p>
       </section>
 
@@ -47,9 +47,9 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
         <EntertainmentGrid items={items} />
       ) : (
         <div className="glass-panel rounded-2xl p-7 text-sm text-zinc-400">
-          <p className="font-semibold text-zinc-200">No MovieBox titles loaded for this view</p>
+          <p className="font-semibold text-zinc-200">No CineplexBD titles loaded for this view</p>
           <p className="mt-2 leading-6">
-            The MovieBox catalog is temporarily unreachable. Try again shortly or check{" "}
+            The CineplexBD catalog is temporarily unreachable. Try again shortly or check{" "}
             <a className="text-accent underline-offset-2 hover:underline" href="/api/health">
               /api/health
             </a>
