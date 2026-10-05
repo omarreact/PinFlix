@@ -85,7 +85,7 @@ jobs:
               }
             ],
             annotations: {
-              "workers/message": "PinFlix MovieBox-only verified build"
+              "workers/message": "PinFlix CineplexBD-only verified build"
             }
           };
 
@@ -178,7 +178,7 @@ jobs:
             exit 1
           fi
           node -e 'const j=require("/tmp/search-local.json"); if (!Array.isArray(j.entertainment)) process.exit(1)'
-          echo "Local MovieBox-only Workers runtime smoke test passed."
+          echo "Local CineplexBD-only Workers runtime smoke test passed."
 
       - name: Observe deployed Cloudflare workers.dev runtime
         if: github.event_name == 'push'
@@ -211,8 +211,8 @@ jobs:
           const failures = [];
           if (healthHttp !== "200") failures.push("PinFlix health HTTP " + healthHttp);
           if (!health || health.ok !== true || health.service !== "pinflix") failures.push("PinFlix health payload invalid");
-          if (health?.catalog?.provider !== "moviebox") failures.push("MovieBox is not the active catalog provider");
-          if (health?.playback?.provider !== "moviebox") failures.push("MovieBox is not the active playback provider");
+          if (health?.catalog?.provider !== "cineplexbd") failures.push("CineplexBD is not the active catalog provider");
+          if (health?.playback?.provider !== "cineplexbd") failures.push("CineplexBD is not the active playback provider");
 
           if (failures.length) {
             console.error(failures.join("; "));
