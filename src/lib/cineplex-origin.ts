@@ -21,10 +21,10 @@ function normalizeUrl(input: string | URL) {
   return url;
 }
 
-async function getOriginBinding(): Promise<FetcherBinding | null> {
+async function getEdgeBinding(): Promise<FetcherBinding | null> {
   try {
     const runtime = await import("cloudflare:workers");
-    const candidate = runtime.env.CINEPLEX_ORIGIN as FetcherBinding | undefined;
+    const candidate = runtime.env.CINEPLEX_EDGE as FetcherBinding | undefined;
     if (candidate && typeof candidate.fetch === "function") return candidate;
   } catch {
     // Standard Next.js/Node builds do not provide cloudflare:workers.
@@ -37,10 +37,19 @@ export async function fetchCineplexOrigin(
   init: RequestInit = {},
 ): Promise<Response> {
   const url = normalizeUrl(input);
-  const binding = await getOriginBinding();
+  const binding = await getEdgeBinding();
 
-  if (binding && (url.hostname === "cineplexbd.net" || url.hostname === "www.cineplexbd.net")) {
-    const internal = new URL(url.pathname + url.search, "https://cineplex-origin.internal");
+  if (binding) {
+    if (url.hostname === "cineplexbd.net" || url.hostname === "www.cineplexbd.net") {
+      const internal = new URL(
+        `/catalog${url.pathname}${url.search}`,
+        "https://pinflix-media-edge.internal",
+      );
+      return binding.fetch(new Request(internal, init));
+    }
+
+    const internal = new URL("https://pinflix-media-edge.internal/");
+    internal.searchParams.set("url", url.toString());
     return binding.fetch(new Request(internal, init));
   }
 
