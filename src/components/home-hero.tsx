@@ -8,7 +8,7 @@ export function HomeHero({ item }: { item?: Entertainment }) {
   const title = item?.title || "Cinematic streaming, beautifully simplified";
   const overview =
     item?.synopsis ||
-    "Discover MovieBox movies, series and collections through the PinFlix interface.";
+    "Discover CineplexBD movies and series through the PinFlix interface.";
   const year = item?.year ? String(item.year) : "";
   const kind = item?.kind;
 
@@ -28,7 +28,7 @@ export function HomeHero({ item }: { item?: Entertainment }) {
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-md">
             <span className="h-2 w-2 rounded-full bg-brand shadow-[0_0_14px_rgba(168,85,247,.9)]" />
             <span className="text-[11px] font-bold uppercase tracking-[.18em] text-zinc-300">
-              {item ? "MovieBox featured" : "PinFlix"}
+              {item ? "CineplexBD featured" : "PinFlix"}
             </span>
           </div>
 
