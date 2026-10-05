@@ -44,6 +44,19 @@ function parseProviderId(id: string): ParsedProviderId {
   return { rawId: id, kind: "movie" };
 }
 
+
+function transformVodUrl(url: string) {
+  if (!url.includes("vod.cineplexbd.net:8081")) return url;
+
+  const transformed = url
+    .replace("http://vod.cineplexbd.net:8081/tv-series/", "http://cineplexbd.net/hls/t/")
+    .replace("http://vod.cineplexbd.net:8081/movies/", "http://cineplexbd.net/hls/m/")
+    .replace("http://vod.cineplexbd.net:8081/", "http://cineplexbd.net/hls/")
+    .replace(/\/index\.m3u8(?=$|[?#])/i, "/master.m3u8");
+
+  return transformed;
+}
+
 function safePositiveInteger(value: number | undefined, fallback: number) {
   return Number.isInteger(value) && Number(value) > 0 ? Number(value) : fallback;
 }
@@ -262,6 +275,7 @@ async function resolveStreams(
       videoUrl = `${CINEPLEX_BASE_URL}${videoUrl}`;
     }
 
+    videoUrl = transformVodUrl(videoUrl);
     const isHls = /\.m3u8(?:$|[?#])/i.test(videoUrl);
 
     return [
