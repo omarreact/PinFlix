@@ -1,0 +1,51 @@
+npm notice run pinflix@0.1.0 npx
+npm notice run vinext check
+
+  vinext check
+
+  Scanning project...
+
+
+  [1mvinext compatibility report[0m
+  ========================================
+
+  [1mImports[0m: 5/5 fully supported
+    [32m✓[0m  next/headers [90m(4 files)[0m
+    [32m✓[0m  next/server [90m(2 files)[0m [90m— NextRequest, NextResponse, NextFetchEvent, userAgent, userAgentFromString, after, connection[0m
+    [32m✓[0m  next/link [90m(19 files)[0m
+    [32m✓[0m  next/navigation [90m(7 files)[0m
+    [32m✓[0m  server-only [90m(4 files)[0m
+
+  [1mConfig[0m: 0/1 options supported
+    [33m~[0m  images [90m— remotePatterns, deviceSizes/imageSizes, qualities and SVG/CSP options honoured; resizing needs an optimizer via vinext({ images: { optimizer } }), images are served as-is otherwise; loader/loaderFile are ignored[0m
+
+  [1mLibraries[0m: 4/4 compatible
+    [32m✓[0m  tailwindcss
+    [32m✓[0m  lucide-react
+    [32m✓[0m  zod
+    [32m✓[0m  prisma [90m— works on Cloudflare Workers with driver adapters (D1, Hyperdrive) or Prisma Accelerate[0m
+
+  [1mProject structure[0m:
+    [32m✓[0m  App Router (app/)
+    [32m✓[0m  10 page(s)
+    [32m✓[0m  1 layout(s)
+    [32m✓[0m  10 route handler(s)
+    [32m✓[0m  1 loading boundary(ies)
+    [32m✓[0m  1 error boundary(ies)
+    [32m✓[0m  1 not-found page(s)
+
+  ----------------------------------------
+  [1mOverall[0m: [32m97% compatible[0m (16 supported, 1 partial, 0 issues)
+
+  [1mPartial support (may need attention):[0m
+    [33m~[0m  images — remotePatterns, deviceSizes/imageSizes, qualities and SVG/CSP options honoured; resizing needs an optimizer via vinext({ images: { optimizer } }), images are served as-is otherwise; loader/loaderFile are ignored
+
+  [1mRecommended next steps:[0m
+    Run [36mvinext init[0m to set up your project automatically
+
+  Or manually:
+    1. Add [36m"type": "module"[0m to package.json
+    2. Install: [36mnpm install -D vinext vite @vitejs/plugin-react @vitejs/plugin-rsc react-server-dom-webpack[0m
+    3. Create vite.config.ts with [36mplugins: [vinext()][0m
+    4. Run: [36mnpx vite dev[0m
+
