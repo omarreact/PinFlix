@@ -5,10 +5,13 @@ export async function GET() {
   return Response.json(
     {
       ok: true,
-      app: "StreamFlix",
-      mode: "demo",
-      database: "ok",
-      playback: "configured",
+      service: "pinflix",
+      catalog: {
+        provider: "cineplexbd",
+      },
+      playback: {
+        provider: "cineplexbd",
+      },
     },
     { headers: { "Cache-Control": "no-store" } },
   );
