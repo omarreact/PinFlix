@@ -1,0 +1,1 @@
+import{a as e}from"./headers-OiCakfq0.js";import{t}from"./env-CF-CPtq9.js";async function n(){return(await e()).set(t.SESSION_COOKIE_NAME,``,{httpOnly:!0,sameSite:`lax`,secure:t.NODE_ENV===`production`,path:`/`,expires:new Date(0),maxAge:0}),Response.json({ok:!0})}export{n as POST};

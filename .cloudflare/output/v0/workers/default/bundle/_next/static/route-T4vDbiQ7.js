@@ -1,0 +1,1 @@
+var e=`nodejs`,t=`force-dynamic`;async function n(){return Response.json({ok:!0,service:`pinflix`,catalog:{provider:`cineplexbd`},playback:{provider:`cineplexbd`}},{headers:{"Cache-Control":`no-store`}})}export{n as GET,t as dynamic,e as runtime};
