@@ -69,11 +69,13 @@ PinFlix production is Cloudflare-only.
 
 - Production application: Cloudflare Worker `pinflix`
 - Production domain: `pinflix.pincodeit.com`
-- Static assets: Cloudflare Worker `pinflix-assets`
+- Static assets: Cloudflare Workers Static Assets, deployed atomically with `pinflix`
 - Source of truth: GitHub `main`
 - Vercel is not a deployment target for this application.
 
 Do not add Vercel configuration or Vercel deployment workflows to this repository.
+
+Static CSS/JS assets are deployed directly with the main Worker through Wrangler's native `assets.directory` configuration. Production must not depend on GitHub Raw or jsDelivr for runtime application assets.
 
 ## Media boundary
 

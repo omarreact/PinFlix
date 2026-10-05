@@ -15,12 +15,11 @@
       "custom_domain": true
     }
   ],
-  "services": [
-    {
-      "binding": "ASSETS",
-      "service": "pinflix-assets"
-    }
-  ],
+  "assets": {
+    "directory": ".cloudflare/output/v0/workers/default/assets",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
   "images": {
     "binding": "IMAGES"
   },

@@ -7,7 +7,7 @@ on:
     branches: [cloudflare-workers-migration, main]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: cloudflare-compat-${{ github.ref }}
@@ -41,103 +41,25 @@ jobs:
       - name: Build Cloudflare Workers target
         run: npm run build:vinext
 
-      - name: Build connector deployment package
+      - name: Verify native Cloudflare static assets
         shell: bash
         run: |
+          test -f .cloudflare/output/v0/workers/default/assets/vinext-client-entry-manifest.json
+          find .cloudflare/output/v0/workers/default/assets/_next/static -type f | grep -q .
+          test -f .cloudflare/output/v0/workers/default/bundle/index.js
+
           node <<'NODE'
           const fs = require("fs");
-          const path = require("path");
-
-          const root = ".cloudflare/output/v0/workers/default/bundle";
-          const out = ".cloudflare/output/pinflix-worker-upload.multipart";
-          const boundary = "----PinFlixWorkerUploadBoundary20261002";
-
-          function walk(dir, base = "") {
-            const entries = fs.readdirSync(dir, { withFileTypes: true });
-            const files = [];
-            for (const entry of entries) {
-              const rel = base ? base + "/" + entry.name : entry.name;
-              const full = path.join(dir, entry.name);
-              if (entry.isDirectory()) {
-                if (rel === ".vite") continue;
-                files.push(...walk(full, rel));
-              } else if (entry.isFile()) {
-                files.push(rel);
-              }
-            }
-            return files;
+          const config = JSON.parse(fs.readFileSync("wrangler.deploy.jsonc", "utf8"));
+          if (!config.assets?.directory) throw new Error("Cloudflare native static asset directory is missing.");
+          if (config.assets.binding !== "ASSETS") throw new Error("ASSETS must be a native static assets binding.");
+          if (config.services?.some?.((x) => x.binding === "ASSETS")) {
+            throw new Error("ASSETS must not be a service binding.");
           }
-
-          const metadata = {
-            main_module: "index.js",
-            compatibility_date: "2026-10-02",
-            compatibility_flags: ["nodejs_compat"],
-            observability: { enabled: true },
-            bindings: [
-              {
-                type: "service",
-                name: "ASSETS",
-                service: "pinflix-assets"
-              },
-              {
-                type: "images",
-                name: "IMAGES"
-              }
-            ],
-            annotations: {
-              "workers/message": "PinFlix CineplexBD-only verified build"
-            }
-          };
-
-          const entryPath = path.join(root, "index.js");
-          let entry = fs.readFileSync(entryPath, "utf8");
-          const exportPattern = /export\s*\{\s*([A-Za-z_$][\w$]*)\s+as\s+default\s*\};\s*(?:\/\/# sourceMappingURL=.*)?/m;
-          const exportMatch = entry.match(exportPattern);
-          if (!exportMatch) {
-            throw new Error("Unable to inject PinFlix static-asset router: vinext default export not found.");
-          }
-
-          const handler = exportMatch[1];
-          entry = entry.replace(
-            exportPattern,
-            `const PinFlixAssetRouter={...${handler},async fetch(request,env,ctx){const url=new URL(request.url);if((url.pathname.startsWith("/_next/static/")||url.pathname==="/vinext-client-entry-manifest.json")&&env?.ASSETS)return env.ASSETS.fetch(request);return ${handler}.fetch(request,env,ctx)}};export{PinFlixAssetRouter as default};`
-          );
-          fs.writeFileSync(entryPath, entry);
-
-          const chunks = [];
-          const push = (value) => chunks.push(Buffer.isBuffer(value) ? value : Buffer.from(value));
-          push("--" + boundary + "\r\n");
-          push('Content-Disposition: form-data; name="metadata"\r\n');
-          push("Content-Type: application/json\r\n\r\n");
-          push(JSON.stringify(metadata));
-          push("\r\n");
-
-          for (const rel of walk(root)) {
-            if (!rel.endsWith(".js") && !rel.endsWith(".wasm")) continue;
-
-            const full = path.join(root, rel);
-            const type = rel.endsWith(".wasm")
-              ? "application/wasm"
-              : "application/javascript+module";
-
-            push("--" + boundary + "\r\n");
-            push('Content-Disposition: form-data; name="' + rel + '"; filename="' + rel + '"\r\n');
-            push("Content-Type: " + type + "\r\n\r\n");
-            push(fs.readFileSync(full));
-            push("\r\n");
-          }
-
-          push("--" + boundary + "--\r\n");
-          fs.writeFileSync(out, Buffer.concat(chunks));
-          fs.writeFileSync(
-            ".cloudflare/output/pinflix-worker-upload.content-type",
-            "multipart/form-data; boundary=" + boundary
-          );
-          console.log("Generated connector upload package:", fs.statSync(out).size, "bytes");
           NODE
 
-      - name: Package Cloudflare output
-        run: tar -czf pinflix-cloudflare-output.tgz .cloudflare/output cloudflare.config.ts vite.config.ts package.json package-lock.json
+      - name: Package verified Cloudflare output
+        run: tar -czf pinflix-cloudflare-output.tgz .cloudflare/output cloudflare.config.ts wrangler.deploy.jsonc vite.config.ts package.json package-lock.json
 
       - name: Upload Cloudflare output artifact
         uses: actions/upload-artifact@v5
@@ -180,73 +102,5 @@ jobs:
           node -e 'const j=require("/tmp/search-local.json"); if (!Array.isArray(j.entertainment)) process.exit(1)'
           echo "Local CineplexBD-only Workers runtime smoke test passed."
 
-      - name: Observe deployed Cloudflare workers.dev runtime
-        if: github.event_name == 'push'
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -uo pipefail
-
-          HEALTH_HTTP="$(curl --show-error --silent --max-time 20 --output /tmp/pinflix-health.json --write-out "%{http_code}" https://pinflix.farukkhanone.workers.dev/api/health || true)"
-          HEALTH_BODY="$(cat /tmp/pinflix-health.json 2>/dev/null || true)"
-
-          {
-            echo "## Cloudflare workers.dev smoke report"
-            echo
-            echo "- health HTTP: $HEALTH_HTTP"
-            echo
-            echo "### health"
-            echo '~~~json'
-            printf '%s\n' "$HEALTH_BODY" | head -c 4000
-            echo
-            echo '~~~'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          node - "$HEALTH_HTTP" <<'NODE'
-          const fs = require("fs");
-          const healthHttp = process.argv[2];
-          let health = null;
-          try { health = JSON.parse(fs.readFileSync("/tmp/pinflix-health.json", "utf8")); } catch {}
-
-          const failures = [];
-          if (healthHttp !== "200") failures.push("PinFlix health HTTP " + healthHttp);
-          if (!health || health.ok !== true || health.service !== "pinflix") failures.push("PinFlix health payload invalid");
-          if (health?.catalog?.provider !== "cineplexbd") failures.push("CineplexBD is not the active catalog provider");
-          if (health?.playback?.provider !== "cineplexbd") failures.push("CineplexBD is not the active playback provider");
-
-          if (failures.length) {
-            console.error(failures.join("; "));
-            process.exit(1);
-          }
-          NODE
-
-          echo "Cloudflare platform smoke test passed."
-
-      - name: Upload Cloudflare smoke diagnostics
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: cloudflare-smoke-diagnostics
-          path: /tmp/pinflix-health.json
-          if-no-files-found: warn
-          retention-days: 1
-
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
-
-      - name: Publish verified Cloudflare build output
-        if: github.event_name == 'push' && (github.ref_name == 'cloudflare-workers-migration' || github.ref_name == 'main')
-        shell: bash
-        run: |
-          rm -rf /tmp/pinflix-cloudflare-publish
-          mkdir -p /tmp/pinflix-cloudflare-publish/.cloudflare
-          cp -R .cloudflare/output /tmp/pinflix-cloudflare-publish/.cloudflare/output
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan cloudflare-built-output
-          git rm -rf . >/dev/null 2>&1 || true
-          cp -R /tmp/pinflix-cloudflare-publish/.cloudflare .
-          git add -f .cloudflare/output
-          git commit -m "build: publish verified Cloudflare output"
-          git push --force origin HEAD:cloudflare-built-output
