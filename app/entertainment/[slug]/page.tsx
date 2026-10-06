@@ -5,7 +5,7 @@ import { BackLink } from "@/src/components/catalog-sections";
 import { SavedToggle } from "@/src/components/saved-toggle";
 import { catalogProvider } from "@/src/lib/providers/catalog";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function EntertainmentDetailPage({
   params,
@@ -44,6 +44,9 @@ export default async function EntertainmentDetailPage({
           <img
             src={item.backdrop}
             alt=""
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover opacity-55"
           />
         )}
@@ -57,6 +60,8 @@ export default async function EntertainmentDetailPage({
                 <img
                   src={item.poster}
                   alt=""
+                  loading="lazy"
+                  decoding="async"
                   className="aspect-[2/3] w-full object-cover"
                 />
               ) : (
