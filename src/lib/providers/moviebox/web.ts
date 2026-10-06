@@ -8,7 +8,7 @@ const API_BASE = "https://h5-api.aoneroom.com";
 const SITE_BASE = "https://movibox.net";
 const PLAYBACK_BASE = "https://h5-api.aoneroom.com";
 
-const REQUEST_TIMEOUT_MS = 12_000;
+const REQUEST_TIMEOUT_MS = 15_000;
 
 type H5ApiResponse<T> = {
   code: number;
@@ -87,21 +87,26 @@ async function fetchJson<T>(url: URL | string, init: RequestInit = {}): Promise<
 
   try {
     const headers = new Headers(init.headers);
-    if (!headers.has("Accept")) headers.set("Accept", "application/json");
+    headers.set("Accept", "application/json, text/plain, */*");
+    headers.set("Accept-Language", "en-US,en;q=0.9");
     if (!headers.has("User-Agent")) {
       headers.set(
         "User-Agent",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
       );
     }
     if (!headers.has("Origin")) headers.set("Origin", SITE_BASE);
     if (!headers.has("Referer")) headers.set("Referer", `${SITE_BASE}/`);
+    if (!headers.has("sec-fetch-site")) headers.set("sec-fetch-site", "same-site");
+    if (!headers.has("sec-fetch-mode")) headers.set("sec-fetch-mode", "cors");
+    if (!headers.has("sec-fetch-dest")) headers.set("sec-fetch-dest", "empty");
 
     const response = await fetch(url, {
       ...init,
       headers,
       signal: controller.signal,
-      next: { revalidate: 120 },
+      // Edge/Workers: avoid Next data-cache holding empty failures
+      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -155,6 +160,7 @@ export async function getLatestPage(kind: "movie" | "show", page = 1) {
     });
 
     if (res.code !== 0 || !res.data?.items) {
+      console.error("MovieBox getLatestPage non-ok", res.code, res.message);
       return { items: [], page, hasNextPage: false };
     }
 
@@ -309,7 +315,6 @@ export async function resolveStreams(
   const validSources: StreamSource[] = [];
   let topStreamId: string | null = null;
 
-  // Primary play endpoint (full episode / movie when the H5 API unlocks streams)
   const playUrl = new URL("/wefeed-h5api-bff/subject/play", PLAYBACK_BASE);
   playUrl.searchParams.set("subjectId", parsed.subjectId);
   playUrl.searchParams.set("se", String(season));
@@ -335,11 +340,11 @@ export async function resolveStreams(
       }
 
       for (const h of res.data.hls ?? []) {
-        const url = h?.url || h?.playUrl || h;
-        if (typeof url === "string") {
+        const streamUrl = h?.url || h?.playUrl || h;
+        if (typeof streamUrl === "string") {
           pushStream(
             validSources,
-            url,
+            streamUrl,
             `MovieBox HLS ${h?.resolutions ? h.resolutions + "p" : ""}`.trim(),
             "hls",
             Number(h?.resolutions) || 40,
@@ -348,11 +353,11 @@ export async function resolveStreams(
       }
 
       for (const d of res.data.dash ?? []) {
-        const url = d?.url || d?.playUrl || d;
-        if (typeof url === "string") {
+        const streamUrl = d?.url || d?.playUrl || d;
+        if (typeof streamUrl === "string") {
           pushStream(
             validSources,
-            url,
+            streamUrl,
             `MovieBox DASH ${d?.resolutions ? d.resolutions + "p" : ""}`.trim(),
             "native",
             Number(d?.resolutions) || 30,
@@ -364,7 +369,6 @@ export async function resolveStreams(
     console.error("MovieBox resolveStreams play error:", error);
   }
 
-  // Trailer / preview from detail when full streams are locked or empty
   try {
     const detailUrl = new URL("/wefeed-h5api-bff/detail", API_BASE);
     detailUrl.searchParams.set("detailPath", parsed.detailPath);
@@ -387,7 +391,6 @@ export async function resolveStreams(
     console.error("MovieBox trailer fallback error:", error);
   }
 
-  // Always offer movibox.net embed so the title is watchable on-site when H5 locks streams
   const embedUrl = new URL(`/detail/${parsed.detailPath}`, SITE_BASE);
   embedUrl.searchParams.set("id", parsed.subjectId);
   embedUrl.searchParams.set("type", "/movie/detail");
@@ -430,11 +433,16 @@ export async function resolveStreams(
 }
 
 export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
-  const url = new URL("/wefeed-h5api-bff/home?host=movibox.net", API_BASE);
+  const url = new URL("/wefeed-h5api-bff/home", API_BASE);
+  url.searchParams.set("host", "movibox.net");
+  url.searchParams.set("channel", "1");
 
   try {
     const res = await fetchJson<H5ApiResponse<any>>(url);
-    if (res.code !== 0 || !res.data?.operatingList) return [];
+    if (res.code !== 0 || !res.data?.operatingList) {
+      console.error("MovieBox getHomeSections non-ok", res.code, res.message);
+      return [];
+    }
 
     const sections: MovieBoxHomeSection[] = [];
 
