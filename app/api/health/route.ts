@@ -41,6 +41,8 @@ async function probe(path: string, init?: RequestInit) {
       itemCount,
       ms: Date.now() - started,
       bytes: text.length,
+      rateLimited: response.status === 429,
+      retryAfter: response.headers.get("retry-after"),
     };
   } catch (error) {
     return {
@@ -66,9 +68,13 @@ export async function GET() {
 
   const reachable = Boolean(home.ok || filter.ok);
 
+  const rateLimited = Boolean(home.rateLimited || filter.rateLimited);
+
   return Response.json(
     {
-      ok: true,
+      ok: reachable,
+      degraded: !reachable,
+      reason: rateLimited ? "moviebox_upstream_rate_limited" : reachable ? null : "moviebox_upstream_unreachable",
       service: "pinflix",
       catalog: {
         provider: "moviebox",
@@ -84,6 +90,9 @@ export async function GET() {
         filter,
       },
     },
-    { headers: { "Cache-Control": "no-store" } },
+    {
+      status: reachable ? 200 : 503,
+      headers: { "Cache-Control": "no-store" },
+    },
   );
 }
