@@ -260,7 +260,7 @@ export function parseCineplexTaxonomy(html: string): CineplexTaxonomy {
 
 export async function getCineplexTaxonomy(): Promise<CineplexTaxonomy> {
   try {
-    const html = await fetchHtml("/", 60);
+    const html = await fetchHtml("/", 3600);
     const live = parseCineplexTaxonomy(html);
     const movieCount = live.categories.filter((item) => item.endpoint === "category.php").length;
     const tvCount = live.categories.filter((item) => item.endpoint === "tcategory.php").length;
