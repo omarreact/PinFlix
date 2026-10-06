@@ -1,6 +1,7 @@
 import { fetchCineplexOrigin } from "@/src/lib/cineplex-origin";
 
 export const CINEPLEX_BASE_URL = "http://cineplexbd.net";
+const METADATA_TIMEOUT_MS = 6_000;
 
 const headers = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -19,12 +20,12 @@ export async function fetchHtml(path: string, revalidate = 0): Promise<string> {
     ? {
         headers,
         next: { revalidate },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(METADATA_TIMEOUT_MS),
       }
     : {
         headers,
         cache: "no-store",
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(METADATA_TIMEOUT_MS),
       });
   if (!response.ok) throw new Error(`Failed to fetch ${url}: HTTP ${response.status}`);
   return response.text();
@@ -36,12 +37,12 @@ export async function fetchJson(path: string, revalidate = 0): Promise<unknown> 
     ? {
         headers,
         next: { revalidate },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(METADATA_TIMEOUT_MS),
       }
     : {
         headers,
         cache: "no-store",
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(METADATA_TIMEOUT_MS),
       });
   if (!response.ok) throw new Error(`Failed to fetch JSON ${url}: HTTP ${response.status}`);
   return response.json();
