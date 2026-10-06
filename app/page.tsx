@@ -24,10 +24,6 @@ export default async function HomePage() {
       <HomeHero item={featured} />
 
       <div className="relative z-20 mx-auto -mt-8 max-w-[1400px] space-y-12 px-6 pb-24 md:-mt-14 md:px-12">
-        <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          Demo Mode active. Only add media you own, have licensed, or are authorized to distribute.
-        </div>
-
         <Suspense fallback={null}>
           <BrowseTabs active="all" />
         </Suspense>
@@ -41,18 +37,14 @@ export default async function HomePage() {
         )}
 
         {extraSections.map((section) => (
-          <EntertainmentRail
-            key={section.id}
-            title={section.label}
-            items={section.items}
-          />
+          <EntertainmentRail key={section.id} title={section.label} items={section.items} />
         ))}
 
         {!featured && (
           <div className="glass-panel rounded-2xl p-7 text-zinc-400">
             <p className="font-bold text-white">Catalog temporarily unavailable</p>
             <p className="mt-2 max-w-2xl text-sm leading-6">
-              PinFlix could not refresh the catalog right now. Try again shortly.
+              PinFlix could not refresh the movibox.net catalog right now. Try again shortly.
             </p>
           </div>
         )}

@@ -8,14 +8,21 @@ export function HomeHero({ item }: { item?: Entertainment }) {
   const title = item?.title || "Cinematic streaming, beautifully simplified";
   const overview =
     item?.synopsis ||
-    "Discover CineplexBD movies and series through the PinFlix interface.";
+    "Discover movies and series through the PinFlix interface powered by movibox.net.";
   const year = item?.year ? String(item.year) : "";
   const kind = item?.kind;
 
   return (
     <section className="relative flex min-h-[78vh] items-end overflow-hidden md:min-h-[86vh]">
       {image ? (
-        <img src={image} alt="" loading="eager" fetchPriority="high" decoding="async" className="hero-media absolute inset-0 h-full w-full scale-[1.025] object-cover object-center opacity-60" />
+        <img
+          src={image}
+          alt=""
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
+          className="hero-media absolute inset-0 h-full w-full scale-[1.025] object-cover object-center opacity-60"
+        />
       ) : (
         <div className="poster-fallback absolute inset-0" />
       )}
@@ -26,9 +33,9 @@ export function HomeHero({ item }: { item?: Entertainment }) {
       <div className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-20 pt-40 md:px-12 md:pb-24">
         <div className="max-w-3xl animate-slide-up">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-md">
-            <span className="h-2 w-2 rounded-full bg-brand shadow-[0_0_14px_rgba(168,85,247,.9)]" />
+            <span className="h-2 w-2 rounded-full bg-brand shadow-[0_0_14px_rgba(230,57,70,.9)]" />
             <span className="text-[11px] font-bold uppercase tracking-[.18em] text-zinc-300">
-              {item ? "CineplexBD featured" : "PinFlix"}
+              {item ? "Featured" : "PinFlix"}
             </span>
           </div>
 
@@ -39,11 +46,21 @@ export function HomeHero({ item }: { item?: Entertainment }) {
           <div className="mt-5 flex flex-wrap items-center gap-2 text-sm font-medium text-zinc-300">
             {year && <span>{year}</span>}
             {item?.genres.slice(0, 3).map((genre) => (
-              <span key={genre} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur">{genre}</span>
+              <span
+                key={genre}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur"
+              >
+                {genre}
+              </span>
             ))}
             {kind && (
               <span className="rounded-full border border-brand/30 bg-brand/15 px-3 py-1 font-bold text-accent">
                 {kind === "show" ? "Series" : "Movie"}
+              </span>
+            )}
+            {item?.rating != null && (
+              <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 font-bold text-amber-200">
+                ★ {item.rating.toFixed(1)}
               </span>
             )}
           </div>
@@ -57,7 +74,7 @@ export function HomeHero({ item }: { item?: Entertainment }) {
               <>
                 <Link
                   href={`/watch/${item.id}`}
-                  className="media-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white shadow-[0_0_30px_rgba(168,85,247,.22)] hover:shadow-[0_0_38px_rgba(168,85,247,.46)]"
+                  className="media-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white shadow-[0_0_30px_rgba(230,57,70,.35)] hover:shadow-[0_0_38px_rgba(230,57,70,.55)]"
                 >
                   <Play size={18} fill="currentColor" />
                   Watch now
@@ -83,8 +100,18 @@ export function HomeHero({ item }: { item?: Entertainment }) {
               </>
             ) : (
               <>
-                <Link href="/movies" className="media-focus accent-gradient rounded-full px-7 py-3 font-bold text-white">Browse movies</Link>
-                <Link href="/series" className="media-focus rounded-full border border-white/10 bg-white/5 px-7 py-3 font-semibold">Browse series</Link>
+                <Link
+                  href="/movies"
+                  className="media-focus accent-gradient rounded-full px-7 py-3 font-bold text-white"
+                >
+                  Browse movies
+                </Link>
+                <Link
+                  href="/series"
+                  className="media-focus rounded-full border border-white/10 bg-white/5 px-7 py-3 font-semibold"
+                >
+                  Browse series
+                </Link>
               </>
             )}
           </div>

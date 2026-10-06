@@ -33,9 +33,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="fixed inset-x-0 top-4 z-50 px-3 sm:px-5">
         <div className="glass-nav mx-auto flex min-h-[64px] w-full max-w-7xl items-center justify-between gap-3 rounded-full px-4 py-2.5 sm:px-6">
           <div className="flex min-w-0 items-center gap-4 lg:gap-8">
-            <Link href="/" className="media-focus flex min-h-11 shrink-0 items-center gap-2 rounded-full font-black tracking-tight">
+            <Link
+              href="/"
+              className="media-focus flex min-h-11 shrink-0 items-center gap-2 rounded-full font-black tracking-tight"
+            >
               <PlayCircle className="text-brand" size={29} fill="currentColor" />
-              <span className="text-xl sm:text-2xl">PIN<span className="font-light text-brand-2">FLIX</span></span>
+              <span className="text-xl sm:text-2xl">
+                PIN<span className="font-light text-coral">FLIX</span>
+              </span>
             </Link>
             <nav className="hidden items-center gap-5 lg:flex">
               {nav.map((item) => {
@@ -58,7 +63,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="ml-auto flex min-w-0 items-center gap-2">
             <form onSubmit={submitSearch} className="relative min-w-0">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" size={17} />
+              <Search
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500"
+                size={17}
+              />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -103,14 +111,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
 
-      <main className={cn(pathname === "/" ? "min-h-screen" : "mx-auto min-h-screen max-w-[1400px] px-5 pb-24 pt-32 sm:px-8 md:px-12")}>
+      <main
+        className={cn(
+          pathname === "/"
+            ? "min-h-screen"
+            : "mx-auto min-h-screen max-w-[1400px] px-5 pb-24 pt-32 sm:px-8 md:px-12",
+        )}
+      >
         {children}
       </main>
 
       <footer className="border-t border-white/5 px-5 py-8 text-center text-xs text-zinc-600">
         <p>
-          Catalog, metadata and available playback are resolved through CineplexBD.{" "}
-          <Link href="/credits" className="media-focus rounded underline-offset-4 hover:text-zinc-300 hover:underline">
+          Catalog, metadata and available playback are resolved through movibox.net.{" "}
+          <Link
+            href="/credits"
+            className="media-focus rounded underline-offset-4 hover:text-zinc-300 hover:underline"
+          >
             Source information
           </Link>
         </p>
