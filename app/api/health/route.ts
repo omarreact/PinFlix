@@ -7,10 +7,12 @@ export async function GET() {
       ok: true,
       service: "pinflix",
       catalog: {
-        provider: "cineplexbd",
+        provider: "moviebox",
+        host: "movibox.net",
       },
       playback: {
-        provider: "cineplexbd",
+        provider: "moviebox",
+        host: "movibox.net",
       },
     },
     { headers: { "Cache-Control": "no-store" } },

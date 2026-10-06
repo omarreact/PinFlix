@@ -1,4 +1,4 @@
-export type StreamProtocol = "hls" | "native";
+export type StreamProtocol = "hls" | "native" | "embed";
 
 export type StreamSource = {
   url: string;

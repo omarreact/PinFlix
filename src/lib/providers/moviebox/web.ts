@@ -6,7 +6,7 @@ import type { SeriesNavigation } from "../contracts";
 
 const API_BASE = "https://h5-api.aoneroom.com";
 const SITE_BASE = "https://movibox.net";
-const PLAYBACK_BASE = "https://movibox.net";
+const PLAYBACK_BASE = "https://h5-api.aoneroom.com";
 
 const REQUEST_TIMEOUT_MS = 12_000;
 
@@ -101,7 +101,6 @@ async function fetchJson<T>(url: URL | string, init: RequestInit = {}): Promise<
       ...init,
       headers,
       signal: controller.signal,
-      // Avoid long-lived empty cache on edge if upstream was briefly down
       next: { revalidate: 120 },
     });
 
@@ -119,10 +118,6 @@ export function canHandleId(id: string): boolean {
   return parseProviderId(id) !== null;
 }
 
-/**
- * Search: H5 search endpoints require an auth token we do not hold.
- * Fallback: scan latest movie + series pages and match title / synopsis.
- */
 export async function search(query: string, page = 1): Promise<Entertainment[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
@@ -251,12 +246,18 @@ export async function getSeriesNavigation(
 
     const seasons = rawSeasons
       .map((item: any) => Number(item.se))
-      .filter((value: number) => Number.isInteger(value) && value > 0)
+      .filter((value: number) => Number.isInteger(value) && value >= 0)
+      .map((value: number) => (value === 0 ? 1 : value))
+      .filter((value: number, index: number, arr: number[]) => arr.indexOf(value) === index)
       .sort((a: number, b: number) => a - b);
 
     const season = seasons.includes(fallbackSeason) ? fallbackSeason : (seasons[0] ?? fallbackSeason);
 
-    const seasonMeta = rawSeasons.find((item: any) => Number(item.se) === season);
+    const seasonMeta =
+      rawSeasons.find((item: any) => Number(item.se) === season) ??
+      rawSeasons.find((item: any) => Number(item.se) === 0) ??
+      rawSeasons[0];
+
     let episodes = 1;
     if (seasonMeta) {
       if (typeof seasonMeta.allEp === "string" && seasonMeta.allEp.trim()) {
@@ -281,6 +282,18 @@ export async function getSeriesNavigation(
   }
 }
 
+function pushStream(
+  list: StreamSource[],
+  url: string | undefined | null,
+  quality: string,
+  protocol: StreamSource["protocol"],
+  priority: number,
+) {
+  if (!url || typeof url !== "string") return;
+  if (!/^https?:\/\//i.test(url)) return;
+  list.push({ url, quality, protocol, priority });
+}
+
 export async function resolveStreams(
   id: string,
   options: { season?: number; episode?: number } = {},
@@ -293,74 +306,129 @@ export async function resolveStreams(
   const episode =
     Number.isInteger(options.episode) && Number(options.episode) > 0 ? Number(options.episode) : 0;
 
-  const url = new URL("/wefeed-h5api-bff/subject/play", PLAYBACK_BASE);
-  url.searchParams.set("subjectId", parsed.subjectId);
-  url.searchParams.set("se", String(season));
-  url.searchParams.set("ep", String(episode));
-  url.searchParams.set("detailPath", parsed.detailPath);
-  url.searchParams.set("streamSignType", "1");
+  const validSources: StreamSource[] = [];
+  let topStreamId: string | null = null;
+
+  // Primary play endpoint (full episode / movie when the H5 API unlocks streams)
+  const playUrl = new URL("/wefeed-h5api-bff/subject/play", PLAYBACK_BASE);
+  playUrl.searchParams.set("subjectId", parsed.subjectId);
+  playUrl.searchParams.set("se", String(season));
+  playUrl.searchParams.set("ep", String(episode || (season > 0 ? 1 : 0)));
+  playUrl.searchParams.set("detailPath", parsed.detailPath);
+  playUrl.searchParams.set("streamSignType", "1");
 
   try {
-    const res = await fetchJson<H5ApiResponse<any>>(url);
-    if (res.code !== 0 || !res.data) return [];
+    const res = await fetchJson<H5ApiResponse<any>>(playUrl);
+    if (res.code === 0 && res.data) {
+      const mp4Streams = res.data.streams ?? [];
+      for (const m of mp4Streams) {
+        if (!m?.url) continue;
+        const resolution = m.resolutions ? `${m.resolutions}p` : "";
+        pushStream(
+          validSources,
+          m.url,
+          `MovieBox ${resolution} ${m.codecName || "MP4"}`.trim(),
+          "native",
+          Number(m.resolutions) || 50,
+        );
+        if (!topStreamId) topStreamId = m.id;
+      }
 
-    const validSources: StreamSource[] = [];
-    let topStreamId: string | null = null;
-
-    const mp4Streams = res.data.streams ?? [];
-    for (const m of mp4Streams) {
-      if (!m.url) continue;
-      const resolution = m.resolutions ? `${m.resolutions}p` : "";
-      validSources.push({
-        url: m.url,
-        quality: `MovieBox ${resolution} ${m.codecName || "MP4"}`.trim(),
-        protocol: "native",
-        priority: Number(m.resolutions) || 0,
-      });
-      if (!topStreamId) topStreamId = m.id;
-    }
-
-    if (validSources.length > 0 && topStreamId) {
-      try {
-        const capUrl = new URL("/wefeed-h5api-bff/subject/caption", API_BASE);
-        capUrl.searchParams.set("format", "MP4");
-        capUrl.searchParams.set("id", topStreamId);
-        capUrl.searchParams.set("subjectId", parsed.subjectId);
-        capUrl.searchParams.set("detailPath", parsed.detailPath);
-
-        const capRes = await fetchJson<H5ApiResponse<any>>(capUrl);
-        if (capRes.code === 0 && capRes.data?.captions) {
-          const subtitles = capRes.data.captions
-            .filter((c: any) => c.url && c.lanName)
-            .map((c: any) => ({
-              label: c.lanName || c.lan || "Unknown",
-              language: c.lan || "un",
-              url: c.url,
-            }));
-
-          if (subtitles.length > 0) {
-            for (const source of validSources) {
-              source.subtitles = subtitles;
-            }
-          }
+      for (const h of res.data.hls ?? []) {
+        const url = h?.url || h?.playUrl || h;
+        if (typeof url === "string") {
+          pushStream(
+            validSources,
+            url,
+            `MovieBox HLS ${h?.resolutions ? h.resolutions + "p" : ""}`.trim(),
+            "hls",
+            Number(h?.resolutions) || 40,
+          );
         }
-      } catch (err) {
-        console.error("MovieBox caption fetch error:", err);
+      }
+
+      for (const d of res.data.dash ?? []) {
+        const url = d?.url || d?.playUrl || d;
+        if (typeof url === "string") {
+          pushStream(
+            validSources,
+            url,
+            `MovieBox DASH ${d?.resolutions ? d.resolutions + "p" : ""}`.trim(),
+            "native",
+            Number(d?.resolutions) || 30,
+          );
+        }
       }
     }
-
-    return validSources.sort((a, b) => b.priority - a.priority);
   } catch (error) {
-    console.error("MovieBox resolveStreams error:", error);
-    return [];
+    console.error("MovieBox resolveStreams play error:", error);
   }
+
+  // Trailer / preview from detail when full streams are locked or empty
+  try {
+    const detailUrl = new URL("/wefeed-h5api-bff/detail", API_BASE);
+    detailUrl.searchParams.set("detailPath", parsed.detailPath);
+    const detail = await fetchJson<H5ApiResponse<any>>(detailUrl);
+    const trailerUrl =
+      detail.data?.subject?.trailer?.videoAddress?.url ||
+      detail.data?.subject?.trailer?.url ||
+      detail.data?.trailer?.videoAddress?.url;
+
+    if (trailerUrl) {
+      pushStream(
+        validSources,
+        trailerUrl,
+        validSources.length ? "Trailer" : "Preview (Trailer)",
+        "native",
+        5,
+      );
+    }
+  } catch (error) {
+    console.error("MovieBox trailer fallback error:", error);
+  }
+
+  // Always offer movibox.net embed so the title is watchable on-site when H5 locks streams
+  const embedUrl = new URL(`/detail/${parsed.detailPath}`, SITE_BASE);
+  embedUrl.searchParams.set("id", parsed.subjectId);
+  embedUrl.searchParams.set("type", "/movie/detail");
+  embedUrl.searchParams.set("lang", "en");
+  if (season > 0) embedUrl.searchParams.set("se", String(season));
+  if (episode > 0) embedUrl.searchParams.set("ep", String(episode));
+
+  pushStream(validSources, embedUrl.toString(), "Watch on MoviBox", "embed", 1);
+
+  if (validSources.length > 0 && topStreamId) {
+    try {
+      const capUrl = new URL("/wefeed-h5api-bff/subject/caption", API_BASE);
+      capUrl.searchParams.set("format", "MP4");
+      capUrl.searchParams.set("id", topStreamId);
+      capUrl.searchParams.set("subjectId", parsed.subjectId);
+      capUrl.searchParams.set("detailPath", parsed.detailPath);
+
+      const capRes = await fetchJson<H5ApiResponse<any>>(capUrl);
+      if (capRes.code === 0 && capRes.data?.captions) {
+        const subtitles = capRes.data.captions
+          .filter((c: any) => c.url && c.lanName)
+          .map((c: any) => ({
+            label: c.lanName || c.lan || "Unknown",
+            language: c.lan || "un",
+            url: c.url,
+          }));
+
+        if (subtitles.length > 0) {
+          for (const source of validSources) {
+            if (source.protocol !== "embed") source.subtitles = subtitles;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("MovieBox caption fetch error:", err);
+    }
+  }
+
+  return validSources.sort((a, b) => b.priority - a.priority);
 }
 
-/**
- * Home operating list includes:
- * - BANNER sections → banner.items (each may nest .subject)
- * - SUBJECTS_MOVIE sections → subjects[] (flat subject objects)
- */
 export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
   const url = new URL("/wefeed-h5api-bff/home?host=movibox.net", API_BASE);
 
