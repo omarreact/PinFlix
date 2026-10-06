@@ -15,7 +15,7 @@ export function HomeHero({ item }: { item?: Entertainment }) {
   return (
     <section className="relative flex min-h-[78vh] items-end overflow-hidden md:min-h-[86vh]">
       {image ? (
-        <img src={image} alt="" className="hero-media absolute inset-0 h-full w-full scale-[1.025] object-cover object-center opacity-60" />
+        <img src={image} alt="" loading="eager" fetchPriority="high" decoding="async" className="hero-media absolute inset-0 h-full w-full scale-[1.025] object-cover object-center opacity-60" />
       ) : (
         <div className="poster-fallback absolute inset-0" />
       )}
