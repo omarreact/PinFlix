@@ -2,26 +2,52 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { Captions, ChevronDown, Maximize, Pause, Play, RefreshCw, SkipForward, Volume2, VolumeX, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Captions,
+  ChevronDown,
+  Maximize,
+  Minimize,
+  Pause,
+  PictureInPicture2,
+  Play,
+  RefreshCw,
+  RotateCcw,
+  RotateCw,
+  SkipForward,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
 
 type ResolvedSubtitle = { label: string; language: string; url: string; blobUrl?: string };
 type ResolvedSource = {
   url: string;
   quality: string;
-  protocol: "hls" | "native";
+  protocol: "hls" | "native" | "embed";
   priority: number;
   sourceIndex: number;
   subtitles?: ResolvedSubtitle[];
 };
 type HlsLevel = { index: number; label: string };
 
+function formatTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 async function srtToVttBlobUrl(srtUrl: string): Promise<string> {
   try {
     const response = await fetch(srtUrl);
     if (!response.ok) throw new Error("Failed to fetch subtitle");
     const srtText = await response.text();
-    const vttText = "WEBVTT\n\n" + srtText.replace(/\r\n|\r/g, "\n").replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
+    const vttText =
+      "WEBVTT\n\n" +
+      srtText.replace(/\r\n|\r/g, "\n").replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
     return URL.createObjectURL(new Blob([vttText], { type: "text/vtt" }));
   } catch (error) {
     console.error("Subtitle load error:", error);
@@ -48,10 +74,12 @@ export function WatchPlayer({
 }) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<import("hls.js").default | null>(null);
   const failoverRef = useRef<() => void>(() => undefined);
   const qualityMenuRef = useRef<HTMLDivElement>(null);
   const subtitleMenuRef = useRef<HTMLDivElement>(null);
+  const speedMenuRef = useRef<HTMLDivElement>(null);
   const [sources, setSources] = useState<ResolvedSource[]>([]);
   const [sourcePosition, setSourcePosition] = useState(0);
   const [hlsLevels, setHlsLevels] = useState<HlsLevel[]>([]);
@@ -59,15 +87,23 @@ export function WatchPlayer({
   const [subtitleTracks, setSubtitleTracks] = useState<ResolvedSubtitle[]>([]);
   const [selectedSubtitle, setSelectedSubtitle] = useState("off");
   const [playing, setPlaying] = useState(false);
-  // Start muted so browsers allow autoplay; user can unmute with the control or M key.
   const [muted, setMuted] = useState(true);
+  const [volume, setVolume] = useState(0.9);
   const [buffering, setBuffering] = useState(true);
   const [status, setStatus] = useState<"loading" | "ready" | "switching" | "error">("loading");
   const [error, setError] = useState("");
   const [qualityOpen, setQualityOpen] = useState(false);
   const [subtitleOpen, setSubtitleOpen] = useState(false);
+  const [speedOpen, setSpeedOpen] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [buffered, setBuffered] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const source = sources[sourcePosition];
+  const isEmbed = source?.protocol === "embed";
 
   const resolveStreams = async () => {
     const params = new URLSearchParams({ id: mediaId });
@@ -75,34 +111,57 @@ export function WatchPlayer({
     if (episode) params.set("episode", String(episode));
 
     const response = await fetch(`/api/resolve?${params.toString()}`);
-    const data = await response.json() as { sources?: ResolvedSource[]; error?: string; code?: string };
+    const data = (await response.json()) as {
+      sources?: ResolvedSource[];
+      error?: string;
+    };
     if (!response.ok) throw new Error(data.error || "Unable to resolve this stream.");
     return data.sources ?? [];
   };
 
+  const showControls = useCallback(() => {
+    setControlsVisible(true);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => {
+      if (playing && !qualityOpen && !subtitleOpen && !speedOpen) setControlsVisible(false);
+    }, 3200);
+  }, [playing, qualityOpen, subtitleOpen, speedOpen]);
+
   useEffect(() => {
     const savedQuality = window.localStorage.getItem("pinflix-quality");
-    resolveStreams().then((resolved) => {
-      if (savedQuality) {
-        const savedPosition = resolved.findIndex((item) => item.quality === savedQuality);
-        if (savedPosition >= 0) setSourcePosition(savedPosition);
-      }
-      setSources(resolved);
-      setStatus(resolved.length ? "loading" : "error");
-      if (!resolved.length) setError("No playable sources are available.");
-    }).catch((reason: Error) => { setStatus("error"); setError(reason.message); });
+    resolveStreams()
+      .then((resolved) => {
+        if (savedQuality) {
+          const savedPosition = resolved.findIndex((item) => item.quality === savedQuality);
+          if (savedPosition >= 0) setSourcePosition(savedPosition);
+        }
+        setSources(resolved);
+        setStatus(resolved.length ? "loading" : "error");
+        if (!resolved.length) setError("No playable sources are available.");
+      })
+      .catch((reason: Error) => {
+        setStatus("error");
+        setError(reason.message);
+      });
   }, [mediaId, episode, season]);
 
   useEffect(() => {
-    if (!buffering || status !== "ready") return;
+    if (!buffering || status !== "ready" || isEmbed) return;
     const stallTimeout = setTimeout(() => {
       console.warn("Stall detected, forcing failover");
       failoverRef.current();
-    }, 8000);
+    }, 10000);
     return () => clearTimeout(stallTimeout);
-  }, [buffering, status]);
+  }, [buffering, status, isEmbed]);
 
   useEffect(() => {
+    if (isEmbed) {
+      setStatus("ready");
+      setBuffering(false);
+      setPlaying(true);
+      return;
+    }
+
     const video = videoRef.current;
     if (!video || !source) return;
     let cancelled = false;
@@ -118,16 +177,18 @@ export function WatchPlayer({
 
     const playResolved = () => {
       if (cancelled) return;
-      video.muted = true;
-      setMuted(true);
-      
+      video.muted = muted;
+      video.volume = volume;
+      video.playbackRate = playbackRate;
+
       const resumeKey = `pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`;
       const savedTime = Number(window.localStorage.getItem(resumeKey));
       if (savedTime > 5 && video.currentTime === 0) {
         video.currentTime = savedTime;
       }
-      
-      video.play()
+
+      video
+        .play()
         .then(() => {
           setPlaying(true);
           setStatus("ready");
@@ -139,32 +200,31 @@ export function WatchPlayer({
           setPlaying(false);
         });
     };
-    
+
     let isRefreshing = false;
     const failover = () => {
       if (cancelled || isRefreshing) return;
-      
-      // If we've played for a while, this might be an expired link. Refresh the links instead of degrading quality.
+
       if (video.currentTime > 5) {
         isRefreshing = true;
         setStatus("switching");
         const resumeKey = `pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`;
         window.localStorage.setItem(resumeKey, String(video.currentTime));
-        
-        resolveStreams().then((resolved) => {
-          if (cancelled) return;
-          if (resolved.length > 0) {
-            setSources(resolved);
-            // This component will re-render and run this effect again, which will restore currentTime
-          } else {
+
+        resolveStreams()
+          .then((resolved) => {
+            if (cancelled) return;
+            if (resolved.length > 0) setSources(resolved);
+            else {
+              setStatus("error");
+              setError("Playback is unavailable right now.");
+            }
+          })
+          .catch((reason: Error) => {
+            if (cancelled) return;
             setStatus("error");
-            setError("Playback is unavailable right now.");
-          }
-        }).catch((reason: Error) => {
-          if (cancelled) return;
-          setStatus("error");
-          setError(reason.message);
-        });
+            setError(reason.message);
+          });
         return;
       }
 
@@ -180,26 +240,37 @@ export function WatchPlayer({
     failoverRef.current = failover;
 
     if (source.protocol === "hls" && !video.canPlayType("application/vnd.apple.mpegurl")) {
-      void import("hls.js").then(({ default: Hls }) => {
-        if (cancelled || !Hls.isSupported()) { failover(); return; }
-        const hls = new Hls({ enableWorker: true });
-        hlsRef.current = hls;
-        hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
-          if (cancelled) return;
-          setHlsLevels(data.levels.map((level, index) => ({ index, label: level.height ? `${level.height}p` : `Level ${index + 1}` })));
-          playResolved();
-        });
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (data.fatal) failover();
-        });
-        hls.loadSource(source.url);
-        hls.attachMedia(video);
-      }).catch(() => failover());
+      void import("hls.js")
+        .then(({ default: Hls }) => {
+          if (cancelled || !Hls.isSupported()) {
+            failover();
+            return;
+          }
+          const hls = new Hls({ enableWorker: true });
+          hlsRef.current = hls;
+          hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+            if (cancelled) return;
+            setHlsLevels(
+              data.levels.map((level, index) => ({
+                index,
+                label: level.height ? `${level.height}p` : `Level ${index + 1}`,
+              })),
+            );
+            playResolved();
+          });
+          hls.on(Hls.Events.ERROR, (_event, data) => {
+            if (data.fatal) failover();
+          });
+          hls.loadSource(source.url);
+          hls.attachMedia(video);
+        })
+        .catch(() => failover());
     } else {
       video.src = source.url;
       video.load();
       playResolved();
     }
+
     return () => {
       cancelled = true;
       hlsRef.current?.destroy();
@@ -209,18 +280,56 @@ export function WatchPlayer({
       video.load();
       failoverRef.current = () => undefined;
     };
-  }, [mediaId, source, sourcePosition, sources.length]);
+  }, [mediaId, source, sourcePosition, sources.length, isEmbed]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) {
+      video.muted = muted;
+      video.volume = muted ? 0 : volume;
+    }
+  }, [muted, volume]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) video.playbackRate = playbackRate;
+  }, [playbackRate]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const video = videoRef.current;
-      if (!video) return;
-      if (event.key === "Escape") { setQualityOpen(false); setSubtitleOpen(false); return; }
-      if (event.key === " " || event.key.toLowerCase() === "k") { event.preventDefault(); void togglePlayback(); }
-      if (event.key === "ArrowRight") video.currentTime += 10;
+      if (!video || isEmbed) return;
+      const tag = (event.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      showControls();
+      if (event.key === "Escape") {
+        setQualityOpen(false);
+        setSubtitleOpen(false);
+        setSpeedOpen(false);
+        return;
+      }
+      if (event.key === " " || event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        void togglePlayback();
+      }
+      if (event.key === "ArrowRight") video.currentTime = Math.min(duration, video.currentTime + 10);
       if (event.key === "ArrowLeft") video.currentTime = Math.max(0, video.currentTime - 10);
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setVolume((v) => Math.min(1, Math.round((v + 0.05) * 100) / 100));
+        setMuted(false);
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setVolume((v) => Math.max(0, Math.round((v - 0.05) * 100) / 100));
+      }
       if (event.key.toLowerCase() === "m") setMuted((value) => !value);
-      if (event.key.toLowerCase() === "f") void video.requestFullscreen();
+      if (event.key.toLowerCase() === "f") void toggleFullscreen();
+      if (event.key.toLowerCase() === "j") video.currentTime = Math.max(0, video.currentTime - 10);
+      if (event.key.toLowerCase() === "l") video.currentTime = Math.min(duration, video.currentTime + 10);
+      if (event.key === ",") video.currentTime = Math.max(0, video.currentTime - 0.04);
+      if (event.key === ".") video.currentTime = Math.min(duration, video.currentTime + 0.04);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -230,6 +339,7 @@ export function WatchPlayer({
     const closeMenus = (event: MouseEvent) => {
       if (!qualityMenuRef.current?.contains(event.target as Node)) setQualityOpen(false);
       if (!subtitleMenuRef.current?.contains(event.target as Node)) setSubtitleOpen(false);
+      if (!speedMenuRef.current?.contains(event.target as Node)) setSpeedOpen(false);
     };
     document.addEventListener("mousedown", closeMenus);
     return () => document.removeEventListener("mousedown", closeMenus);
@@ -237,8 +347,38 @@ export function WatchPlayer({
 
   async function togglePlayback() {
     const video = videoRef.current;
-    if (!video) return;
-    if (video.paused) { await video.play(); setPlaying(true); } else { video.pause(); setPlaying(false); }
+    if (!video || isEmbed) return;
+    if (video.paused) {
+      await video.play();
+      setPlaying(true);
+    } else {
+      video.pause();
+      setPlaying(false);
+    }
+  }
+
+  async function toggleFullscreen() {
+    const shell = shellRef.current;
+    if (!shell) return;
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await shell.requestFullscreen();
+  }
+
+  async function togglePiP() {
+    const video = videoRef.current;
+    if (!video || isEmbed) return;
+    try {
+      if (document.pictureInPictureElement) await document.exitPictureInPicture();
+      else await video.requestPictureInPicture();
+    } catch (err) {
+      console.error("PiP error:", err);
+    }
+  }
+
+  function seekTo(ratio: number) {
+    const video = videoRef.current;
+    if (!video || !duration) return;
+    video.currentTime = Math.max(0, Math.min(duration, duration * ratio));
   }
 
   function chooseSource(position: number) {
@@ -250,18 +390,23 @@ export function WatchPlayer({
   function chooseLevel(index: number) {
     if (hlsRef.current) hlsRef.current.currentLevel = index;
     setSelectedLevel(index);
-    window.localStorage.setItem("pinflix-quality", hlsLevels.find((level) => level.index === index)?.label ?? "");
+    window.localStorage.setItem(
+      "pinflix-quality",
+      hlsLevels.find((level) => level.index === index)?.label ?? "",
+    );
     setQualityOpen(false);
   }
 
   async function chooseSubtitle(value: string) {
     setSelectedSubtitle(value);
     setSubtitleOpen(false);
-    
-    const trackObj = subtitleTracks.find(t => t.language === value);
+
+    const trackObj = subtitleTracks.find((t) => t.language === value);
     if (trackObj && !trackObj.blobUrl && trackObj.url) {
       const blobUrl = await srtToVttBlobUrl(trackObj.url);
-      setSubtitleTracks(tracks => tracks.map(t => t.language === value ? { ...t, blobUrl } : t));
+      setSubtitleTracks((tracks) =>
+        tracks.map((t) => (t.language === value ? { ...t, blobUrl } : t)),
+      );
     }
 
     setTimeout(() => {
@@ -274,36 +419,86 @@ export function WatchPlayer({
     }, 100);
   }
 
-  const isBusy = status === "loading" || status === "switching";
+  const isBusy = !isEmbed && (status === "loading" || status === "switching");
+  const progress = duration > 0 ? currentTime / duration : 0;
+  const bufferRatio = duration > 0 ? buffered / duration : 0;
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-black text-white">
-      <div className="relative min-h-[calc(100vh-72px)]">
-        <video
-          ref={videoRef}
-          muted={muted}
-          controls={false}
-          playsInline
-          preload="auto"
-          className="absolute inset-0 h-full w-full object-contain bg-black"
-          aria-label={`Player for ${mediaId}`}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onWaiting={() => setBuffering(true)}
-          onPlaying={() => { setBuffering(false); setStatus("ready"); }}
-          onCanPlay={() => {
-            setBuffering(false);
-            setStatus((current) => (current === "loading" ? "ready" : current));
-          }}
-          onLoadedData={() => setBuffering(false)}
-          onError={() => failoverRef.current()}
-          onEnded={() => { if (nextHref) router.push(nextHref); }}
-        />
+    <div
+      ref={shellRef}
+      className="relative min-h-screen overflow-hidden bg-black text-white"
+      onMouseMove={showControls}
+      onClick={showControls}
+    >
+      <div className="relative min-h-[calc(100vh-88px)]">
+        {isEmbed ? (
+          <iframe
+            title={title}
+            src={source.url}
+            className="absolute inset-0 h-full w-full border-0 bg-black"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+            sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-forms"
+          />
+        ) : (
+          <video
+            ref={videoRef}
+            muted={muted}
+            controls={false}
+            playsInline
+            preload="auto"
+            className="absolute inset-0 h-full w-full object-contain bg-black"
+            aria-label={`Player for ${title}`}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onWaiting={() => setBuffering(true)}
+            onPlaying={() => {
+              setBuffering(false);
+              setStatus("ready");
+            }}
+            onCanPlay={() => {
+              setBuffering(false);
+              setStatus((current) => (current === "loading" ? "ready" : current));
+            }}
+            onLoadedData={() => setBuffering(false)}
+            onTimeUpdate={() => {
+              const video = videoRef.current;
+              if (!video) return;
+              setCurrentTime(video.currentTime);
+              if (video.buffered.length > 0) {
+                setBuffered(video.buffered.end(video.buffered.length - 1));
+              }
+              const resumeKey = `pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`;
+              if (Math.floor(video.currentTime) % 5 === 0) {
+                window.localStorage.setItem(resumeKey, String(video.currentTime));
+              }
+            }}
+            onDurationChange={() => setDuration(videoRef.current?.duration || 0)}
+            onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+            onError={() => failoverRef.current()}
+            onEnded={() => {
+              if (nextHref) router.push(nextHref);
+            }}
+            onClick={() => void togglePlayback()}
+          />
+        )}
 
-        {subtitleTracks.map((track) => (
-          <track key={track.language} kind="subtitles" srcLang={track.language} label={track.label} src={track.blobUrl || track.url} />
-        ))}
+        {!isEmbed &&
+          subtitleTracks.map((track) => (
+            <track
+              key={track.language}
+              kind="subtitles"
+              srcLang={track.language}
+              label={track.label}
+              src={track.blobUrl || track.url}
+            />
+          ))}
 
-        <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 bg-gradient-to-b from-black/90 via-black/35 to-transparent px-4 pb-16 pt-4 md:px-8 md:pt-6">
+        <div
+          className={`absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 bg-gradient-to-b from-black/90 via-black/35 to-transparent px-4 pb-16 pt-4 transition-opacity md:px-8 md:pt-6 ${
+            controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+        >
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[.22em] text-accent">Now playing</p>
             <h1 className="mt-1 max-w-3xl truncate text-lg font-bold md:text-2xl">{title}</h1>
@@ -340,7 +535,7 @@ export function WatchPlayer({
           </div>
         )}
 
-        {buffering && status === "ready" && (
+        {buffering && status === "ready" && !isEmbed && (
           <div className="pointer-events-none absolute left-4 top-24 z-20 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 text-xs text-zinc-300 backdrop-blur">
             Buffering…
           </div>
@@ -355,7 +550,21 @@ export function WatchPlayer({
                 <button
                   type="button"
                   className="media-focus accent-gradient inline-flex min-h-11 items-center gap-2 rounded-full px-5 py-2.5 font-semibold"
-                  onClick={() => { setError(""); setStatus("loading"); setSourcePosition(0); }}
+                  onClick={() => {
+                    setError("");
+                    setStatus("loading");
+                    setSourcePosition(0);
+                    resolveStreams()
+                      .then((resolved) => {
+                        setSources(resolved);
+                        setStatus(resolved.length ? "loading" : "error");
+                        if (!resolved.length) setError("No playable sources are available.");
+                      })
+                      .catch((reason: Error) => {
+                        setStatus("error");
+                        setError(reason.message);
+                      });
+                  }}
                 >
                   <RefreshCw size={16} />
                   Try again
@@ -373,119 +582,278 @@ export function WatchPlayer({
         )}
       </div>
 
-      <div className="relative z-40 flex min-h-[72px] flex-wrap items-center gap-1 border-t border-white/10 bg-[#08080b] px-3 md:px-6">
-        <button
-          type="button"
-          aria-label={playing ? "Pause" : "Play"}
-          className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
-          onClick={() => void togglePlayback()}
-        >
-          {playing ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
-        </button>
-
-        <button
-          type="button"
-          aria-label={muted ? "Unmute" : "Mute"}
-          className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
-          onClick={() => setMuted((value) => !value)}
-        >
-          {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-        </button>
-
-        {(sources.length > 1 || hlsLevels.length > 1) && (
-          <div ref={qualityMenuRef} className="relative">
-            <button
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={qualityOpen}
-              className="media-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
-              onClick={() => { setQualityOpen((value) => !value); setSubtitleOpen(false); }}
+      {/* Control bar */}
+      <div
+        className={`relative z-40 border-t border-white/10 bg-[#08080b]/95 backdrop-blur transition-opacity ${
+          controlsVisible ? "opacity-100" : "opacity-80"
+        }`}
+      >
+        {!isEmbed && (
+          <div className="px-3 pt-2 md:px-6">
+            <div
+              className="group relative h-1.5 cursor-pointer rounded-full bg-white/15"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                seekTo((e.clientX - rect.left) / rect.width);
+              }}
             >
-              {hlsLevels[selectedLevel]?.label ?? source?.quality ?? "Auto"}
-              <ChevronDown size={14} />
-            </button>
-            {qualityOpen && (
-              <div role="menu" className="absolute bottom-14 left-0 z-50 min-w-40 rounded-2xl border border-white/10 bg-panel/95 p-1.5 shadow-2xl backdrop-blur-xl">
-                {sources.map((item, index) => (
-                  <button
-                    key={`${item.quality}-${item.sourceIndex}`}
-                    type="button"
-                    role="menuitem"
-                    className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
-                    onClick={() => chooseSource(index)}
-                  >
-                    {item.quality}
-                  </button>
-                ))}
-                {hlsLevels.map((level) => (
-                  <button
-                    key={level.index}
-                    type="button"
-                    role="menuitem"
-                    className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
-                    onClick={() => chooseLevel(level.index)}
-                  >
-                    {level.label}
-                  </button>
-                ))}
-              </div>
-            )}
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-white/25"
+                style={{ width: `${bufferRatio * 100}%` }}
+              />
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-accent"
+                style={{ width: `${progress * 100}%` }}
+              />
+              <div
+                className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white shadow opacity-0 transition group-hover:opacity-100"
+                style={{ left: `calc(${progress * 100}% - 7px)` }}
+              />
+            </div>
+            <div className="mt-1 flex justify-between text-[11px] tabular-nums text-zinc-500">
+              <span>{formatTime(currentTime)}</span>
+              <span>{formatTime(duration)}</span>
+            </div>
           </div>
         )}
 
-        {subtitleTracks.length > 0 && (
-          <div ref={subtitleMenuRef} className="relative">
-            <button
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={subtitleOpen}
-              aria-label={`Subtitles: ${selectedSubtitle === "off" ? "off" : selectedSubtitle}`}
-              className="media-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
-              onClick={() => { setSubtitleOpen((value) => !value); setQualityOpen(false); }}
-            >
-              <Captions size={18} />
-              <ChevronDown size={14} />
-            </button>
-            {subtitleOpen && (
-              <div role="menu" className="absolute bottom-14 left-0 z-50 min-w-40 rounded-2xl border border-white/10 bg-panel/95 p-1.5 shadow-2xl backdrop-blur-xl">
-                <button
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={selectedSubtitle === "off"}
-                  className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
-                  onClick={() => chooseSubtitle("off")}
+        <div className="flex min-h-[56px] flex-wrap items-center gap-0.5 px-2 py-1 md:px-4">
+          {!isEmbed && (
+            <>
+              <button
+                type="button"
+                aria-label={playing ? "Pause" : "Play"}
+                className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
+                onClick={() => void togglePlayback()}
+              >
+                {playing ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
+              </button>
+
+              <button
+                type="button"
+                aria-label="Rewind 10 seconds"
+                className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
+                onClick={() => {
+                  const v = videoRef.current;
+                  if (v) v.currentTime = Math.max(0, v.currentTime - 10);
+                }}
+              >
+                <RotateCcw size={18} />
+              </button>
+
+              <button
+                type="button"
+                aria-label="Forward 10 seconds"
+                className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
+                onClick={() => {
+                  const v = videoRef.current;
+                  if (v) v.currentTime = Math.min(duration, v.currentTime + 10);
+                }}
+              >
+                <RotateCw size={18} />
+              </button>
+
+              <button
+                type="button"
+                aria-label={muted ? "Unmute" : "Mute"}
+                className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
+                onClick={() => setMuted((value) => !value)}
+              >
+                {muted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
+              </button>
+
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={muted ? 0 : volume}
+                aria-label="Volume"
+                className="hidden w-24 accent-[var(--pinflix-accent,#e63946)] sm:block"
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  setVolume(next);
+                  setMuted(next === 0);
+                }}
+              />
+            </>
+          )}
+
+          {isEmbed && (
+            <p className="px-3 text-xs text-zinc-400">
+              Playing via movibox.net player · switch quality above if available
+            </p>
+          )}
+
+          {(sources.length > 1 || hlsLevels.length > 1) && (
+            <div ref={qualityMenuRef} className="relative">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={qualityOpen}
+                className="media-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
+                onClick={() => {
+                  setQualityOpen((value) => !value);
+                  setSubtitleOpen(false);
+                  setSpeedOpen(false);
+                }}
+              >
+                {hlsLevels[selectedLevel]?.label ?? source?.quality ?? "Auto"}
+                <ChevronDown size={14} />
+              </button>
+              {qualityOpen && (
+                <div
+                  role="menu"
+                  className="absolute bottom-14 left-0 z-50 max-h-64 min-w-44 overflow-auto rounded-2xl border border-white/10 bg-panel/95 p-1.5 shadow-2xl backdrop-blur-xl"
                 >
-                  Off
-                </button>
-                {subtitleTracks.map((track) => (
+                  {sources.map((item, index) => (
+                    <button
+                      key={`${item.quality}-${item.sourceIndex}`}
+                      type="button"
+                      role="menuitem"
+                      className={`media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm hover:bg-white/10 ${
+                        index === sourcePosition ? "text-accent" : "text-zinc-300"
+                      }`}
+                      onClick={() => chooseSource(index)}
+                    >
+                      {item.quality}
+                    </button>
+                  ))}
+                  {hlsLevels.map((level) => (
+                    <button
+                      key={level.index}
+                      type="button"
+                      role="menuitem"
+                      className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
+                      onClick={() => chooseLevel(level.index)}
+                    >
+                      {level.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isEmbed && subtitleTracks.length > 0 && (
+            <div ref={subtitleMenuRef} className="relative">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={subtitleOpen}
+                aria-label={`Subtitles: ${selectedSubtitle === "off" ? "off" : selectedSubtitle}`}
+                className="media-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
+                onClick={() => {
+                  setSubtitleOpen((value) => !value);
+                  setQualityOpen(false);
+                  setSpeedOpen(false);
+                }}
+              >
+                <Captions size={18} />
+                <ChevronDown size={14} />
+              </button>
+              {subtitleOpen && (
+                <div
+                  role="menu"
+                  className="absolute bottom-14 left-0 z-50 min-w-40 rounded-2xl border border-white/10 bg-panel/95 p-1.5 shadow-2xl backdrop-blur-xl"
+                >
                   <button
-                    key={track.language}
                     type="button"
                     role="menuitemradio"
-                    aria-checked={selectedSubtitle === track.language}
+                    aria-checked={selectedSubtitle === "off"}
                     className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
-                    onClick={() => chooseSubtitle(track.language)}
+                    onClick={() => chooseSubtitle("off")}
                   >
-                    {track.label}
+                    Off
                   </button>
-                ))}
-              </div>
+                  {subtitleTracks.map((track) => (
+                    <button
+                      key={track.language}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={selectedSubtitle === track.language}
+                      className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
+                      onClick={() => chooseSubtitle(track.language)}
+                    >
+                      {track.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isEmbed && (
+            <div ref={speedMenuRef} className="relative">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={speedOpen}
+                className="media-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
+                onClick={() => {
+                  setSpeedOpen((v) => !v);
+                  setQualityOpen(false);
+                  setSubtitleOpen(false);
+                }}
+              >
+                {playbackRate}x
+                <ChevronDown size={14} />
+              </button>
+              {speedOpen && (
+                <div
+                  role="menu"
+                  className="absolute bottom-14 left-0 z-50 min-w-28 rounded-2xl border border-white/10 bg-panel/95 p-1.5 shadow-2xl backdrop-blur-xl"
+                >
+                  {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
+                    <button
+                      key={rate}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={playbackRate === rate}
+                      className={`media-focus flex min-h-10 w-full items-center rounded-xl px-3 text-left text-sm hover:bg-white/10 ${
+                        playbackRate === rate ? "text-accent" : "text-zinc-300"
+                      }`}
+                      onClick={() => {
+                        setPlaybackRate(rate);
+                        setSpeedOpen(false);
+                      }}
+                    >
+                      {rate}x
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <span className="ml-auto hidden px-2 text-xs text-zinc-500 sm:inline">
+            {status === "switching" ? "Switching…" : source?.quality ?? "Auto"}
+          </span>
+
+          {!isEmbed && (
+            <button
+              type="button"
+              aria-label="Picture in picture"
+              className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
+              onClick={() => void togglePiP()}
+            >
+              <PictureInPicture2 size={18} />
+            </button>
+          )}
+
+          <button
+            type="button"
+            aria-label="Fullscreen"
+            className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
+            onClick={() => void toggleFullscreen()}
+          >
+            {typeof document !== "undefined" && document.fullscreenElement ? (
+              <Minimize size={20} />
+            ) : (
+              <Maximize size={20} />
             )}
-          </div>
-        )}
-
-        <span className="ml-auto hidden px-3 text-xs text-zinc-500 sm:inline">
-          {status === "switching" ? "Switching source…" : source?.quality ?? "Auto"}
-        </span>
-
-        <button
-          type="button"
-          aria-label="Fullscreen"
-          className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
-          onClick={() => void videoRef.current?.requestFullscreen()}
-        >
-          <Maximize size={20} />
-        </button>
+          </button>
+        </div>
       </div>
     </div>
   );
