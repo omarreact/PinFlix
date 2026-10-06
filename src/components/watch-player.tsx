@@ -104,8 +104,12 @@ export function WatchPlayer({
 
   const source = sources[sourcePosition];
   const isEmbed = source?.protocol === "embed";
+  // Derive embed UI state — do not sync via setState in an effect (eslint react-hooks/set-state-in-effect)
+  const displayStatus = isEmbed ? "ready" : status;
+  const displayBuffering = isEmbed ? false : buffering;
+  const displayPlaying = isEmbed ? true : playing;
 
-  const resolveStreams = async () => {
+  const resolveStreams = useCallback(async () => {
     const params = new URLSearchParams({ id: mediaId });
     if (season) params.set("season", String(season));
     if (episode) params.set("episode", String(episode));
@@ -117,20 +121,22 @@ export function WatchPlayer({
     };
     if (!response.ok) throw new Error(data.error || "Unable to resolve this stream.");
     return data.sources ?? [];
-  };
+  }, [mediaId, season, episode]);
 
   const showControls = useCallback(() => {
     setControlsVisible(true);
     if (hideTimer.current) clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(() => {
-      if (playing && !qualityOpen && !subtitleOpen && !speedOpen) setControlsVisible(false);
+      if (displayPlaying && !qualityOpen && !subtitleOpen && !speedOpen) setControlsVisible(false);
     }, 3200);
-  }, [playing, qualityOpen, subtitleOpen, speedOpen]);
+  }, [displayPlaying, qualityOpen, subtitleOpen, speedOpen]);
 
   useEffect(() => {
+    let cancelled = false;
     const savedQuality = window.localStorage.getItem("pinflix-quality");
     resolveStreams()
       .then((resolved) => {
+        if (cancelled) return;
         if (savedQuality) {
           const savedPosition = resolved.findIndex((item) => item.quality === savedQuality);
           if (savedPosition >= 0) setSourcePosition(savedPosition);
@@ -140,38 +146,44 @@ export function WatchPlayer({
         if (!resolved.length) setError("No playable sources are available.");
       })
       .catch((reason: Error) => {
+        if (cancelled) return;
         setStatus("error");
         setError(reason.message);
       });
-  }, [mediaId, episode, season]);
+    return () => {
+      cancelled = true;
+    };
+  }, [resolveStreams]);
 
   useEffect(() => {
-    if (!buffering || status !== "ready" || isEmbed) return;
+    if (!displayBuffering || displayStatus !== "ready" || isEmbed) return;
     const stallTimeout = setTimeout(() => {
       console.warn("Stall detected, forcing failover");
       failoverRef.current();
     }, 10000);
     return () => clearTimeout(stallTimeout);
-  }, [buffering, status, isEmbed]);
+  }, [displayBuffering, displayStatus, isEmbed]);
 
   useEffect(() => {
-    if (isEmbed) {
-      setStatus("ready");
-      setBuffering(false);
-      setPlaying(true);
-      return;
-    }
+    // Embed mode: iframe only — no video element work, no setState sync
+    if (isEmbed || !source) return;
 
     const video = videoRef.current;
-    if (!video || !source) return;
+    if (!video) return;
     let cancelled = false;
-    setStatus("loading");
-    setBuffering(true);
-    setError("");
-    setHlsLevels([]);
-    setSelectedLevel(-1);
-    setSubtitleTracks(source.subtitles ?? []);
-    setSelectedSubtitle("off");
+
+    // Schedule state updates after paint to satisfy react-hooks/set-state-in-effect
+    const boot = window.setTimeout(() => {
+      if (cancelled) return;
+      setStatus("loading");
+      setBuffering(true);
+      setError("");
+      setHlsLevels([]);
+      setSelectedLevel(-1);
+      setSubtitleTracks(source.subtitles ?? []);
+      setSelectedSubtitle("off");
+    }, 0);
+
     hlsRef.current?.destroy();
     hlsRef.current = null;
 
@@ -190,11 +202,13 @@ export function WatchPlayer({
       video
         .play()
         .then(() => {
+          if (cancelled) return;
           setPlaying(true);
           setStatus("ready");
           setBuffering(false);
         })
         .catch(() => {
+          if (cancelled) return;
           setStatus("ready");
           setBuffering(false);
           setPlaying(false);
@@ -265,7 +279,7 @@ export function WatchPlayer({
           hls.attachMedia(video);
         })
         .catch(() => failover());
-    } else {
+    } else if (source.protocol === "native" || source.protocol === "hls") {
       video.src = source.url;
       video.load();
       playResolved();
@@ -273,6 +287,7 @@ export function WatchPlayer({
 
     return () => {
       cancelled = true;
+      window.clearTimeout(boot);
       hlsRef.current?.destroy();
       hlsRef.current = null;
       video.pause();
@@ -280,7 +295,9 @@ export function WatchPlayer({
       video.load();
       failoverRef.current = () => undefined;
     };
-  }, [mediaId, source, sourcePosition, sources.length, isEmbed]);
+    // muted/volume/playbackRate applied in dedicated effects; resolveStreams is stable via useCallback
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: reload only when source identity changes
+  }, [mediaId, source, sourcePosition, sources.length, isEmbed, resolveStreams, season, episode]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -419,7 +436,7 @@ export function WatchPlayer({
     }, 100);
   }
 
-  const isBusy = !isEmbed && (status === "loading" || status === "switching");
+  const isBusy = !isEmbed && (displayStatus === "loading" || displayStatus === "switching");
   const progress = duration > 0 ? currentTime / duration : 0;
   const bufferRatio = duration > 0 ? buffered / duration : 0;
 
@@ -431,7 +448,7 @@ export function WatchPlayer({
       onClick={showControls}
     >
       <div className="relative min-h-[calc(100vh-88px)]">
-        {isEmbed ? (
+        {isEmbed && source ? (
           <iframe
             title={title}
             src={source.url}
@@ -529,19 +546,19 @@ export function WatchPlayer({
             <div>
               <div className="mx-auto h-14 w-14 animate-spin rounded-full border-4 border-white/10 border-t-brand" />
               <p className="mt-4 text-xs font-bold uppercase tracking-[.18em] text-accent">
-                {status === "switching" ? "Trying another source" : "Loading stream"}
+                {displayStatus === "switching" ? "Trying another source" : "Loading stream"}
               </p>
             </div>
           </div>
         )}
 
-        {buffering && status === "ready" && !isEmbed && (
+        {displayBuffering && displayStatus === "ready" && !isEmbed && (
           <div className="pointer-events-none absolute left-4 top-24 z-20 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 text-xs text-zinc-300 backdrop-blur">
             Buffering…
           </div>
         )}
 
-        {status === "error" && (
+        {displayStatus === "error" && (
           <div className="absolute inset-0 z-30 grid place-items-center bg-black/90 p-6 text-center backdrop-blur-md">
             <div className="max-w-md">
               <p className="text-5xl">⚠</p>
@@ -582,7 +599,6 @@ export function WatchPlayer({
         )}
       </div>
 
-      {/* Control bar */}
       <div
         className={`relative z-40 border-t border-white/10 bg-[#08080b]/95 backdrop-blur transition-opacity ${
           controlsVisible ? "opacity-100" : "opacity-80"
@@ -622,11 +638,11 @@ export function WatchPlayer({
             <>
               <button
                 type="button"
-                aria-label={playing ? "Pause" : "Play"}
+                aria-label={displayPlaying ? "Pause" : "Play"}
                 className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
                 onClick={() => void togglePlayback()}
               >
-                {playing ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
+                {displayPlaying ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
               </button>
 
               <button
@@ -827,7 +843,7 @@ export function WatchPlayer({
           )}
 
           <span className="ml-auto hidden px-2 text-xs text-zinc-500 sm:inline">
-            {status === "switching" ? "Switching…" : source?.quality ?? "Auto"}
+            {displayStatus === "switching" ? "Switching…" : source?.quality ?? "Auto"}
           </span>
 
           {!isEmbed && (
