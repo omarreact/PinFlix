@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   if (!query) {
     return Response.json(
       { entertainment: [] },
-      { headers: { "Cache-Control": "no-store" } },
+      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
     );
   }
 
@@ -17,6 +17,6 @@ export async function GET(request: Request) {
 
   return Response.json(
     { entertainment },
-    { headers: { "Cache-Control": "no-store" } },
+    { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
   );
 }
