@@ -8,7 +8,7 @@ const API_BASE = "https://h5-api.aoneroom.com";
 const SITE_BASE = "https://movibox.net";
 const PLAYBACK_BASE = "https://movibox.net";
 
-const REQUEST_TIMEOUT_MS = 5_000;
+const REQUEST_TIMEOUT_MS = 12_000;
 
 type H5ApiResponse<T> = {
   code: number;
@@ -42,7 +42,8 @@ function mapItem(item: any, kindFallback?: "movie" | "show"): Entertainment {
     (item.subjectType === 2 || item.subject?.subjectType === 2 ? "show" : "movie");
   const subj = item.subject ?? item;
   const subjectId = subj.subjectId ?? item.subjectId;
-  const detailPath = item.detailPath ?? subj.detailPath ?? String(subjectId);
+  const detailPath =
+    item.detailPath ?? subj.detailPath ?? item.subject?.detailPath ?? String(subjectId);
   const id = providerId(subjectId, detailPath);
 
   return {
@@ -63,6 +64,7 @@ function mapItem(item: any, kindFallback?: "movie" | "show"): Entertainment {
       item.image?.url ??
       (Array.isArray(subj.stills) ? subj.stills[0]?.url : subj.stills?.url) ??
       subj.cover?.url ??
+      item.cover?.url ??
       "",
     genres: (subj.genre ?? item.genre)
       ? String(subj.genre ?? item.genre)
@@ -87,14 +89,20 @@ async function fetchJson<T>(url: URL | string, init: RequestInit = {}): Promise<
     const headers = new Headers(init.headers);
     if (!headers.has("Accept")) headers.set("Accept", "application/json");
     if (!headers.has("User-Agent")) {
-      headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+      headers.set(
+        "User-Agent",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      );
     }
+    if (!headers.has("Origin")) headers.set("Origin", SITE_BASE);
+    if (!headers.has("Referer")) headers.set("Referer", `${SITE_BASE}/`);
 
     const response = await fetch(url, {
       ...init,
       headers,
       signal: controller.signal,
-      next: { revalidate: 3600 },
+      // Avoid long-lived empty cache on edge if upstream was briefly down
+      next: { revalidate: 120 },
     });
 
     if (!response.ok) {
@@ -133,7 +141,6 @@ export async function search(query: string, page = 1): Promise<Entertainment[]> 
         item.genres.some((g) => g.toLowerCase().includes(q)),
     );
 
-    // Deduplicate by id
     return [...new Map(matched.map((item) => [item.id, item])).values()];
   } catch (error) {
     console.error("MovieBox search error:", error);
@@ -349,6 +356,11 @@ export async function resolveStreams(
   }
 }
 
+/**
+ * Home operating list includes:
+ * - BANNER sections → banner.items (each may nest .subject)
+ * - SUBJECTS_MOVIE sections → subjects[] (flat subject objects)
+ */
 export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
   const url = new URL("/wefeed-h5api-bff/home?host=movibox.net", API_BASE);
 
@@ -359,18 +371,32 @@ export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
     const sections: MovieBoxHomeSection[] = [];
 
     for (const op of res.data.operatingList) {
-      if (op.banner?.items?.length) {
-        const items = op.banner.items
-          .filter((item: any) => item.subject || item.subjectId)
-          .map((item: any) => mapItem(item));
+      const rawItems: any[] =
+        (Array.isArray(op.banner?.items) && op.banner.items.length > 0
+          ? op.banner.items
+          : null) ??
+        (Array.isArray(op.subjects) && op.subjects.length > 0 ? op.subjects : null) ??
+        [];
 
-        if (items.length > 0) {
-          sections.push({
-            id: op.title || String(op.position),
-            label: op.title || "Featured",
-            items,
-          });
-        }
+      if (!rawItems.length) continue;
+
+      const items = rawItems
+        .filter((item: any) => item && (item.subject || item.subjectId))
+        .map((item: any) => mapItem(item));
+
+      if (items.length > 0) {
+        const label =
+          op.title && !String(op.title).startsWith("Banner_")
+            ? String(op.title)
+            : op.type === "BANNER"
+              ? "Featured"
+              : String(op.title || "Collection");
+
+        sections.push({
+          id: String(op.opId ?? op.title ?? op.position),
+          label,
+          items,
+        });
       }
     }
 

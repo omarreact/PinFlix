@@ -2,22 +2,53 @@ import { Suspense } from "react";
 import { EntertainmentRail } from "@/src/components/catalog-sections";
 import { HomeHero } from "@/src/components/home-hero";
 import { BrowseTabs } from "@/src/components/browse-tabs";
-import { getHomeSections } from "@/src/lib/providers/moviebox/web";
+import { getHomeSections, getLatestPage } from "@/src/lib/providers/moviebox/web";
 
-export const revalidate = 300;
+export const revalidate = 120;
 
 export default async function HomePage() {
-  const homeSections = await getHomeSections();
-  const homeItems = homeSections.flatMap((section) => section.items);
-  const uniqueItems = [...new Map(homeItems.map((item) => [item.id, item])).values()];
-  const movieRail = uniqueItems.filter((item) => item.kind === "movie").slice(0, 12);
-  const seriesRail = uniqueItems.filter((item) => item.kind === "show").slice(0, 12);
-  const featured = uniqueItems[0];
+  const [homeSections, latestMovies, latestShows] = await Promise.all([
+    getHomeSections().catch(() => []),
+    getLatestPage("movie", 1).catch(() => ({ items: [], page: 1, hasNextPage: false })),
+    getLatestPage("show", 1).catch(() => ({ items: [], page: 1, hasNextPage: false })),
+  ]);
 
-  const sectionLabels = new Set(["trending movies", "trending movie", "top series"]);
+  const homeItems = homeSections.flatMap((section) => section.items);
+  const uniqueHome = [...new Map(homeItems.map((item) => [item.id, item])).values()];
+
+  let movieRail = uniqueHome.filter((item) => item.kind === "movie").slice(0, 14);
+  let seriesRail = uniqueHome.filter((item) => item.kind === "show").slice(0, 14);
+
+  if (movieRail.length < 6 && latestMovies.items.length) {
+    movieRail = [...new Map([...movieRail, ...latestMovies.items].map((i) => [i.id, i])).values()].slice(
+      0,
+      14,
+    );
+  }
+  if (seriesRail.length < 6 && latestShows.items.length) {
+    seriesRail = [...new Map([...seriesRail, ...latestShows.items].map((i) => [i.id, i])).values()].slice(
+      0,
+      14,
+    );
+  }
+
+  const featured =
+    uniqueHome[0] ?? movieRail[0] ?? seriesRail[0] ?? latestMovies.items[0] ?? latestShows.items[0];
+
+  const sectionLabels = new Set([
+    "trending movies",
+    "trending movie",
+    "top series",
+    "featured",
+    "popular series",
+    "popular movie",
+  ]);
   const extraSections = homeSections
     .filter((section) => !sectionLabels.has(section.label.toLowerCase()))
-    .slice(0, 12);
+    .filter((section) => section.items.length > 0)
+    .slice(0, 14);
+
+  const hasCatalog = Boolean(featured) || movieRail.length > 0 || seriesRail.length > 0;
 
   return (
     <div>
@@ -40,7 +71,7 @@ export default async function HomePage() {
           <EntertainmentRail key={section.id} title={section.label} items={section.items} />
         ))}
 
-        {!featured && (
+        {!hasCatalog && (
           <div className="glass-panel rounded-2xl p-7 text-zinc-400">
             <p className="font-bold text-white">Catalog temporarily unavailable</p>
             <p className="mt-2 max-w-2xl text-sm leading-6">
