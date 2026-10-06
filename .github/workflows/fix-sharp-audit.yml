@@ -1,0 +1,40 @@
+name: One-time sharp audit fix
+
+on:
+  push:
+    paths:
+      - ".github/workflows/fix-sharp-audit.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Update sharp and lockfile
+        run: npm install --package-lock-only --save-exact sharp@0.35.5 --ignore-scripts
+
+      - name: Verify production audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Commit dependency fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "No dependency changes required"
+            exit 0
+          fi
+          git commit -m "security: update sharp to 0.35.5"
+          git push
