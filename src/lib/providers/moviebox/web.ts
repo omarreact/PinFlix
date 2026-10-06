@@ -10,6 +10,20 @@ const PLAYBACK_BASE = "https://h5-api.aoneroom.com";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
+function formatError(error: unknown) {
+  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  return String(error);
+}
+
+function upstreamLabel(input: URL | string) {
+  try {
+    const url = input instanceof URL ? input : new URL(input);
+    return `${url.hostname}${url.pathname}`;
+  } catch {
+    return String(input);
+  }
+}
+
 type H5ApiResponse<T> = {
   code: number;
   message: string;
@@ -109,11 +123,22 @@ async function fetchJson<T>(url: URL | string, init: RequestInit = {}): Promise<
       cache: "no-store",
     });
 
+    const body = await response.text();
+    const target = upstreamLabel(url);
+
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw new Error(
+        `${target} returned HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`,
+      );
     }
 
-    return await response.json();
+    try {
+      return JSON.parse(body) as T;
+    } catch {
+      throw new Error(
+        `${target} returned invalid JSON (HTTP ${response.status}, content-type=${response.headers.get("content-type") ?? "unknown"}, bytes=${body.length})`,
+      );
+    }
   } finally {
     clearTimeout(timeoutId);
   }
@@ -143,7 +168,7 @@ export async function search(query: string, page = 1): Promise<Entertainment[]> 
 
     return [...new Map(matched.map((item) => [item.id, item])).values()];
   } catch (error) {
-    console.error("MovieBox search error:", error);
+    console.error("MovieBox search error:", formatError(error));
     return [];
   }
 }
@@ -172,7 +197,7 @@ export async function getLatestPage(kind: "movie" | "show", page = 1) {
       hasNextPage: Boolean(res.data.pager?.hasMore),
     };
   } catch (error) {
-    console.error("MovieBox getLatestPage error:", error);
+    console.error("MovieBox getLatestPage error:", formatError(error));
     return { items: [], page, hasNextPage: false };
   }
 }
@@ -226,7 +251,7 @@ export async function getDetails(id: string): Promise<Entertainment | null> {
       detailUrl: new URL(`/detail/${parsed.detailPath}`, SITE_BASE).toString(),
     };
   } catch (error) {
-    console.error("MovieBox getDetails error:", error);
+    console.error("MovieBox getDetails error:", formatError(error));
     return null;
   }
 }
@@ -283,7 +308,7 @@ export async function getSeriesNavigation(
       episodes,
     };
   } catch (error) {
-    console.error("MovieBox getSeriesNavigation error:", error);
+    console.error("MovieBox getSeriesNavigation error:", formatError(error));
     return { seasons: [fallbackSeason], season: fallbackSeason, episodes: 1 };
   }
 }
@@ -366,7 +391,7 @@ export async function resolveStreams(
       }
     }
   } catch (error) {
-    console.error("MovieBox resolveStreams play error:", error);
+    console.error("MovieBox resolveStreams play error:", formatError(error));
   }
 
   try {
@@ -388,7 +413,7 @@ export async function resolveStreams(
       );
     }
   } catch (error) {
-    console.error("MovieBox trailer fallback error:", error);
+    console.error("MovieBox trailer fallback error:", formatError(error));
   }
 
   const embedUrl = new URL(`/detail/${parsed.detailPath}`, SITE_BASE);
@@ -425,7 +450,7 @@ export async function resolveStreams(
         }
       }
     } catch (err) {
-      console.error("MovieBox caption fetch error:", err);
+      console.error("MovieBox caption fetch error:", formatError(err));
     }
   }
 
@@ -478,7 +503,7 @@ export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
 
     return sections;
   } catch (error) {
-    console.error("MovieBox getHomeSections error:", error);
+    console.error("MovieBox getHomeSections error:", formatError(error));
     return [];
   }
 }
