@@ -1,7 +1,6 @@
 import "server-only";
 
 import * as movieboxWeb from "./moviebox/web";
-import { cineplexbdProvider } from "./cineplexbd";
 import type {
   PinFlixProvider,
   ProviderCatalogPage,
@@ -10,45 +9,42 @@ import type {
 } from "./contracts";
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
 
+/**
+ * PinFlix catalog + playback is bound exclusively to the movibox.net
+ * (MovieBox H5 API) implementation in ./moviebox/web.
+ */
 export const catalogProvider: PinFlixProvider = {
-  name: "multiplex",
+  name: "moviebox",
 
   canHandleId(id) {
-    return movieboxWeb.canHandleId(id) || cineplexbdProvider.canHandleId(id);
+    return movieboxWeb.canHandleId(id);
   },
 
   async search(query, page = 1) {
-    const [mb, cb] = await Promise.all([
-      movieboxWeb.search(query, page).catch(() => []),
-      cineplexbdProvider.search(query, page).catch(() => []),
-    ]);
-    return [...cb, ...mb];
+    return movieboxWeb.search(query, page);
   },
 
   async getLatestPage(kind, page = 1) {
-    return cineplexbdProvider.getLatestPage(kind, page).catch(() => movieboxWeb.getLatestPage(kind, page));
+    return movieboxWeb.getLatestPage(kind, page);
   },
 
   async getCategories(kind) {
-    return cineplexbdProvider.getCategories(kind);
+    return movieboxWeb.getCategories(kind);
   },
 
   async getCategoryPage(categoryId, page = 1) {
-    return cineplexbdProvider.getCategoryPage(categoryId, page);
+    return movieboxWeb.getCategoryPage(categoryId, page);
   },
 
   async getDetails(id) {
-    if (cineplexbdProvider.canHandleId(id)) return cineplexbdProvider.getDetails(id);
     return movieboxWeb.getDetails(id);
   },
 
   async getSeriesNavigation(id, requestedSeason = 1) {
-    if (cineplexbdProvider.canHandleId(id)) return cineplexbdProvider.getSeriesNavigation(id, requestedSeason);
     return movieboxWeb.getSeriesNavigation(id, requestedSeason);
   },
 
   async resolveStreams(id, options = {}) {
-    if (cineplexbdProvider.canHandleId(id)) return cineplexbdProvider.resolveStreams(id, options);
     return movieboxWeb.resolveStreams(id, options);
   },
 };

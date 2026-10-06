@@ -16,30 +16,28 @@ PinFlix is a Next.js movie and series interface with a cinematic dark UI and a d
 
 ## Architecture
 
-PinFlix uses **CineplexBD as its only active catalog and playback provider**.
+PinFlix uses **movibox.net (MovieBox) as its only active catalog and playback provider**.
 
 ```text
 PinFlix UI
     ↓
-CineplexBD provider adapter
+MovieBox (movibox.net) provider adapter
     ↓
-catalog/search/title metadata
+catalog/search/title metadata + home sections
     ↓
-playback resolver
+playback resolver (MP4 streams + captions)
     ↓
-HTTPS media gateway where required
-    ↓
-PinFlix HLS/native player
+PinFlix native / HLS player
 ```
 
-The UI consumes normalized provider-neutral title and stream contracts, but no MovieBox provider is active or included in the production catalog pipeline.
+The UI consumes normalized provider-neutral title and stream contracts. All catalog and stream resolution is performed exclusively through the verified movibox.net / H5 API surfaces (`https://movibox.net` + `https://h5-api.aoneroom.com`).
 
 ```text
 app/                              routes and API handlers
 src/components/                   reusable UI and player components
 src/lib/providers/contracts.ts    provider-neutral catalog/playback contract
-src/lib/providers/catalog.ts      active CineplexBD provider binding
-src/lib/providers/cineplexbd/     CineplexBD catalog/playback adapter
+src/lib/providers/catalog.ts      active MovieBox (movibox.net) provider binding
+src/lib/providers/moviebox/       MovieBox web/H5 API adapter
 src/lib/saved.ts                  client-side My List persistence
 src/types/                        catalog and playback contracts
 ```
@@ -79,6 +77,6 @@ Static CSS/JS assets are deployed directly with the main Worker through Wrangler
 
 ## Media boundary
 
-CineplexBD is the only configured catalog/playback provider. Do not add MovieBox or additional source providers unless the project owner explicitly changes this decision.
+movibox.net (MovieBox H5 API) is the only configured catalog/playback provider. Do not add CineplexBD, TMDB, or additional source providers unless the project owner explicitly changes this decision.
 
 Use media only where the operator is authorized to access and relay it. Upstream availability, content rights and regional routing remain the responsibility of the source provider.
