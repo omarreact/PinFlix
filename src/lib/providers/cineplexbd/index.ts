@@ -61,10 +61,10 @@ function safePositiveInteger(value: number | undefined, fallback: number) {
   return Number.isInteger(value) && Number(value) > 0 ? Number(value) : fallback;
 }
 
-async function tryFetchHtml(paths: string[]) {
+async function tryFetchHtml(paths: string[], revalidate = 0) {
   for (const path of paths) {
     try {
-      return { html: await fetchHtml(path, 0), path };
+      return { html: await fetchHtml(path, revalidate), path };
     } catch {
       // Continue through the verified public CineplexBD route fallbacks.
     }
@@ -72,10 +72,10 @@ async function tryFetchHtml(paths: string[]) {
   return null;
 }
 
-async function tryFetchJson(paths: string[]) {
+async function tryFetchJson(paths: string[], revalidate = 0) {
   for (const path of paths) {
     try {
-      return await fetchJson(path, 0);
+      return await fetchJson(path, revalidate);
     } catch {
       // Continue to the next public metadata route.
     }
@@ -91,7 +91,7 @@ async function getLatestPage(
 
   if (kind === "movie") {
     try {
-      const html = await fetchHtml(`/search.php?q=&page=${safePage}`, 0);
+      const html = await fetchHtml(`/search.php?q=&page=${safePage}`, 300);
       const all = parseCatalog(html);
       const items = all.filter((item) => item.kind === "movie");
       return {
@@ -108,9 +108,9 @@ async function getLatestPage(
   const [webSeries, recent] = await Promise.allSettled([
     fetchHtml(
       `/tcategory.php?category=${encodeURIComponent("Web Series")}&page=${safePage}`,
-      0,
+      300,
     ),
-    fetchHtml(`/search.php?q=&page=${safePage}`, 0),
+    fetchHtml(`/search.php?q=&page=${safePage}`, 300),
   ]);
 
   const seen = new Set<string>();
@@ -148,15 +148,15 @@ async function getDetails(id: string): Promise<Entertainment | null> {
             `/watch.php?id=${encodedId}&season=1`,
             `/watch.php?series_id=${encodedId}&season=1`,
             `/tview.php?id=${encodedId}`,
-          ])
-        : await tryFetchHtml([`/view.php?id=${encodedId}`]);
+          ], 300)
+        : await tryFetchHtml([`/view.php?id=${encodedId}`], 300);
 
     if (!details) return null;
 
     const metaJson = await tryFetchJson([
       `/watch.php?id=${encodedId}&season=1&meta=1`,
       `/watch.php?series_id=${encodedId}&season=1&meta=1`,
-    ]);
+    ], 300);
 
     const partial = parseDetails(details.html, details.path, metaJson);
 
@@ -200,7 +200,7 @@ async function getSeriesNavigation(
     `/watch.php?id=${encodedId}&season=${fallbackSeason}`,
     `/watch.php?series_id=${encodedId}&season=${fallbackSeason}`,
     `/tview.php?id=${encodedId}`,
-  ]);
+  ], 300);
 
   const seasons = page ? parseSeasonNumbers(page.html) : [];
   const season = seasons.includes(fallbackSeason)
@@ -210,7 +210,7 @@ async function getSeriesNavigation(
   const metaJson = await tryFetchJson([
     `/watch.php?id=${encodedId}&season=${season}&meta=1`,
     `/watch.php?series_id=${encodedId}&season=${season}&meta=1`,
-  ]);
+  ], 300);
 
   return {
     seasons: seasons.length ? seasons : [season],
@@ -319,7 +319,7 @@ async function getCategoryPage(
   });
 
   try {
-    const html = await fetchHtml(`/${category.endpoint}?${params.toString()}`, 0);
+    const html = await fetchHtml(`/${category.endpoint}?${params.toString()}`, 300);
     const forcedKind = category.endpoint === "category.php" ? "movie" : "show";
     return {
       items: parseCatalog(html, {
@@ -349,7 +349,7 @@ export const cineplexbdProvider: PinFlixProvider = {
     try {
       const html = await fetchHtml(
         `/search.php?q=${encodeURIComponent(normalized)}&page=${Math.max(1, page)}`,
-        0,
+        60,
       );
       return parseCatalog(html);
     } catch (error) {
