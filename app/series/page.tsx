@@ -4,6 +4,8 @@ import { EntertainmentGrid } from "@/src/components/catalog-sections";
 import { ProviderCategoryNav } from "@/src/components/provider-category-nav";
 import { catalogProvider } from "@/src/lib/providers/catalog";
 
+export const revalidate = 300;
+
 type SearchParams = Promise<{ category?: string; page?: string }>;
 
 function pageHref(page: number, category?: string) {
