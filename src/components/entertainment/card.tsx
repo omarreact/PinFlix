@@ -10,7 +10,7 @@ export function EntertainmentCard({ item }: { item: Entertainment }) {
       aria-label={`View ${item.title}`}
     >
       {item.poster ? (
-        <img src={item.poster} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
+        <img src={item.poster} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
       ) : (
         <div className="poster-fallback grid h-full place-items-center p-5 text-center text-lg font-bold text-white/70">{item.title}</div>
       )}
