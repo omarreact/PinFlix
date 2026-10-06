@@ -2,24 +2,17 @@ import { Suspense } from "react";
 import { EntertainmentRail } from "@/src/components/catalog-sections";
 import { HomeHero } from "@/src/components/home-hero";
 import { BrowseTabs } from "@/src/components/browse-tabs";
-import { catalogProvider } from "@/src/lib/providers/catalog";
 import { getHomeSections } from "@/src/lib/providers/moviebox/web";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function HomePage() {
-  const [homeSections, latestMovies, latestSeries] = await Promise.all([
-    getHomeSections(),
-    catalogProvider.getLatestPage("movie", 1),
-    catalogProvider.getLatestPage("show", 1),
-  ]);
-
-  const movieRail = latestMovies.items.slice(0, 12);
-  const seriesRail = latestSeries.items.slice(0, 12);
-  const featured =
-    homeSections.flatMap((section) => section.items)[0] ??
-    movieRail[0] ??
-    seriesRail[0];
+  const homeSections = await getHomeSections();
+  const homeItems = homeSections.flatMap((section) => section.items);
+  const uniqueItems = [...new Map(homeItems.map((item) => [item.id, item])).values()];
+  const movieRail = uniqueItems.filter((item) => item.kind === "movie").slice(0, 12);
+  const seriesRail = uniqueItems.filter((item) => item.kind === "show").slice(0, 12);
+  const featured = uniqueItems[0];
 
   const sectionLabels = new Set(["trending movies", "trending movie", "top series"]);
   const extraSections = homeSections
@@ -57,9 +50,9 @@ export default async function HomePage() {
 
         {!featured && (
           <div className="glass-panel rounded-2xl p-7 text-zinc-400">
-            <p className="font-bold text-white">MovieBox catalog temporarily unavailable</p>
+            <p className="font-bold text-white">Catalog temporarily unavailable</p>
             <p className="mt-2 max-w-2xl text-sm leading-6">
-              PinFlix could not refresh MovieBox right now. Try again shortly.
+              PinFlix could not refresh the catalog right now. Try again shortly.
             </p>
           </div>
         )}
