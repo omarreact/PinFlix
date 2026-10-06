@@ -59,9 +59,16 @@ export default function SearchPage() {
   return (
     <div className="space-y-8">
       <section className="animate-slide-up">
-        <Link href="/" className="tv-focus inline-flex min-h-11 items-center rounded-full text-sm font-semibold text-zinc-400 hover:text-white">← Discover</Link>
-        <h1 className="mt-4 text-4xl font-black tracking-[-.04em] text-gradient md:text-5xl">Search CineplexBD</h1>
-        <p className="mt-3 text-sm text-zinc-400">Search CineplexBD movies and series directly from PinFlix.</p>
+        <Link
+          href="/"
+          className="tv-focus inline-flex min-h-11 items-center rounded-full text-sm font-semibold text-zinc-400 hover:text-white"
+        >
+          ← Discover
+        </Link>
+        <h1 className="mt-4 text-4xl font-black tracking-[-.04em] text-gradient md:text-5xl">Search</h1>
+        <p className="mt-3 text-sm text-zinc-400">
+          Find movies and series from the movibox.net catalog.
+        </p>
 
         <label className="glass-panel mt-6 flex min-h-14 max-w-3xl items-center gap-3 rounded-full px-5 focus-within:border-brand/60">
           <Search size={20} className="shrink-0 text-zinc-500" />
@@ -74,7 +81,7 @@ export default function SearchPage() {
               setLoading(Boolean(value.trim()));
               if (!value.trim()) setEntertainment([]);
             }}
-            placeholder="Search CineplexBD titles"
+            placeholder="Search movies and series…"
             className="min-w-0 flex-1 bg-transparent py-4 text-white placeholder:text-zinc-600"
           />
         </label>
@@ -82,7 +89,7 @@ export default function SearchPage() {
 
       {!normalized ? (
         <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-12 text-center text-zinc-500">
-          Start typing to search CineplexBD.
+          Start typing to search the catalog.
         </div>
       ) : loading ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
@@ -92,9 +99,13 @@ export default function SearchPage() {
         </div>
       ) : entertainment.length > 0 ? (
         (() => {
-          const availableYears = Array.from(new Set(entertainment.map(e => e.year).filter(Boolean))).sort((a, b) => Number(b) - Number(a));
-          const filtered = entertainment.filter(item => yearFilter === "all" || item.year?.toString() === yearFilter);
-          
+          const availableYears = Array.from(
+            new Set(entertainment.map((e) => e.year).filter(Boolean)),
+          ).sort((a, b) => Number(b) - Number(a));
+          const filtered = entertainment.filter(
+            (item) => yearFilter === "all" || item.year?.toString() === yearFilter,
+          );
+
           return (
             <section>
               <div className="mb-5 flex items-center justify-between">
@@ -102,22 +113,26 @@ export default function SearchPage() {
                   Results <span className="text-sm font-normal text-zinc-500">({filtered.length})</span>
                 </h2>
                 {availableYears.length > 0 && (
-                  <select 
-                    value={yearFilter} 
+                  <select
+                    value={yearFilter}
                     onChange={(e) => setYearFilter(e.target.value)}
                     className="rounded-lg border border-white/10 bg-surface px-3 py-1.5 text-sm text-white"
                   >
                     <option value="all">All Years</option>
-                    {availableYears.map(year => (
-                      <option key={year} value={year?.toString()}>{year}</option>
+                    {availableYears.map((year) => (
+                      <option key={year} value={year?.toString()}>
+                        {year}
+                      </option>
                     ))}
                   </select>
                 )}
               </div>
-              
+
               {filtered.length > 0 ? (
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
-                  {filtered.map((item) => <EntertainmentCard key={item.id} item={item} />)}
+                  {filtered.map((item) => (
+                    <EntertainmentCard key={item.id} item={item} />
+                  ))}
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-12 text-center text-zinc-500">
@@ -129,7 +144,7 @@ export default function SearchPage() {
         })()
       ) : (
         <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-12 text-center text-zinc-500">
-          No CineplexBD titles found. Try a different spelling.
+          No titles found. Try a different spelling.
         </div>
       )}
     </div>

@@ -35,11 +35,11 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
       <section className="animate-slide-up">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold uppercase tracking-[.16em] text-accent">
           <Film size={14} />
-          CineplexBD catalog
+          movibox.net catalog
         </div>
         <h1 className="text-4xl font-black tracking-[-.04em] text-gradient md:text-5xl">{heading}</h1>
         <p className="mt-3 max-w-2xl text-sm font-light leading-6 text-zinc-400">
-          Browse movie titles and editorial collections directly from CineplexBD.
+          Browse movies powered exclusively by movibox.net — cinematic rails, posters, and direct playback.
         </p>
       </section>
 
@@ -49,13 +49,9 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
         <EntertainmentGrid items={items} />
       ) : (
         <div className="glass-panel rounded-2xl p-7 text-sm text-zinc-400">
-          <p className="font-semibold text-zinc-200">No CineplexBD titles loaded for this view</p>
+          <p className="font-semibold text-zinc-200">No titles loaded for this view</p>
           <p className="mt-2 leading-6">
-            The CineplexBD catalog is temporarily unreachable. Try again shortly or check{" "}
-            <a className="text-accent underline-offset-2 hover:underline" href="/api/cineplexbd/status">
-              /api/cineplexbd/status
-            </a>
-            .
+            The movibox.net catalog is temporarily unreachable. Try again shortly.
           </p>
         </div>
       )}
@@ -64,7 +60,10 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
         <div className="flex items-center justify-between border-t border-white/10 pt-6">
           <div>
             {page > 1 && (
-              <Link className="tv-focus rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-white/10" href={pageHref(page - 1, activeCategory?.id)}>
+              <Link
+                className="tv-focus rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-white/10"
+                href={pageHref(page - 1, activeCategory?.id)}
+              >
                 ← Previous
               </Link>
             )}
@@ -72,7 +71,10 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
           <span className="text-sm text-zinc-500">Page {page}</span>
           <div>
             {hasNext && (
-              <Link className="tv-focus rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-white/10" href={pageHref(page + 1, activeCategory?.id)}>
+              <Link
+                className="tv-focus rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-white/10"
+                href={pageHref(page + 1, activeCategory?.id)}
+              >
                 Next →
               </Link>
             )}
