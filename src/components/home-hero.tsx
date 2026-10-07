@@ -12,10 +12,10 @@ export function HomeHero({ item }: { item?: Entertainment }) {
   const isTmdb = item?.provider === "tmdb" && item.providerId;
   const detailHref = item
     ? isTmdb
-      ? \`/title/\${item.kind === "show" ? "tv" : "movie"}/\${item.providerId}\`
-      : \`/entertainment/\${item.id}\`
+      ? `/title/${item.kind === "show" ? "tv" : "movie"}/${item.providerId}`
+      : `/entertainment/${item.id}`
     : "/movies";
-  const primaryHref = item && !isTmdb ? \`/watch/\${item.id}\` : detailHref;
+  const primaryHref = item && !isTmdb ? `/watch/${item.id}` : detailHref;
 
   return (
     <section className="relative flex min-h-[78vh] items-end overflow-hidden md:min-h-[86vh]">

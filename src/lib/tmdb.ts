@@ -49,7 +49,7 @@ export type TmdbTitleDetails = {
 function authHeaders() {
   const token = process.env.TMDB_READ_ACCESS_TOKEN?.trim();
   return token
-    ? { accept: "application/json", Authorization: \`Bearer \${token}\` }
+    ? { accept: "application/json", Authorization: `Bearer ${token}` }
     : { accept: "application/json" };
 }
 
@@ -58,7 +58,7 @@ export async function tmdbFetch<T>(
   params: Record<string, string | number | boolean | undefined> = {},
   revalidate = 300,
 ): Promise<T> {
-  const url = new URL(\`\${TMDB_BASE}\${path}\`);
+  const url = new URL(`${TMDB_BASE}${path}`);
   const token = process.env.TMDB_READ_ACCESS_TOKEN?.trim();
   const apiKey = process.env.TMDB_API_KEY?.trim();
 
@@ -78,14 +78,14 @@ export async function tmdbFetch<T>(
   });
 
   if (!response.ok) {
-    throw new Error(\`TMDB \${path} returned HTTP \${response.status}\`);
+    throw new Error(`TMDB ${path} returned HTTP ${response.status}`);
   }
 
   return response.json() as Promise<T>;
 }
 
 function image(path: string | null | undefined, size: string) {
-  return path ? \`\${TMDB_IMAGE_BASE}/\${size}\${path}\` : "";
+  return path ? `${TMDB_IMAGE_BASE}/${size}${path}` : "";
 }
 
 function yearFrom(value?: string) {
@@ -101,8 +101,8 @@ export function tmdbItemToEntertainment(
   const release = mediaType === "movie" ? item.release_date : item.first_air_date;
 
   return {
-    id: \`tmdb-\${mediaType}-\${item.id}\`,
-    slug: \`tmdb-\${mediaType}-\${item.id}\`,
+    id: `tmdb-${mediaType}-${item.id}`,
+    slug: `tmdb-${mediaType}-${item.id}`,
     title: title ?? "Untitled",
     kind: mediaType === "tv" ? "show" : "movie",
     year: yearFrom(release),
@@ -135,7 +135,7 @@ export async function getTmdbDiscover(mediaType: TmdbMediaType, page = 1) {
     results: TmdbListItem[];
     total_pages: number;
   }>(
-    \`/discover/\${mediaType}\`,
+    `/discover/${mediaType}`,
     {
       language: "en-US",
       page,
@@ -205,7 +205,7 @@ export async function getTmdbDetails(
     number_of_episodes?: number;
     credits?: TmdbCredits;
   }>(
-    \`/\${mediaType}/\${id}\`,
+    `/${mediaType}/${id}`,
     {
       language: "en-US",
       append_to_response: "credits",

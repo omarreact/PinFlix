@@ -26,8 +26,8 @@ export default async function TmdbTitlePage({
 
   const kind = mediaType === "tv" ? "show" : "movie";
   const savedItem = {
-    id: \`tmdb-\${mediaType}-\${item.id}\`,
-    slug: \`tmdb-\${mediaType}-\${item.id}\`,
+    id: `tmdb-${mediaType}-${item.id}`,
+    slug: `tmdb-${mediaType}-${item.id}`,
     title: item.title,
     kind: kind as "movie" | "show",
     poster: item.poster,
@@ -89,7 +89,7 @@ export default async function TmdbTitlePage({
 
               {mediaType === "tv" && (
                 <p className="mt-4 text-sm text-zinc-400">
-                  {[item.numberOfSeasons ? \`\${item.numberOfSeasons} seasons\` : "", item.numberOfEpisodes ? \`\${item.numberOfEpisodes} episodes\` : ""].filter(Boolean).join(" · ")}
+                  {[item.numberOfSeasons ? `${item.numberOfSeasons} seasons` : "", item.numberOfEpisodes ? `${item.numberOfEpisodes} episodes` : ""].filter(Boolean).join(" · ")}
                 </p>
               )}
 
@@ -110,7 +110,7 @@ export default async function TmdbTitlePage({
           <h2 className="text-xl font-bold text-white">Cast</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {item.cast.map((credit) => (
-              <div key={\`\${credit.name}-\${credit.role ?? ""}\`} className="rounded-2xl border border-white/5 bg-white/[.03] p-4">
+              <div key={`${credit.name}-${credit.role ?? ""}`} className="rounded-2xl border border-white/5 bg-white/[.03] p-4">
                 <p className="font-semibold text-zinc-100">{credit.name}</p>
                 {credit.role && <p className="mt-1 text-xs text-zinc-500">{credit.role}</p>}
               </div>

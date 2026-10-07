@@ -33,9 +33,9 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
 
       {(page > 1 || catalog.hasNextPage) && (
         <div className="flex items-center justify-between border-t border-white/10 pt-6">
-          <div>{page > 1 && <Link className="tv-focus rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold" href={\`/series?page=\${page - 1}\`}>← Previous</Link>}</div>
+          <div>{page > 1 && <Link className="tv-focus rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold" href={`/series?page=${page - 1}`}>← Previous</Link>}</div>
           <span className="text-sm text-zinc-500">Page {page}</span>
-          <div>{catalog.hasNextPage && <Link className="tv-focus rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold" href={\`/series?page=\${page + 1}\`}>Next →</Link>}</div>
+          <div>{catalog.hasNextPage && <Link className="tv-focus rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold" href={`/series?page=${page + 1}`}>Next →</Link>}</div>
         </div>
       )}
     </div>

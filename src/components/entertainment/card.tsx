@@ -5,14 +5,14 @@ import type { Entertainment } from "@/src/types/catalog";
 export function EntertainmentCard({ item }: { item: Entertainment }) {
   const detailHref =
     item.provider === "tmdb" && item.providerId
-      ? \`/title/\${item.kind === "show" ? "tv" : "movie"}/\${item.providerId}\`
-      : \`/entertainment/\${item.id}\`;
+      ? `/title/${item.kind === "show" ? "tv" : "movie"}/${item.providerId}`
+      : `/entertainment/${item.id}`;
 
   return (
     <Link
       href={detailHref}
       className="movie-card media-focus group relative block aspect-[2/3] min-w-0 overflow-hidden rounded-2xl border border-white/5 bg-surface"
-      aria-label={\`View \${item.title}\`}
+      aria-label={`View ${item.title}`}
     >
       {item.poster ? (
         <img src={item.poster} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />

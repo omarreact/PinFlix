@@ -28,7 +28,7 @@ export function LiveSearch() {
       setLoading(true);
 
       try {
-        const response = await fetch(\`/api/tmdb/search?q=\${encodeURIComponent(value)}\`);
+        const response = await fetch(`/api/tmdb/search?q=${encodeURIComponent(value)}`);
         if (!response.ok) throw new Error("Search failed");
         const data = (await response.json()) as { results?: Entertainment[] };
 
@@ -53,7 +53,7 @@ export function LiveSearch() {
     const value = query.trim();
     if (!value) return;
     setOpen(false);
-    router.push(\`/search?q=\${encodeURIComponent(value)}\`);
+    router.push(`/search?q=${encodeURIComponent(value)}`);
   }
 
   return (
@@ -85,7 +85,7 @@ export function LiveSearch() {
                 return (
                   <Link
                     key={item.id}
-                    href={\`/title/\${type}/\${item.providerId}\`}
+                    href={`/title/${type}/${item.providerId}`}
                     className="flex items-center gap-3 border-b border-white/5 p-3 transition hover:bg-white/[.06]"
                   >
                     <div className="h-[66px] w-11 shrink-0 overflow-hidden rounded-lg bg-white/5">
@@ -104,7 +104,7 @@ export function LiveSearch() {
                       </div>
                       <p className="mt-1 text-xs text-zinc-500">
                         {item.kind === "show" ? "TV Series" : "Movie"}
-                        {item.year ? \` · \${item.year}\` : ""}
+                        {item.year ? ` · ${item.year}` : ""}
                       </p>
                       {item.synopsis && (
                         <p className="mt-1 line-clamp-1 text-xs text-zinc-400">{item.synopsis}</p>
@@ -118,7 +118,7 @@ export function LiveSearch() {
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   setOpen(false);
-                  router.push(\`/search?q=\${encodeURIComponent(query.trim())}\`);
+                  router.push(`/search?q=${encodeURIComponent(query.trim())}`);
                 }}
                 className="w-full p-3 text-center text-sm font-semibold text-accent transition hover:bg-white/[.05]"
               >

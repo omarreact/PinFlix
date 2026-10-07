@@ -27,7 +27,7 @@ export default function SearchPage() {
     setLoading(true);
     setError("");
 
-    fetch(\`/api/tmdb/search?q=\${encodeURIComponent(q)}\`)
+    fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Search unavailable");
         return response.json() as Promise<{ results?: Entertainment[] }>;
@@ -54,7 +54,7 @@ export default function SearchPage() {
     event.preventDefault();
     const value = query.trim();
     if (!value) return;
-    router.push(\`/search?q=\${encodeURIComponent(value)}\`);
+    router.push(`/search?q=${encodeURIComponent(value)}`);
   }
 
   return (
@@ -106,7 +106,7 @@ export default function SearchPage() {
               return (
                 <Link
                   key={item.id}
-                  href={\`/title/\${type}/\${item.providerId}\`}
+                  href={`/title/${type}/${item.providerId}`}
                   className="movie-card media-focus group relative block aspect-[2/3] overflow-hidden rounded-2xl border border-white/5 bg-surface"
                 >
                   {item.poster ? (
@@ -124,7 +124,7 @@ export default function SearchPage() {
                   <div className="absolute inset-x-0 bottom-0 p-4">
                     <h3 className="line-clamp-2 font-bold text-white">{item.title}</h3>
                     <p className="mt-1 text-xs text-zinc-400">
-                      {[item.year, item.rating ? \`★ \${item.rating.toFixed(1)}\` : ""].filter(Boolean).join(" · ")}
+                      {[item.year, item.rating ? `★ ${item.rating.toFixed(1)}` : ""].filter(Boolean).join(" · ")}
                     </p>
                   </div>
                 </Link>
