@@ -377,18 +377,9 @@ export async function resolveStreams(
         }
       }
 
-      for (const d of res.data.dash ?? []) {
-        const streamUrl = d?.url || d?.playUrl || d;
-        if (typeof streamUrl === "string") {
-          pushStream(
-            validSources,
-            streamUrl,
-            `MovieBox DASH ${d?.resolutions ? d.resolutions + "p" : ""}`.trim(),
-            "native",
-            Number(d?.resolutions) || 30,
-          );
-        }
-      }
+      // Do not expose MPEG-DASH as a native <video> source. The current player
+      // has HLS.js support but no DASH engine, so advertising DASH here creates
+      // a guaranteed playback failure before failover.
     }
   } catch (error) {
     console.error("MovieBox resolveStreams play error:", formatError(error));
