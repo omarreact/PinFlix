@@ -46,11 +46,11 @@ export type TmdbTitleDetails = {
   cast: Array<{ name: string; role?: string }>;
 };
 
-function authHeaders() {
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { accept: "application/json" };
   const token = process.env.TMDB_READ_ACCESS_TOKEN?.trim();
-  return token
-    ? { accept: "application/json", Authorization: `Bearer ${token}` }
-    : { accept: "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
 }
 
 export async function tmdbFetch<T>(
