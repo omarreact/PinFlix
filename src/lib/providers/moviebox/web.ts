@@ -102,6 +102,14 @@ async function fetchJson<T>(url: URL | string, init: RequestInit = {}): Promise<
     const headers = new Headers(init.headers);
     headers.set("Accept", "application/json, text/plain, */*");
     headers.set("Accept-Language", "en-US,en;q=0.9");
+    headers.set(
+      "X-Client-Info",
+      JSON.stringify({
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      }),
+    );
+    headers.set("X-Source", "");
+    headers.set("X-Request-Lang", "en");
     if (!headers.has("User-Agent")) {
       headers.set(
         "User-Agent",
@@ -347,7 +355,16 @@ export async function resolveStreams(
   playUrl.searchParams.set("streamSignType", "1");
 
   try {
-    const res = await fetchJson<H5ApiResponse<any>>(playUrl);
+    const playerUrl = new URL(`/movies/${parsed.detailPath}`, SITE_BASE);
+    playerUrl.searchParams.set("id", parsed.subjectId);
+    playerUrl.searchParams.set("type", "/movie/detail");
+    playerUrl.searchParams.set("detailSe", season > 0 ? String(season) : "");
+    playerUrl.searchParams.set("detailEp", episode > 0 ? String(episode) : "");
+    playerUrl.searchParams.set("lang", "en");
+
+    const res = await fetchJson<H5ApiResponse<any>>(playUrl, {
+      headers: { Referer: playerUrl.toString() },
+    });
     if (res.code === 0 && res.data) {
       const mp4Streams = res.data.streams ?? [];
       for (const m of mp4Streams) {

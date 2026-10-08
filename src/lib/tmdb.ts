@@ -1,5 +1,6 @@
 import "server-only";
 
+import { catalogProvider } from "@/src/lib/providers/catalog";
 import type { Entertainment } from "@/src/types/catalog";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -118,67 +119,92 @@ export function tmdbItemToEntertainment(
 }
 
 export async function getTmdbTrending() {
-  const data = await tmdbFetch<{ results: TmdbListItem[] }>(
-    "/trending/all/day",
-    { language: "en-US" },
-    120,
-  );
+  try {
+    const data = await tmdbFetch<{ results: TmdbListItem[] }>(
+      "/trending/all/day",
+      { language: "en-US" },
+      120,
+    );
 
-  return data.results
-    .filter((item) => item.media_type === "movie" || item.media_type === "tv")
-    .map((item) => tmdbItemToEntertainment(item, item.media_type as TmdbMediaType));
+    return data.results
+      .filter((item) => item.media_type === "movie" || item.media_type === "tv")
+      .map((item) => tmdbItemToEntertainment(item, item.media_type as TmdbMediaType));
+  } catch (error) {
+    console.warn("TMDB trending unavailable; using MovieBox catalog instead.", error);
+    const [movies, shows] = await Promise.all([
+      catalogProvider.getLatestPage("movie"),
+      catalogProvider.getLatestPage("show"),
+    ]);
+    return [...movies.items, ...shows.items];
+  }
 }
 
 export async function getTmdbDiscover(mediaType: TmdbMediaType, page = 1) {
-  const data = await tmdbFetch<{
-    page: number;
-    results: TmdbListItem[];
-    total_pages: number;
-  }>(
-    `/discover/${mediaType}`,
-    {
-      language: "en-US",
-      page,
-      include_adult: false,
-      sort_by: "popularity.desc",
-    },
-    300,
-  );
+  try {
+    const data = await tmdbFetch<{
+      page: number;
+      results: TmdbListItem[];
+      total_pages: number;
+    }>(
+      `/discover/${mediaType}`,
+      {
+        language: "en-US",
+        page,
+        include_adult: false,
+        sort_by: "popularity.desc",
+      },
+      300,
+    );
 
-  return {
-    items: data.results.map((item) => tmdbItemToEntertainment(item, mediaType)),
-    page: data.page,
-    hasNextPage: data.page < Math.min(data.total_pages, 500),
-  };
+    return {
+      items: data.results.map((item) => tmdbItemToEntertainment(item, mediaType)),
+      page: data.page,
+      hasNextPage: data.page < Math.min(data.total_pages, 500),
+    };
+  } catch (error) {
+    console.warn(`TMDB ${mediaType} catalog unavailable; using MovieBox catalog instead.`, error);
+    return catalogProvider.getLatestPage(mediaType === "tv" ? "show" : "movie", page);
+  }
 }
 
 export async function searchTmdb(query: string, page = 1) {
-  const data = await tmdbFetch<{
-    page: number;
-    results: TmdbListItem[];
-    total_pages: number;
-    total_results: number;
-  }>(
-    "/search/multi",
-    {
-      query,
+  try {
+    const data = await tmdbFetch<{
+      page: number;
+      results: TmdbListItem[];
+      total_pages: number;
+      total_results: number;
+    }>(
+      "/search/multi",
+      {
+        query,
+        page,
+        include_adult: false,
+        language: "en-US",
+      },
+      60,
+    );
+
+    const results = data.results
+      .filter((item) => item.media_type === "movie" || item.media_type === "tv")
+      .map((item) => tmdbItemToEntertainment(item, item.media_type as TmdbMediaType));
+
+    return {
+      page: data.page,
+      results,
+      totalPages: data.total_pages,
+      totalResults: data.total_results,
+    };
+  } catch (error) {
+    console.warn("TMDB search unavailable; using MovieBox catalog instead.", error);
+    const results = await catalogProvider.search(query, page);
+    return {
       page,
-      include_adult: false,
-      language: "en-US",
-    },
-    60,
-  );
-
-  const results = data.results
-    .filter((item) => item.media_type === "movie" || item.media_type === "tv")
-    .map((item) => tmdbItemToEntertainment(item, item.media_type as TmdbMediaType));
-
-  return {
-    page: data.page,
-    results,
-    totalPages: data.total_pages,
-    totalResults: data.total_results,
-  };
+      results,
+      totalPages: results.length ? page : 0,
+      totalResults: results.length,
+    };
+  }
 }
 
 export async function getTmdbDetails(

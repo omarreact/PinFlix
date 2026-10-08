@@ -17,18 +17,18 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
       <section className="animate-slide-up">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold uppercase tracking-[.16em] text-accent">
           <Clapperboard size={14} />
-          TMDB metadata
+          TV catalog
         </div>
         <h1 className="text-4xl font-black tracking-[-.04em] text-gradient md:text-5xl">Series</h1>
         <p className="mt-3 max-w-2xl text-sm font-light leading-6 text-zinc-400">
-          Discover popular TV series with metadata and artwork supplied by TMDB.
+          Browse TV series and artwork from the available catalog.
         </p>
       </section>
 
       {catalog.items.length > 0 ? (
         <EntertainmentGrid items={catalog.items} />
       ) : (
-        <div className="glass-panel rounded-2xl p-7 text-sm text-zinc-400">TMDB TV metadata is temporarily unavailable.</div>
+        <div className="glass-panel rounded-2xl p-7 text-sm text-zinc-400">The TV catalog is temporarily unavailable.</div>
       )}
 
       {(page > 1 || catalog.hasNextPage) && (

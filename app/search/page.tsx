@@ -26,10 +26,10 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
         <Link href="/" className="tv-focus text-sm font-semibold text-zinc-400 hover:text-white">
           ← Discover
         </Link>
-        <p className="mt-6 text-xs font-bold uppercase tracking-[.2em] text-accent">TMDB discovery</p>
+        <p className="mt-6 text-xs font-bold uppercase tracking-[.2em] text-accent">Movie and TV discovery</p>
         <h1 className="mt-2 text-4xl font-black tracking-[-.04em] text-gradient md:text-5xl">Search PinFlix</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-          Search movie and TV metadata from TMDB. Playback availability is handled separately.
+          Search the available movie and TV catalog.
         </p>
 
         <form action="/search" className="glass-panel mt-6 flex min-h-14 max-w-3xl items-center gap-3 rounded-full px-5">
@@ -45,7 +45,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
 
       {!query ? (
         <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-12 text-center text-zinc-500">
-          Enter a title to search TMDB.
+          Enter a title to search the catalog.
         </div>
       ) : data.results.length ? (
         <section>
@@ -62,7 +62,11 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
               return (
                 <Link
                   key={item.id}
-                  href={"/title/" + type + "/" + item.providerId}
+                  href={
+                    item.provider === "tmdb"
+                      ? `/title/${type}/${item.providerId}`
+                      : `/entertainment/${item.id}`
+                  }
                   className="movie-card media-focus group relative block aspect-[2/3] overflow-hidden rounded-2xl border border-white/5 bg-surface"
                 >
                   {item.poster ? (

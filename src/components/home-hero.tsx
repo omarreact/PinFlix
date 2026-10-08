@@ -32,7 +32,9 @@ export function HomeHero({ item }: { item?: Entertainment }) {
         <div className="max-w-3xl animate-slide-up">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-md">
             <span className="h-2 w-2 rounded-full bg-brand shadow-[0_0_14px_rgba(230,57,70,.9)]" />
-            <span className="text-[11px] font-bold uppercase tracking-[.18em] text-zinc-300">{item ? "Trending on TMDB" : "PinFlix"}</span>
+            <span className="text-[11px] font-bold uppercase tracking-[.18em] text-zinc-300">
+              {item ? (item.provider === "tmdb" ? "Trending on TMDB" : "Featured on MovieBox") : "PinFlix"}
+            </span>
           </div>
 
           <h1 className="text-gradient max-w-3xl text-5xl font-black leading-[.95] tracking-[-.055em] sm:text-6xl md:text-7xl lg:text-8xl">{title}</h1>

@@ -71,7 +71,7 @@ export function LiveSearch() {
             onFocus={() => query.trim() && setOpen(true)}
             onBlur={() => window.setTimeout(() => setOpen(false), 160)}
             type="search"
-            placeholder="Search TMDB"
+            placeholder="Search movies and TV"
             aria-label="Search movies and TV shows"
             className="min-w-0 flex-1 bg-transparent px-2 text-sm text-white placeholder:text-zinc-500"
           />
@@ -89,7 +89,11 @@ export function LiveSearch() {
                 return (
                   <Link
                     key={item.id}
-                    href={"/title/" + type + "/" + item.providerId}
+                    href={
+                      item.provider === "tmdb"
+                        ? `/title/${type}/${item.providerId}`
+                        : `/entertainment/${item.id}`
+                    }
                     className="flex items-center gap-3 border-b border-white/5 p-3 transition hover:bg-white/[.06]"
                   >
                     <div className="h-[66px] w-11 shrink-0 overflow-hidden rounded-lg bg-white/5">

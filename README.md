@@ -49,7 +49,8 @@ PinFlix is a production-oriented Next.js OTT (over-the-top) streaming applicatio
 |-------|--------|
 | Frontend | Next.js App Router, React Server Components |
 | Styling | Tailwind CSS v4 — theater-dark abyss + crimson accent |
-| Catalog / Playback | **Only** `https://movibox.net` via H5 API (`h5-api.aoneroom.com`) |
+| Discovery metadata | TMDB when configured; MovieBox H5 API is the catalog fallback |
+| Playback | **Only** `https://movibox.net` via H5 API (`h5-api.aoneroom.com`) |
 | Player | Native `<video>` + hls.js, quality switching, captions, resume |
 | Deploy | Cloudflare Workers + static assets (`pinflix.pincodeit.com`) |
 | Auth / DB | Prisma + optional local/SQLite user state |
@@ -104,8 +105,8 @@ npm run build:vinext
 
 ## Media boundary
 
-**movibox.net is the only configured catalog and playback provider.**  
-Do not reintroduce CineplexBD, TMDB as catalog source, or third-party embed aggregators unless the project owner explicitly changes this decision.
+**movibox.net is the only configured playback provider.** TMDB credentials are optional; when unavailable, discovery and search fall back to the MovieBox catalog so titles remain browseable and playable.
+Do not reintroduce CineplexBD or third-party embed aggregators unless the project owner explicitly changes this decision.
 
 Use media only where the operator is authorized to access and relay it. Upstream availability, content rights, and regional routing remain the responsibility of the source provider.
 

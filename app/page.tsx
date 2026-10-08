@@ -25,8 +25,8 @@ export default async function HomePage() {
 
         {!featured && (
           <div className="glass-panel rounded-2xl p-7 text-zinc-400">
-            <p className="font-bold text-white">TMDB catalog temporarily unavailable</p>
-            <p className="mt-2 text-sm leading-6">PinFlix could not refresh metadata right now. Try again shortly.</p>
+            <p className="font-bold text-white">Movie catalog temporarily unavailable</p>
+            <p className="mt-2 text-sm leading-6">PinFlix could not load titles from its catalog providers. Try again shortly.</p>
           </div>
         )}
       </div>

@@ -71,7 +71,7 @@ export default async function EntertainmentDetailPage({
 
             <div className="max-w-3xl">
               <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">
-                CineplexBD · {item.kind === "show" ? "Series" : "Movie"}
+                {item.provider === "moviebox" ? "MovieBox" : "PinFlix"} · {item.kind === "show" ? "Series" : "Movie"}
               </p>
               <h1 className="text-gradient mt-2 text-4xl font-black tracking-[-.05em] sm:text-5xl md:text-6xl">
                 {item.title}

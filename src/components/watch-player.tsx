@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { catalogProvider } from "@/src/lib/providers/catalog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Captions,
@@ -29,6 +28,10 @@ type ResolvedSource = {
   priority: number;
   sourceIndex: number;
   subtitles?: ResolvedSubtitle[];
+};
+type ResolveResponse = {
+  sources?: Array<Omit<ResolvedSource, "sourceIndex">>;
+  error?: string;
 };
 type HlsLevel = { index: number; label: string };
 
@@ -111,18 +114,26 @@ export function WatchPlayer({
   const displayPlaying = isEmbed ? true : playing;
 
   const resolveStreams = useCallback(async () => {
-    try {
-      const resolved = await catalogProvider.resolveStreams(mediaId, {
-        season: season || undefined,
-        episode: episode || undefined,
-      });
-      return resolved.map((source, index) => ({
-        ...source,
-        sourceIndex: index,
-      })) as ResolvedSource[];
-    } catch (err: any) {
-      throw new Error(err.message || "Unable to resolve this stream.");
+    const params = new URLSearchParams({ id: mediaId });
+    if (season) params.set("season", String(season));
+    if (episode) params.set("episode", String(episode));
+
+    const response = await fetch(`/api/resolve?${params.toString()}`, {
+      cache: "no-store",
+    });
+    const result = (await response.json()) as ResolveResponse;
+
+    if (!response.ok) {
+      throw new Error(result.error || `Stream resolution failed (${response.status}).`);
     }
+    if (!Array.isArray(result.sources)) {
+      throw new Error("The stream resolver returned an invalid response.");
+    }
+
+    return result.sources.map((source, index) => ({
+      ...source,
+      sourceIndex: index,
+    }));
   }, [mediaId, season, episode]);
 
   const showControls = useCallback(() => {

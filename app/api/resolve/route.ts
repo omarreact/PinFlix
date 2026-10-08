@@ -30,14 +30,21 @@ export async function GET(request: Request) {
   return Response.json(
     {
       id,
-      sources: streams.map((source, sourceIndex) => ({
-        protocol: source.protocol,
-        priority: source.priority,
-        subtitles: source.subtitles ?? [],
-        quality: source.quality,
-        sourceIndex,
-        url: source.url,
-      })),
+      sources: streams.map((source, sourceIndex) => {
+        const streamUrl =
+          source.protocol === "native"
+            ? `/api/proxy-stream?id=${encodeURIComponent(id)}&url=${encodeURIComponent(source.url)}&season=${optionalPositiveInteger(url.searchParams.get("season")) ?? 0}&episode=${optionalPositiveInteger(url.searchParams.get("episode")) ?? 0}`
+            : source.url;
+
+        return {
+          protocol: source.protocol,
+          priority: source.priority,
+          subtitles: source.subtitles ?? [],
+          quality: source.quality,
+          sourceIndex,
+          url: streamUrl,
+        };
+      }),
     },
     {
       headers: {
