@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { catalogProvider } from "@/src/lib/providers/catalog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Captions,
@@ -110,17 +111,18 @@ export function WatchPlayer({
   const displayPlaying = isEmbed ? true : playing;
 
   const resolveStreams = useCallback(async () => {
-    const params = new URLSearchParams({ id: mediaId });
-    if (season) params.set("season", String(season));
-    if (episode) params.set("episode", String(episode));
-
-    const response = await fetch(`/api/resolve?${params.toString()}`);
-    const data = (await response.json()) as {
-      sources?: ResolvedSource[];
-      error?: string;
-    };
-    if (!response.ok) throw new Error(data.error || "Unable to resolve this stream.");
-    return data.sources ?? [];
+    try {
+      const resolved = await catalogProvider.resolveStreams(mediaId, {
+        season: season || undefined,
+        episode: episode || undefined,
+      });
+      return resolved.map((source, index) => ({
+        ...source,
+        sourceIndex: index,
+      })) as ResolvedSource[];
+    } catch (err: any) {
+      throw new Error(err.message || "Unable to resolve this stream.");
+    }
   }, [mediaId, season, episode]);
 
   const showControls = useCallback(() => {
@@ -366,7 +368,7 @@ export function WatchPlayer({
     const video = videoRef.current;
     if (!video || isEmbed) return;
     if (video.paused) {
-      await video.play();
+      try { await video.play(); } catch(e) {}
       setPlaying(true);
     } else {
       video.pause();

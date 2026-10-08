@@ -1,4 +1,3 @@
-import "server-only";
 
 import * as movieboxWeb from "./moviebox/web";
 import type {

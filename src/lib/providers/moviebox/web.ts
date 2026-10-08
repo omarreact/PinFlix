@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import "server-only";
 
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
 import type { SeriesNavigation } from "../contracts";
@@ -385,36 +384,6 @@ export async function resolveStreams(
     console.error("MovieBox resolveStreams play error:", formatError(error));
   }
 
-  try {
-    const detailUrl = new URL("/wefeed-h5api-bff/detail", API_BASE);
-    detailUrl.searchParams.set("detailPath", parsed.detailPath);
-    const detail = await fetchJson<H5ApiResponse<any>>(detailUrl);
-    const trailerUrl =
-      detail.data?.subject?.trailer?.videoAddress?.url ||
-      detail.data?.subject?.trailer?.url ||
-      detail.data?.trailer?.videoAddress?.url;
-
-    if (trailerUrl) {
-      pushStream(
-        validSources,
-        trailerUrl,
-        validSources.length ? "Trailer" : "Preview (Trailer)",
-        "native",
-        5,
-      );
-    }
-  } catch (error) {
-    console.error("MovieBox trailer fallback error:", formatError(error));
-  }
-
-  const embedUrl = new URL(`/detail/${parsed.detailPath}`, SITE_BASE);
-  embedUrl.searchParams.set("id", parsed.subjectId);
-  embedUrl.searchParams.set("type", "/movie/detail");
-  embedUrl.searchParams.set("lang", "en");
-  if (season > 0) embedUrl.searchParams.set("se", String(season));
-  if (episode > 0) embedUrl.searchParams.set("ep", String(episode));
-
-  pushStream(validSources, embedUrl.toString(), "Watch on MoviBox", "embed", 1);
 
   if (validSources.length > 0 && topStreamId) {
     try {

@@ -5,6 +5,7 @@ import { AppShell } from "@/src/components/app-shell";
 export const metadata: Metadata = {
   title: "PinFlix — Movies & Web Series",
   description: "Discover movies and web series in a cinematic PinFlix experience.",
+  referrer: "no-referrer",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
