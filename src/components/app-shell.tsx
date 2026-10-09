@@ -11,6 +11,7 @@ const nav = [
   { href: "/movies", label: "Movies" },
   { href: "/series", label: "Series" },
   { href: "/saved", label: "My List" },
+  { href: "/history", label: "History" },
   { href: "/login", label: "Login" },
 ];
 
@@ -23,7 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-bg text-fg">
       <header className="fixed inset-x-0 top-4 z-50 px-3 sm:px-5">
-        <div className="glass-nav mx-auto flex min-h-[64px] w-full max-w-7xl items-center justify-between gap-3 rounded-full px-4 py-2.5 sm:px-6">
+        <div className="glass-nav mx-auto flex min-h-[64px] w-full max-w-7xl items-center justify-between gap-3 rounded-2xl px-4 py-2.5 sm:px-6">
           <div className="flex min-w-0 items-center gap-4 lg:gap-8">
             <Link href="/" className="media-focus flex min-h-11 shrink-0 items-center gap-2 rounded-full font-black tracking-tight">
               <PlayCircle className="text-brand" size={29} fill="currentColor" />
@@ -43,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="ml-auto flex w-[min(48vw,420px)] min-w-[150px] items-center gap-2">
             <LiveSearch />
-            <Link href="/saved" aria-label="Open My List" className="media-focus hidden h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-gradient-to-br from-brand/35 to-brand-2/35 text-white shadow-inner sm:grid">
+            <Link href="/saved" aria-label="Open My List" className="media-focus hidden h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-white hover:bg-white/10 sm:grid">
               <UserRound size={17} />
             </Link>
           </div>
