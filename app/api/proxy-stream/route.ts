@@ -3,21 +3,20 @@ import { catalogProvider } from "@/src/lib/providers/catalog";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_MEDIA_HOSTS = new Set([
-  "bcdnxw.hakunaymatata.com",
-  "cacdn.hakunaymatata.com",
-  "macdn.aoneroom.com",
-  "pacdn.aoneroom.com",
-  "pbcdn.aoneroom.com",
-  "pbcdnw.aoneroom.com",
-  "sbcdnw.hakunaymatata.com",
-]);
+const ALLOWED_MEDIA_HOST_SUFFIXES = ["aoneroom.com", "hakunaymatata.com"];
+const STREAM_TIMEOUT_MS = 30_000;
 
 function positiveInteger(value: string | null) {
   const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 && parsed <= 10_000
-    ? parsed
-    : undefined;
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= 10_000 ? parsed : undefined;
+}
+
+function isAllowedMediaUrl(url: URL) {
+  const host = url.hostname.toLowerCase();
+  return (
+    url.protocol === "https:" &&
+    ALLOWED_MEDIA_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))
+  );
 }
 
 function playerReferer(id: string, season: number, episode: number) {
@@ -31,6 +30,34 @@ function playerReferer(id: string, season: number, episode: number) {
   url.searchParams.set("detailEp", episode > 0 ? String(episode) : "");
   url.searchParams.set("lang", "en");
   return url.toString();
+}
+
+function proxiedUrl(mediaUrl: URL, id: string, season: number, episode: number) {
+  const params = new URLSearchParams({
+    id,
+    url: mediaUrl.toString(),
+    season: String(season),
+    episode: String(episode),
+  });
+  return `/api/proxy-stream?${params.toString()}`;
+}
+
+function rewriteManifest(manifest: string, baseUrl: URL, id: string, season: number, episode: number) {
+  return manifest
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        return line.replace(/URI="([^"]+)"/g, (_match, uri: string) => {
+          const absolute = new URL(uri, baseUrl);
+          return `URI="${proxiedUrl(absolute, id, season, episode)}"`;
+        });
+      }
+
+      const absolute = new URL(trimmed, baseUrl);
+      return proxiedUrl(absolute, id, season, episode);
+    })
+    .join("\n");
 }
 
 async function proxyStream(request: Request, method: "GET" | "HEAD") {
@@ -49,12 +76,8 @@ async function proxyStream(request: Request, method: "GET" | "HEAD") {
     return new Response("Invalid media URL", { status: 400 });
   }
 
-  if (
-    mediaUrl.protocol !== "https:" ||
-    !ALLOWED_MEDIA_HOSTS.has(mediaUrl.hostname.toLowerCase()) ||
-    !/\.mp4$/i.test(mediaUrl.pathname)
-  ) {
-    return new Response("Media host or format is not allowed", { status: 403 });
+  if (!isAllowedMediaUrl(mediaUrl)) {
+    return new Response("Media host is not allowed", { status: 403 });
   }
 
   const season = positiveInteger(requestUrl.searchParams.get("season")) ?? 0;
@@ -64,6 +87,7 @@ async function proxyStream(request: Request, method: "GET" | "HEAD") {
 
   const headers = new Headers({
     Accept: request.headers.get("accept") ?? "*/*",
+    Origin: "https://movibox.net",
     Referer: referer,
     "User-Agent": request.headers.get("user-agent") ?? "Mozilla/5.0",
   });
@@ -73,14 +97,35 @@ async function proxyStream(request: Request, method: "GET" | "HEAD") {
     if (value) headers.set(name, value);
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
+
   try {
     const upstream = await fetch(mediaUrl, {
       method,
       headers,
       cache: "no-store",
       redirect: "follow",
-      signal: AbortSignal.timeout(30_000),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
+
+    const contentType = upstream.headers.get("content-type") ?? "";
+    const isManifest =
+      /mpegurl|vnd\.apple\.mpegurl|x-mpegurl/i.test(contentType) || /\.m3u8(?:$|[?#])/i.test(mediaUrl.href);
+
+    if (method === "GET" && isManifest) {
+      const text = await upstream.text();
+      return new Response(rewriteManifest(text, mediaUrl, id, season, episode), {
+        status: upstream.status,
+        headers: {
+          "Cache-Control": "private, no-store, no-cache, max-age=0",
+          "Content-Type": "application/vnd.apple.mpegurl; charset=utf-8",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
 
     const outgoing = new Headers({
       "Cache-Control": "private, no-store, no-cache, max-age=0",
@@ -104,6 +149,7 @@ async function proxyStream(request: Request, method: "GET" | "HEAD") {
       headers: outgoing,
     });
   } catch (error) {
+    clearTimeout(timeout);
     console.error("MovieBox stream proxy error:", error);
     return new Response("MovieBox stream is temporarily unavailable", {
       status: 502,
