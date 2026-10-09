@@ -130,7 +130,7 @@ export function WatchPlayer({
     video.addEventListener("timeupdate", record);
     video.addEventListener("ended", record);
     return () => { record(); video.removeEventListener("timeupdate", record); video.removeEventListener("ended", record); };
-  }, [mediaId, title, historyItem, season, episode]);
+  }, [mediaId, title, historyItem?.slug, historyItem?.kind, historyItem?.poster, historyItem?.year, historyItem?.genres, season, episode]);
 
   const source = sources[sourcePosition];
   const isEmbed = source?.protocol === "embed";
