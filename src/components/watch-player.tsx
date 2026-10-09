@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { saveProgress } from "@/src/lib/history";
+import type { SavedTitle } from "@/src/lib/saved";
+import { toWebVtt } from "@/src/lib/subtitles";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -49,9 +52,7 @@ async function srtToVttBlobUrl(srtUrl: string): Promise<string> {
     const response = await fetch(srtUrl);
     if (!response.ok) throw new Error("Failed to fetch subtitle");
     const srtText = await response.text();
-    const vttText =
-      "WEBVTT\n\n" +
-      srtText.replace(/\r\n|\r/g, "\n").replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
+    const vttText = toWebVtt(srtText);
     return URL.createObjectURL(new Blob([vttText], { type: "text/vtt" }));
   } catch (error) {
     console.error("Subtitle load error:", error);
@@ -61,6 +62,7 @@ async function srtToVttBlobUrl(srtUrl: string): Promise<string> {
 
 export function WatchPlayer({
   mediaId,
+  historyItem,
   title,
   subtitle,
   backHref,
@@ -69,6 +71,7 @@ export function WatchPlayer({
   episode,
 }: {
   mediaId: string;
+  historyItem?: SavedTitle;
   title: string;
   subtitle?: string;
   backHref: string;
@@ -80,6 +83,8 @@ export function WatchPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<import("hls.js").default | null>(null);
+  const refreshAttemptsRef = useRef(0);
+  const subtitleBlobUrlsRef = useRef<string[]>([]);
   const failoverRef = useRef<() => void>(() => undefined);
   const qualityMenuRef = useRef<HTMLDivElement>(null);
   const subtitleMenuRef = useRef<HTMLDivElement>(null);
@@ -105,6 +110,11 @@ export function WatchPlayer({
   const [buffered, setBuffered] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    subtitleBlobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+  }, []);
 
   const source = sources[sourcePosition];
   const isEmbed = source?.protocol === "embed";
@@ -232,7 +242,8 @@ export function WatchPlayer({
     const failover = () => {
       if (cancelled || isRefreshing) return;
 
-      if (video.currentTime > 5) {
+      if (video.currentTime > 5 && sourcePosition + 1 >= sources.length && refreshAttemptsRef.current < 1) {
+        refreshAttemptsRef.current += 1;
         isRefreshing = true;
         setStatus("switching");
         const resumeKey = `pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`;
@@ -256,6 +267,7 @@ export function WatchPlayer({
       }
 
       const nextPosition = sourcePosition + 1;
+      if (video.currentTime > 0) window.localStorage.setItem(`pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`, String(video.currentTime));
       if (nextPosition < sources.length) {
         setStatus("switching");
         setSourcePosition(nextPosition);
@@ -265,6 +277,9 @@ export function WatchPlayer({
       }
     };
     failoverRef.current = failover;
+    const startupTimeout = window.setTimeout(() => {
+      if (!cancelled && video.readyState < 2) failover();
+    }, 15_000);
 
     if (source.protocol === "hls" && !video.canPlayType("application/vnd.apple.mpegurl")) {
       void import("hls.js")
@@ -294,15 +309,17 @@ export function WatchPlayer({
         .catch(() => failover());
     } else if (source.protocol === "native" || source.protocol === "hls") {
       video.src = source.url;
+      video.addEventListener("loadedmetadata", playResolved, { once: true });
       video.load();
-      playResolved();
     }
 
     return () => {
       cancelled = true;
       window.clearTimeout(boot);
+      window.clearTimeout(startupTimeout);
       hlsRef.current?.destroy();
       hlsRef.current = null;
+      video.removeEventListener("loadedmetadata", playResolved);
       video.pause();
       video.removeAttribute("src");
       video.load();
@@ -379,8 +396,10 @@ export function WatchPlayer({
     const video = videoRef.current;
     if (!video || isEmbed) return;
     if (video.paused) {
-      try { await video.play(); } catch(e) {}
-      setPlaying(true);
+      try { await video.play(); } catch {
+        setPlaying(false);
+        setError("Playback could not start. Try another source.");
+      }
     } else {
       video.pause();
       setPlaying(false);
@@ -413,6 +432,8 @@ export function WatchPlayer({
 
   function chooseSource(position: number) {
     window.localStorage.setItem("pinflix-quality", sources[position]?.quality ?? "");
+    const video = videoRef.current;
+    if (video && video.currentTime > 0) window.localStorage.setItem(`pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`, String(video.currentTime));
     setQualityOpen(false);
     setSourcePosition(position);
   }
@@ -434,6 +455,7 @@ export function WatchPlayer({
     const trackObj = subtitleTracks.find((t) => t.language === value);
     if (trackObj && !trackObj.blobUrl && trackObj.url) {
       const blobUrl = await srtToVttBlobUrl(trackObj.url);
+      if (blobUrl) subtitleBlobUrlsRef.current.push(blobUrl);
       setSubtitleTracks((tracks) =>
         tracks.map((t) => (t.language === value ? { ...t, blobUrl } : t)),
       );
@@ -501,28 +523,27 @@ export function WatchPlayer({
               const resumeKey = `pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`;
               if (Math.floor(video.currentTime) % 5 === 0) {
                 window.localStorage.setItem(resumeKey, String(video.currentTime));
+                if (historyItem && Number.isFinite(video.duration)) saveProgress({ ...historyItem, season, episode, position: video.currentTime, duration: video.duration, updatedAt: Date.now(), completed: false });
               }
             }}
             onDurationChange={() => setDuration(videoRef.current?.duration || 0)}
             onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
             onError={() => failoverRef.current()}
             onEnded={() => {
+              const video = videoRef.current;
+              if (historyItem && video && Number.isFinite(video.duration)) saveProgress({ ...historyItem, season, episode, position: video.duration, duration: video.duration, updatedAt: Date.now(), completed: true });
+              window.localStorage.removeItem(`pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`);
               if (nextHref) router.push(nextHref);
             }}
             onClick={() => void togglePlayback()}
-          />
+          >
+            {subtitleTracks.map((track) => (
+              <track key={track.language} kind="subtitles" srcLang={track.language} label={track.label} src={track.blobUrl || track.url} />
+            ))}
+          </video>
         )}
 
-        {!isEmbed &&
-          subtitleTracks.map((track) => (
-            <track
-              key={track.language}
-              kind="subtitles"
-              srcLang={track.language}
-              label={track.label}
-              src={track.blobUrl || track.url}
-            />
-          ))}
+
 
         <div
           className={`absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 bg-gradient-to-b from-black/90 via-black/35 to-transparent px-4 pb-16 pt-4 transition-opacity md:px-8 md:pt-6 ${
@@ -710,7 +731,7 @@ export function WatchPlayer({
 
           {isEmbed && (
             <p className="px-3 text-xs text-zinc-400">
-              Playing via movibox.net player · switch quality above if available
+              Switch quality above if available
             </p>
           )}
 

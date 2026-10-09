@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { notFound, useRouter } from "next/navigation";
 import { ListVideo, Loader2 } from "lucide-react";
 import { WatchPlayer } from "@/src/components/watch-player";
-import { catalogProvider } from "@/src/lib/providers/catalog";
 import type { Entertainment } from "@/src/types/catalog";
 import type { SeriesNavigation } from "@/src/lib/providers/contracts";
 
@@ -26,37 +24,32 @@ export function WatchClient({
   requestedSeason: number;
   requestedEpisode: number;
 }) {
-  const router = useRouter();
   const [item, setItem] = useState<Entertainment | null>(null);
   const [navigation, setNavigation] = useState<SeriesNavigation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function loadData() {
       try {
-        if (!catalogProvider.canHandleId(mediaId)) {
-          setError(true);
-          return;
+        const params = new URLSearchParams({ id: mediaId, season: String(requestedSeason) });
+        const response = await fetch(`/api/catalog/details?${params}`, { signal: controller.signal });
+        if (!response.ok) throw new Error("Title unavailable");
+        const data = await response.json() as { item: Entertainment; navigation: SeriesNavigation | null };
+        if (!controller.signal.aborted) {
+          setItem(data.item);
+          setNavigation(data.navigation);
+          setError(false);
         }
-        const details = await catalogProvider.getDetails(mediaId);
-        if (!details) {
-          setError(true);
-          return;
-        }
-        setItem(details);
-        if (details.kind === "show") {
-          const nav = await catalogProvider.getSeriesNavigation(details.id, requestedSeason);
-          setNavigation(nav);
-        }
-      } catch (err) {
-        console.error(err);
-        setError(true);
+      } catch {
+        if (!controller.signal.aborted) setError(true);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
-    loadData();
+    void loadData();
+    return () => controller.abort();
   }, [mediaId, requestedSeason]);
 
   if (error) {
@@ -95,6 +88,8 @@ export function WatchClient({
   return (
     <div className="min-h-screen bg-bg text-white">
       <WatchPlayer
+        key={`${item.id}-${season}-${episode}`}
+        historyItem={item}
         mediaId={item.id}
         title={item.title}
         subtitle={subtitle}

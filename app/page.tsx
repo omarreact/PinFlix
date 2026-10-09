@@ -1,10 +1,11 @@
+import { WatchHistory } from "@/src/components/watch-history";
 import { Suspense } from "react";
 import { EntertainmentRail } from "@/src/components/catalog-sections";
 import { HomeHero } from "@/src/components/home-hero";
 import { BrowseTabs } from "@/src/components/browse-tabs";
 import { getTmdbTrending } from "@/src/lib/tmdb";
 
-export const revalidate = 120;
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const trending = await getTmdbTrending().catch(() => []);
@@ -20,6 +21,7 @@ export default async function HomePage() {
           <BrowseTabs active="all" />
         </Suspense>
 
+        <WatchHistory compact />
         {movies.length > 0 && <EntertainmentRail title="Trending Movies" items={movies} href="/movies" />}
         {series.length > 0 && <EntertainmentRail title="Trending Series" items={series} href="/series" />}
 

@@ -7,7 +7,7 @@ import { env } from "@/src/lib/env";
 
 const schema = z.object({
   email: z.email(),
-  password: z.string().min(8),
+  password: z.string().min(8).max(128),
 });
 
 export async function POST(request: Request) {
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     where: { email: parsed.data.email.toLowerCase() },
   });
 
-  if (!user) {
+  if (!user || user.status !== "ACTIVE") {
     return Response.json({ error: { code: "INVALID_CREDENTIALS", message: "Invalid email or password." } }, { status: 401 });
   }
 

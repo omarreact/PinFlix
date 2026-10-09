@@ -73,15 +73,18 @@ async function proxyStream(request: Request, method: "GET" | "HEAD") {
     if (value) headers.set(name, value);
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
   try {
     const upstream = await fetch(mediaUrl, {
       method,
       headers,
       cache: "no-store",
       redirect: "follow",
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.any([controller.signal, request.signal]),
     });
 
+    clearTimeout(timeout);
     const outgoing = new Headers({
       "Cache-Control": "private, no-store, no-cache, max-age=0",
       "X-Content-Type-Options": "nosniff",
@@ -104,6 +107,7 @@ async function proxyStream(request: Request, method: "GET" | "HEAD") {
       headers: outgoing,
     });
   } catch (error) {
+    clearTimeout(timeout);
     console.error("MovieBox stream proxy error:", error);
     return new Response("MovieBox stream is temporarily unavailable", {
       status: 502,

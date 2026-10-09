@@ -33,7 +33,7 @@ export function HomeHero({ item }: { item?: Entertainment }) {
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-md">
             <span className="h-2 w-2 rounded-full bg-brand shadow-[0_0_14px_rgba(230,57,70,.9)]" />
             <span className="text-[11px] font-bold uppercase tracking-[.18em] text-zinc-300">
-              {item ? (item.provider === "tmdb" ? "Trending on TMDB" : "Featured on MovieBox") : "PinFlix"}
+              {item ? (item.provider === "tmdb" ? "Trending on TMDB" : item.provider === "demo" ? "Demo screening" : "Featured on PinFlix") : "PinFlix"}
             </span>
           </div>
 

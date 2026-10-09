@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { rewriteManifest } from "@/src/lib/media-manifest";
+import { toWebVtt } from "@/src/lib/subtitles";
 import {
   fetchCineplexOrigin,
   isAllowedCineplexUrl,
@@ -29,40 +31,7 @@ function transformVodUrl(url: URL) {
   return mapped;
 }
 
-function toProxyUrl(url: string) {
-  return `/api/proxy-video?url=${encodeURIComponent(url)}`;
-}
-
-function resolveUri(baseUrl: string, value: string) {
-  try {
-    return new URL(value, baseUrl).toString();
-  } catch {
-    return value;
-  }
-}
-
-function rewriteManifest(manifest: string, manifestUrl: string) {
-  return manifest
-    .split(/\r?\n/)
-    .map((line) => {
-      if (!line) return line;
-
-      if (line.startsWith("#")) {
-        return line.replace(
-          /(URI\s*=\s*)(["']?)([^"',\s]+)\2/gi,
-          (_match, prefix: string, quote: string, target: string) => {
-            const resolved = resolveUri(manifestUrl, target);
-            return `${prefix}${quote}${toProxyUrl(resolved)}${quote}`;
-          },
-        );
-      }
-
-      return toProxyUrl(resolveUri(manifestUrl, line.trim()));
-    })
-    .join("\n");
-}
-
-export async function GET(req: NextRequest) {
+async function proxy(req: NextRequest, method: "GET" | "HEAD") {
   const rawUrl = req.nextUrl.searchParams.get("url");
   if (!rawUrl) return new Response("Missing url parameter", { status: 400 });
 
@@ -90,16 +59,22 @@ export async function GET(req: NextRequest) {
     headers.set("Range", range);
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
   try {
     const response = await fetchCineplexOrigin(upstreamUrl, {
-      method: req.method,
+      method,
       headers,
       cache: "no-store",
       redirect: "follow",
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.any([controller.signal, req.signal]),
     });
 
-    if (!response.ok || !response.body) {
+    clearTimeout(timeout);
+    if (response.status === 416) {
+      return new Response(null, { status: 416, headers: { "Content-Range": response.headers.get("content-range") ?? "bytes */*", "Cache-Control": "no-store" } });
+    }
+    if (!response.ok || (method !== "HEAD" && !response.body)) {
       return new Response("CineplexBD media unavailable", {
         status: response.status || 502,
         headers: { "Cache-Control": "no-store" },
@@ -111,7 +86,10 @@ export async function GET(req: NextRequest) {
       /\.m3u8(?:$|[?#])/i.test(upstreamUrl.pathname) ||
       /mpegurl|m3u8/i.test(contentType);
 
-    if (isManifest) {
+    if (method !== "HEAD" && /\.(srt|vtt)$/i.test(upstreamUrl.pathname)) {
+      return new Response(toWebVtt(await response.text()), { headers: { "Content-Type": "text/vtt; charset=utf-8", "Cache-Control": "private, no-store" } });
+    }
+    if (method !== "HEAD" && isManifest) {
       const text = await response.text();
       return new Response(rewriteManifest(text, upstreamUrl.toString()), {
         status: 200,
@@ -135,12 +113,19 @@ export async function GET(req: NextRequest) {
       if (value) outgoing.set(name, value);
     }
 
-    return new Response(response.body, {
+    return new Response(method === "HEAD" ? null : response.body, {
       status: response.status,
       headers: outgoing,
     });
   } catch (error) {
+    clearTimeout(timeout);
     console.error("CineplexBD media proxy error:", error);
     return new Response("CineplexBD media proxy unavailable", { status: 502 });
   }
+}
+
+export async function GET(req: NextRequest) { return proxy(req, "GET"); }
+export async function HEAD(req: NextRequest) { return proxy(req, "HEAD"); }
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: { "Allow": "GET, HEAD, OPTIONS", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS", "Access-Control-Allow-Headers": "Range, If-Range" } });
 }

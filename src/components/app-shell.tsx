@@ -11,6 +11,8 @@ const nav = [
   { href: "/movies", label: "Movies" },
   { href: "/series", label: "Series" },
   { href: "/saved", label: "My List" },
+  { href: "/history", label: "History" },
+  { href: "/admin", label: "Admin" },
   { href: "/login", label: "Login" },
 ];
 
@@ -72,7 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       <footer className="border-t border-white/5 px-5 py-8 text-center text-xs text-zinc-600">
-        <p>Movie and TV discovery uses TMDB when configured, with the MovieBox catalog as a fallback.</p>
+        <p>PinFlix · Your cinema, wherever you are.</p>
       </footer>
     </div>
   );

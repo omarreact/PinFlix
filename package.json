@@ -8,7 +8,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
-    "check": "npm run lint && npm run test && npm run build",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:setup": "prisma generate && prisma db push",
@@ -17,7 +17,9 @@
     "dev:vinext": "vite dev --port 3001",
     "build:vinext": "vite build",
     "start:vinext": "vite preview",
-    "deploy:vinext": "vinext-cloudflare deploy"
+    "deploy:vinext": "vinext-cloudflare deploy",
+    "ingest": "node --env-file-if-exists=.env --import tsx scripts/ingest.ts",
+    "admin:setup": "node --env-file-if-exists=.env --import tsx scripts/create-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
