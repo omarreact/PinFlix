@@ -73,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       <footer className="border-t border-white/5 px-5 py-8 text-center text-xs text-zinc-600">
-        <p>Movie and TV discovery uses TMDB when configured, with the MovieBox catalog as a fallback.</p>
+        <p>PinFlix keeps discovery minimal, artwork-led, and focused on playable provider-backed titles.</p>
       </footer>
     </div>
   );
