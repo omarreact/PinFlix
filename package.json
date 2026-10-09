@@ -19,7 +19,8 @@
     "start:vinext": "vite preview",
     "deploy:vinext": "vinext-cloudflare deploy",
     "ingest": "node --env-file-if-exists=.env --import tsx scripts/ingest.ts",
-    "admin:setup": "node --env-file-if-exists=.env --import tsx scripts/create-admin.ts"
+    "admin:setup": "node --env-file-if-exists=.env --import tsx scripts/create-admin.ts",
+    "hosting:check": "node --env-file-if-exists=.env scripts/hosting-check.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

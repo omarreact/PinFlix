@@ -19,19 +19,18 @@ Ask the host whether server-side connections to `http://cds3.cineplexbd.net/inde
 ## Node application setup
 
 1. Create a Node 24 application in cPanel, in production mode, with startup file `server.cjs`. Point its application URL at the desired domain.
-2. Upload/clone the repository into its application root. Keep `.env`, SQLite files and the repository outside any publicly served static directory.
-3. Activate the environment shown by cPanel, then run:
+2. Upload/clone the repository into its application root. Keep `.env`, SQLite files and the repository outside any publicly served static directory. Activate the Node environment shown by cPanel.
+3. Run `npm ci` and copy `.env.example` to `.env`. Before database setup or the build, set `PINFLIX_DEPLOY_TARGET=cpanel`, a unique random `AUTH_SECRET`, `NODE_ENV=production`, `NEXT_PUBLIC_APP_URL=https://pinflix.pincodeit.com`, and an absolute database URL such as `DATABASE_URL=file:/home/ACCOUNT/pinflix-data/pinflix.db`. Use `CATALOG_PROVIDER=demo` for the persisted library. Create that private writable database directory.
+4. Run:
 
    ```bash
-   npm ci
-   cp .env.example .env
+   npm run hosting:check
    npm run db:setup
    npm run build
    ```
 
-Set the environment variables in step 4 before database setup and the production build.
+   The hosting check reports Node compatibility, database directory write access, available build, cron command and CineplexBD connectivity. An initial `productionBuildExists: false` is expected before the build. It prints no credential values. If the origin is unreachable, fix hosting/network access before enabling production streaming.
 
-4. Set `PINFLIX_DEPLOY_TARGET=cpanel`, a unique random `AUTH_SECRET`, `NODE_ENV=production`, `NEXT_PUBLIC_APP_URL=https://pinflix.pincodeit.com`, and an absolute database URL such as `DATABASE_URL=file:/home/ACCOUNT/pinflix-data/pinflix.db`. Create that private writable directory before running database setup. Set `CATALOG_PROVIDER=demo` to read the persisted library, including imported titles; this does not require seeded demo content.
 5. Set `ADMIN_EMAIL` and a strong `ADMIN_PASSWORD` temporarily, run `npm run admin:setup`, then remove the bootstrap password. Do not run the destructive demo seed on the production library.
 6. Run `npm run ingest` and inspect the summary. A failed scan does not mean the deployment is connected to BDIX.
 7. Restart the application in cPanel, enable AutoSSL, and verify `/api/health`, a detail page, video playback, seeking and subtitles.
