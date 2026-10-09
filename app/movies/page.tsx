@@ -4,6 +4,7 @@ import { EntertainmentGrid } from "@/src/components/catalog-sections";
 import { catalogProvider } from "@/src/lib/providers/catalog";
 
 export const revalidate = 180;
+export const preferredRegion = "sin1";
 
 type SearchParams = Promise<{ page?: string }>;
 
