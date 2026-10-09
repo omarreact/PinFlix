@@ -8,6 +8,7 @@ import { getHomeSections } from "@/src/lib/providers/moviebox/web";
 import type { Entertainment } from "@/src/types/catalog";
 
 export const revalidate = 120;
+export const preferredRegion = "sin1";
 
 function uniqueItems(items: Entertainment[]) {
   return [...new Map(items.map((item) => [item.id, item])).values()];
