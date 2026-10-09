@@ -1,5 +1,6 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const preferredRegion = "sin1";
 
 const H5 = "https://h5-api.aoneroom.com";
 
@@ -29,8 +30,7 @@ async function probe(path: string, init?: RequestInit) {
         data?: { items?: unknown[]; operatingList?: unknown[] };
       };
       code = typeof json.code === "number" ? json.code : null;
-      itemCount =
-        json.data?.items?.length ?? json.data?.operatingList?.length ?? 0;
+      itemCount = json.data?.items?.length ?? json.data?.operatingList?.length ?? 0;
     } catch {
       /* not json */
     }
@@ -67,13 +67,13 @@ export async function GET() {
   ]);
 
   const reachable = Boolean(home.ok || filter.ok);
-
   const rateLimited = Boolean(home.rateLimited || filter.rateLimited);
 
   return Response.json(
     {
       ok: reachable,
       degraded: !reachable,
+      region: "sin1",
       reason: rateLimited ? "moviebox_upstream_rate_limited" : reachable ? null : "moviebox_upstream_unreachable",
       service: "pinflix",
       catalog: {
