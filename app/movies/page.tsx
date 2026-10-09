@@ -1,27 +1,27 @@
 import Link from "next/link";
 import { Film } from "lucide-react";
 import { EntertainmentGrid } from "@/src/components/catalog-sections";
-import { getTmdbDiscover } from "@/src/lib/tmdb";
+import { catalogProvider } from "@/src/lib/providers/catalog";
 
-export const revalidate = 300;
+export const revalidate = 180;
 
 type SearchParams = Promise<{ page?: string }>;
 
 export default async function MoviesPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
-  const catalog = await getTmdbDiscover("movie", page).catch(() => ({ items: [], page, hasNextPage: false }));
+  const catalog = await catalogProvider.getLatestPage("movie", page).catch(() => ({ items: [], page, hasNextPage: false }));
 
   return (
     <div className="space-y-9">
       <section className="animate-slide-up">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold uppercase tracking-[.16em] text-accent">
           <Film size={14} />
-          Movie catalog
+          Playable catalog
         </div>
         <h1 className="text-4xl font-black tracking-[-.04em] text-gradient md:text-5xl">Movies</h1>
         <p className="mt-3 max-w-2xl text-sm font-light leading-6 text-zinc-400">
-          Browse movie titles and artwork from the available catalog.
+          Browse provider-backed movies that open directly into the PinFlix player.
         </p>
       </section>
 
