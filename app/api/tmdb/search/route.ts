@@ -1,4 +1,4 @@
-import { searchTmdb } from "@/src/lib/tmdb";
+import { catalogProvider } from "@/src/lib/providers/catalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,14 +23,22 @@ export async function GET(request: Request) {
   }
 
   try {
-    const data = await searchTmdb(query, page);
-    return Response.json(data, {
-      headers: {
-        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+    const results = await catalogProvider.search(query, page);
+    return Response.json(
+      {
+        page,
+        results,
+        totalPages: results.length ? page + 1 : page,
+        totalResults: results.length,
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
+        },
+      },
+    );
   } catch (error) {
-    console.error("TMDB search failed", error);
-    return Response.json({ error: "TMDB search unavailable" }, { status: 502 });
+    console.error("Provider search failed", error);
+    return Response.json({ error: "Search unavailable" }, { status: 502 });
   }
 }
