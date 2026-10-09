@@ -71,8 +71,8 @@ export function LiveSearch() {
             onFocus={() => query.trim() && setOpen(true)}
             onBlur={() => window.setTimeout(() => setOpen(false), 160)}
             type="search"
-            placeholder="Search movies and TV"
-            aria-label="Search movies and TV shows"
+            placeholder="Search playable titles"
+            aria-label="Search playable movies and TV shows"
             className="min-w-0 flex-1 bg-transparent px-2 text-sm text-white placeholder:text-zinc-500"
           />
         </label>
@@ -81,46 +81,39 @@ export function LiveSearch() {
       {open && (
         <div className="absolute right-0 top-12 z-[80] w-[min(92vw,440px)] overflow-hidden rounded-2xl border border-white/10 bg-[#120303]/95 shadow-2xl backdrop-blur-2xl">
           {loading ? (
-            <div className="p-4 text-sm text-zinc-400">Searching TMDB…</div>
+            <div className="p-4 text-sm text-zinc-400">Searching playable catalog…</div>
           ) : results.length ? (
             <>
-              {results.map((item) => {
-                const type = item.kind === "show" ? "tv" : "movie";
-                return (
-                  <Link
-                    key={item.id}
-                    href={
-                      item.provider === "tmdb"
-                        ? `/title/${type}/${item.providerId}`
-                        : `/entertainment/${item.id}`
-                    }
-                    className="flex items-center gap-3 border-b border-white/5 p-3 transition hover:bg-white/[.06]"
-                  >
-                    <div className="h-[66px] w-11 shrink-0 overflow-hidden rounded-lg bg-white/5">
-                      {item.poster ? (
-                        <img src={item.poster} alt="" className="h-full w-full object-cover" />
-                      ) : null}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        {item.kind === "show" ? (
-                          <Tv size={13} className="text-accent" />
-                        ) : (
-                          <Film size={13} className="text-accent" />
-                        )}
-                        <p className="truncate text-sm font-semibold text-white">{item.title}</p>
-                      </div>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {item.kind === "show" ? "TV Series" : "Movie"}
-                        {item.year ? " · " + item.year : ""}
-                      </p>
-                      {item.synopsis && (
-                        <p className="mt-1 line-clamp-1 text-xs text-zinc-400">{item.synopsis}</p>
+              {results.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/entertainment/${item.id}`}
+                  className="flex items-center gap-3 border-b border-white/5 p-3 transition hover:bg-white/[.06]"
+                >
+                  <div className="h-[66px] w-11 shrink-0 overflow-hidden rounded-lg bg-white/5">
+                    {item.poster ? (
+                      <img src={item.poster} alt="" className="h-full w-full object-cover" />
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      {item.kind === "show" ? (
+                        <Tv size={13} className="text-accent" />
+                      ) : (
+                        <Film size={13} className="text-accent" />
                       )}
+                      <p className="truncate text-sm font-semibold text-white">{item.title}</p>
                     </div>
-                  </Link>
-                );
-              })}
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {item.kind === "show" ? "TV Series" : "Movie"}
+                      {item.year ? " · " + item.year : ""}
+                    </p>
+                    {item.synopsis && (
+                      <p className="mt-1 line-clamp-1 text-xs text-zinc-400">{item.synopsis}</p>
+                    )}
+                  </div>
+                </Link>
+              ))}
               <button
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
@@ -134,7 +127,7 @@ export function LiveSearch() {
               </button>
             </>
           ) : (
-            <div className="p-4 text-sm text-zinc-500">No matching movies or TV shows.</div>
+            <div className="p-4 text-sm text-zinc-500">No matching playable titles.</div>
           )}
         </div>
       )}
