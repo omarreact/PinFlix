@@ -3,15 +3,33 @@ import { Suspense } from "react";
 import { EntertainmentRail } from "@/src/components/catalog-sections";
 import { HomeHero } from "@/src/components/home-hero";
 import { BrowseTabs } from "@/src/components/browse-tabs";
-import { getTmdbTrending } from "@/src/lib/tmdb";
+import { catalogProvider } from "@/src/lib/providers/catalog";
+import { getHomeSections } from "@/src/lib/providers/moviebox/web";
+import type { Entertainment } from "@/src/types/catalog";
 
 export const revalidate = 120;
 
+function uniqueItems(items: Entertainment[]) {
+  return [...new Map(items.map((item) => [item.id, item])).values()];
+}
+
 export default async function HomePage() {
-  const trending = await getTmdbTrending().catch(() => []);
-  const movies = trending.filter((item) => item.kind === "movie").slice(0, 12);
-  const series = trending.filter((item) => item.kind === "show").slice(0, 12);
-  const featured = trending[0];
+  const [homeSections, movieCatalog, seriesCatalog] = await Promise.all([
+    getHomeSections().catch(() => []),
+    catalogProvider.getLatestPage("movie", 1).catch(() => ({ items: [], page: 1, hasNextPage: false })),
+    catalogProvider.getLatestPage("show", 1).catch(() => ({ items: [], page: 1, hasNextPage: false })),
+  ]);
+
+  const featuredItems = uniqueItems(homeSections.flatMap((section) => section.items));
+  const movies = uniqueItems([
+    ...featuredItems.filter((item) => item.kind === "movie"),
+    ...movieCatalog.items,
+  ]).slice(0, 12);
+  const series = uniqueItems([
+    ...featuredItems.filter((item) => item.kind === "show"),
+    ...seriesCatalog.items,
+  ]).slice(0, 12);
+  const featured = featuredItems[0] ?? movies[0] ?? series[0];
 
   return (
     <div>
@@ -22,13 +40,13 @@ export default async function HomePage() {
         </Suspense>
 
         <WatchHistory compact />
-        {movies.length > 0 && <EntertainmentRail title="Trending Movies" items={movies} href="/movies" />}
-        {series.length > 0 && <EntertainmentRail title="Trending Series" items={series} href="/series" />}
+        {movies.length > 0 && <EntertainmentRail title="Now Streaming Movies" items={movies} href="/movies" />}
+        {series.length > 0 && <EntertainmentRail title="Now Streaming Series" items={series} href="/series" />}
 
         {!featured && (
           <div className="glass-panel rounded-2xl p-7 text-zinc-400">
             <p className="font-bold text-white">Movie catalog temporarily unavailable</p>
-            <p className="mt-2 text-sm leading-6">PinFlix could not load titles from its catalog providers. Try again shortly.</p>
+            <p className="mt-2 text-sm leading-6">PinFlix could not load playable provider-backed titles. Try again shortly.</p>
           </div>
         )}
       </div>
