@@ -1,3 +1,4 @@
+import { isMediaEdgeUrl, resolveMediaEdgeStreams } from "@/src/lib/media-edge";
 import { catalogProvider } from "@/src/lib/providers/catalog";
 
 export const runtime = "nodejs";
@@ -24,15 +25,24 @@ export async function GET(request: Request) {
   const id = url.searchParams.get("id")?.trim() ?? "";
   const season = optionalPositiveInteger(url.searchParams.get("season")) ?? 0;
   const episode = optionalPositiveInteger(url.searchParams.get("episode")) ?? 0;
+  const providerCanHandle = catalogProvider.canHandleId(id);
 
-  if (!catalogProvider.canHandleId(id)) {
+  if (!providerCanHandle) {
     return Response.json({ error: "Unsupported provider title ID" }, { status: 400 });
   }
 
-  const streams = await catalogProvider.resolveStreams(id, {
-    season: season || undefined,
-    episode: episode || undefined,
-  });
+  const [mediaEdgeStreams, providerStreams] = await Promise.all([
+    resolveMediaEdgeStreams(id, {
+      season: season || undefined,
+      episode: episode || undefined,
+    }),
+    catalogProvider.resolveStreams(id, {
+      season: season || undefined,
+      episode: episode || undefined,
+    }),
+  ]);
+
+  const streams = [...mediaEdgeStreams, ...providerStreams].sort((a, b) => b.priority - a.priority);
 
   if (!streams.length) {
     return Response.json({ error: "Stream not found" }, { status: 404 });
@@ -41,9 +51,16 @@ export async function GET(request: Request) {
   return Response.json(
     {
       id,
+      mediaEdge: {
+        enabled: true,
+        matched: mediaEdgeStreams.length > 0,
+        sourceCount: mediaEdgeStreams.length,
+      },
       sources: streams.map((source, sourceIndex) => {
         const shouldProxy =
-          id.startsWith("mb-") && (source.protocol === "native" || source.protocol === "hls");
+          id.startsWith("mb-") &&
+          !isMediaEdgeUrl(source.url) &&
+          (source.protocol === "native" || source.protocol === "hls");
         const streamUrl = shouldProxy ? proxiedStreamUrl(id, source.url, season, episode) : source.url;
 
         return {
