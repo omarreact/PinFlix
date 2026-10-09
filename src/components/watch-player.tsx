@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { saveProgress } from "@/src/lib/history";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -67,6 +68,7 @@ export function WatchPlayer({
   nextHref,
   season,
   episode,
+  historyItem,
 }: {
   mediaId: string;
   title: string;
@@ -75,6 +77,7 @@ export function WatchPlayer({
   nextHref?: string;
   season?: number;
   episode?: number;
+  historyItem?: { slug: string; kind: "movie" | "show"; poster?: string; year?: number; genres?: string[] };
 }) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -105,6 +108,29 @@ export function WatchPlayer({
   const [buffered, setBuffered] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!historyItem) return;
+    const video = videoRef.current;
+    if (!video) return;
+    let lastSaved = 0;
+    const record = () => {
+      const position = video.currentTime;
+      const length = video.duration;
+      if (!Number.isFinite(position) || position < 1 || !Number.isFinite(length) || length <= 0) return;
+      if (Math.abs(position - lastSaved) < 10 && !video.ended) return;
+      lastSaved = position;
+      saveProgress({
+        id: mediaId, slug: historyItem.slug, title, kind: historyItem.kind,
+        poster: historyItem.poster, year: historyItem.year, genres: historyItem.genres,
+        season, episode, position, duration: length, updatedAt: Date.now(),
+        completed: video.ended || position / length >= 0.95,
+      });
+    };
+    video.addEventListener("timeupdate", record);
+    video.addEventListener("ended", record);
+    return () => { record(); video.removeEventListener("timeupdate", record); video.removeEventListener("ended", record); };
+  }, [mediaId, title, historyItem, season, episode]);
 
   const source = sources[sourcePosition];
   const isEmbed = source?.protocol === "embed";
