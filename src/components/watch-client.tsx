@@ -102,6 +102,7 @@ export function WatchClient({
         nextHref={nextHref}
         season={isSeries ? season : undefined}
         episode={isSeries ? episode : undefined}
+        historyItem={{ slug: item.slug, kind: item.kind, poster: item.poster, year: item.year, genres: item.genres }}
       />
 
       <div className="mx-auto max-w-[1400px] space-y-8 px-5 py-8 sm:px-8 md:px-12 md:py-12">
