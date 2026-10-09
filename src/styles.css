@@ -1,25 +1,25 @@
 @import "tailwindcss";
 
 @theme {
-  /* MoviBox-inspired cinematic palette (PDF blueprint + PinFlix brand) */
-  --color-bg: #0a0000;
-  --color-surface: #130303;
-  --color-elevated: #1c0606;
-  --color-panel: #1c0606;
-  --color-fg: #f0f0f2;
-  --color-ink: #f0f0f2;
+  /* Minimal streaming theme: neutral shell, artwork drives the page color. */
+  --color-bg: #030305;
+  --color-surface: #0d0d12;
+  --color-elevated: #15151d;
+  --color-panel: #111117;
+  --color-fg: #f5f5f7;
+  --color-ink: #f5f5f7;
   --color-muted: #a1a1aa;
   --color-subtle: #71717a;
-  --color-accent: #e63946;
-  --color-brand: #e63946;
-  --color-brand-2: #b5121e;
-  --color-coral: #ff4757;
+  --color-accent: #e50914;
+  --color-brand: #e50914;
+  --color-brand-2: #7f1d1d;
+  --color-coral: #ff6b6b;
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
   --color-border: rgba(255, 255, 255, 0.08);
   --color-line: rgba(255, 255, 255, 0.09);
-  --color-ring: #e63946;
+  --color-ring: #e50914;
   --radius-xs: 0.375rem;
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
@@ -30,14 +30,14 @@
 
 :root {
   color-scheme: dark;
-  --pinflix-bg: #0a0000;
-  --pinflix-bg-secondary: #130303;
-  --pinflix-bg-card: #1c0606;
-  --pinflix-accent: #e63946;
-  --pinflix-accent-hover: #ff4757;
-  --pinflix-accent-dim: rgba(230, 57, 70, 0.18);
-  --pinflix-text: #f0f0f2;
-  --pinflix-text-muted: hsla(240, 7%, 95%, 0.55);
+  --pinflix-bg: #030305;
+  --pinflix-bg-secondary: #0d0d12;
+  --pinflix-bg-card: #15151d;
+  --pinflix-accent: #e50914;
+  --pinflix-accent-hover: #ff6b6b;
+  --pinflix-accent-dim: rgba(229, 9, 20, 0.16);
+  --pinflix-text: #f5f5f7;
+  --pinflix-text-muted: hsla(240, 8%, 96%, 0.58);
 }
 
 * {
@@ -52,8 +52,8 @@ body {
   margin: 0;
   background-color: var(--color-bg);
   background-image:
-    radial-gradient(ellipse 120% 55% at 50% -5%, rgba(200, 15, 15, 0.45) 0%, transparent 65%),
-    radial-gradient(ellipse 60% 30% at 80% 110%, rgba(150, 5, 5, 0.18) 0%, transparent 60%);
+    radial-gradient(ellipse 90% 45% at 50% -10%, rgba(255, 255, 255, 0.055) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 30% at 82% 110%, rgba(229, 9, 20, 0.08) 0%, transparent 64%);
   background-attachment: fixed;
   color: var(--color-fg);
   font-family: var(--font-sans);
@@ -83,7 +83,7 @@ img {
 }
 
 ::selection {
-  background: #e63946;
+  background: #e50914;
   color: #fff;
 }
 
@@ -122,11 +122,11 @@ img {
 }
 
 .accent-gradient {
-  background: linear-gradient(135deg, #e63946, #b5121e);
+  background: linear-gradient(135deg, #e50914, #7f1d1d);
 }
 
 .text-gradient {
-  background: linear-gradient(90deg, #fff, #a1a1aa);
+  background: linear-gradient(90deg, #fff, #c7c7d1 58%, #8b8b98);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -134,16 +134,16 @@ img {
 
 .hero-vignette {
   background:
-    radial-gradient(circle at center, transparent 0%, rgba(10, 0, 0, 0.42) 60%, #0a0000 100%),
-    linear-gradient(to top, #0a0000 0%, rgba(10, 0, 0, 0.08) 42%, rgba(10, 0, 0, 0.22) 82%, #0a0000 100%);
+    radial-gradient(circle at center, transparent 0%, rgba(3, 3, 5, 0.28) 54%, #030305 100%),
+    linear-gradient(to top, #030305 0%, rgba(3, 3, 5, 0.18) 42%, rgba(3, 3, 5, 0.32) 82%, #030305 100%);
 }
 
 .hero-side-fade {
   background: linear-gradient(
     90deg,
-    rgba(10, 0, 0, 0.95) 0%,
-    rgba(10, 0, 0, 0.72) 32%,
-    rgba(10, 0, 0, 0.1) 70%,
+    rgba(3, 3, 5, 0.96) 0%,
+    rgba(3, 3, 5, 0.74) 34%,
+    rgba(3, 3, 5, 0.12) 72%,
     transparent 100%
   );
 }
@@ -153,21 +153,22 @@ img {
   width: 62vw;
   height: 62vw;
   border-radius: 9999px;
-  background: radial-gradient(circle, rgba(230, 57, 70, 0.2) 0%, rgba(181, 18, 30, 0.08) 34%, transparent 66%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.13) 0%, rgba(229, 9, 20, 0.08) 34%, transparent 66%);
   pointer-events: none;
   filter: blur(2px);
+  mix-blend-mode: screen;
 }
 
 .glass-nav {
-  background: rgba(10, 0, 0, 0.72);
+  background: rgba(3, 3, 5, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.36);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
 }
 
 .glass-panel {
-  background: rgba(19, 3, 3, 0.85);
+  background: rgba(13, 13, 18, 0.84);
   border: 1px solid rgba(255, 255, 255, 0.09);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
@@ -181,12 +182,21 @@ img {
     border-color 320ms ease;
 }
 
+.movie-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 45%, rgba(3, 3, 5, 0.82) 100%);
+  opacity: 0.74;
+}
+
 .movie-card:hover,
 .movie-card:focus-visible {
   transform: translateY(-8px) scale(1.045);
   z-index: 30;
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 22px 46px -12px rgba(230, 57, 70, 0.42);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 22px 46px -12px rgba(0, 0, 0, 0.76);
 }
 
 .movie-card .meta-overlay {
@@ -195,6 +205,7 @@ img {
   transition:
     opacity 220ms ease,
     transform 220ms ease;
+  z-index: 2;
 }
 
 .movie-card:hover .meta-overlay,
@@ -205,8 +216,8 @@ img {
 
 .poster-fallback {
   background:
-    radial-gradient(circle at 75% 15%, rgba(230, 57, 70, 0.28), transparent 32%),
-    linear-gradient(160deg, #1c0606, #4a0a0a 58%, #0a0000);
+    radial-gradient(circle at 75% 15%, rgba(255, 255, 255, 0.16), transparent 32%),
+    linear-gradient(160deg, #15151d, #27272f 58%, #030305);
 }
 
 @keyframes hero-drift {
@@ -222,7 +233,7 @@ img {
 @keyframes ambient-breathe {
   0%,
   100% {
-    opacity: 0.72;
+    opacity: 0.7;
     transform: translate(-50%, -50%) scale(0.96);
   }
   50% {
@@ -268,9 +279,9 @@ img {
   .hero-side-fade {
     background: linear-gradient(
       0deg,
-      #0a0000 0%,
-      rgba(10, 0, 0, 0.9) 30%,
-      rgba(10, 0, 0, 0.16) 68%,
+      #030305 0%,
+      rgba(3, 3, 5, 0.9) 30%,
+      rgba(3, 3, 5, 0.16) 68%,
       transparent 100%
     );
   }
