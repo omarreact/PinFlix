@@ -2,6 +2,7 @@ import { catalogProvider } from "@/src/lib/providers/catalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const preferredRegion = "sin1";
 
 function optionalPositiveInteger(value: string | null) {
   const parsed = Number(value);
