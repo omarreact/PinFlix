@@ -2,6 +2,7 @@ import { catalogProvider } from "@/src/lib/providers/catalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const preferredRegion = "sin1";
 
 const ALLOWED_MEDIA_HOST_SUFFIXES = ["aoneroom.com", "hakunaymatata.com"];
 const ALLOWED_MEDIA_EXTENSIONS = [
