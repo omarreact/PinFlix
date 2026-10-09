@@ -119,6 +119,9 @@ export function tmdbItemToEntertainment(
 }
 
 export async function getTmdbTrending() {
+  const [movies, shows] = await Promise.all([catalogProvider.getLatestPage("movie"), catalogProvider.getLatestPage("show")]);
+  const playable = [...movies.items, ...shows.items];
+  if (playable.length) return playable;
   try {
     const data = await tmdbFetch<{ results: TmdbListItem[] }>(
       "/trending/all/day",
@@ -130,7 +133,7 @@ export async function getTmdbTrending() {
       .filter((item) => item.media_type === "movie" || item.media_type === "tv")
       .map((item) => tmdbItemToEntertainment(item, item.media_type as TmdbMediaType));
   } catch (error) {
-    console.warn("TMDB trending unavailable; using MovieBox catalog instead.", error);
+    console.warn("TMDB trending unavailable; using the configured catalog instead.", error);
     const [movies, shows] = await Promise.all([
       catalogProvider.getLatestPage("movie"),
       catalogProvider.getLatestPage("show"),
@@ -140,6 +143,8 @@ export async function getTmdbTrending() {
 }
 
 export async function getTmdbDiscover(mediaType: TmdbMediaType, page = 1) {
+  const catalog = await catalogProvider.getLatestPage(mediaType === "tv" ? "show" : "movie", page);
+  if (catalog.items.length || page > 1) return catalog;
   try {
     const data = await tmdbFetch<{
       page: number;
@@ -162,12 +167,14 @@ export async function getTmdbDiscover(mediaType: TmdbMediaType, page = 1) {
       hasNextPage: data.page < Math.min(data.total_pages, 500),
     };
   } catch (error) {
-    console.warn(`TMDB ${mediaType} catalog unavailable; using MovieBox catalog instead.`, error);
+    console.warn(`TMDB ${mediaType} catalog unavailable; using the configured catalog instead.`, error);
     return catalogProvider.getLatestPage(mediaType === "tv" ? "show" : "movie", page);
   }
 }
 
 export async function searchTmdb(query: string, page = 1) {
+  const playable = await catalogProvider.search(query, page);
+  if (playable.length) return { page, results: playable, totalPages: page, totalResults: playable.length };
   try {
     const data = await tmdbFetch<{
       page: number;
@@ -196,7 +203,7 @@ export async function searchTmdb(query: string, page = 1) {
       totalResults: data.total_results,
     };
   } catch (error) {
-    console.warn("TMDB search unavailable; using MovieBox catalog instead.", error);
+    console.warn("TMDB search unavailable; using the configured catalog instead.", error);
     const results = await catalogProvider.search(query, page);
     return {
       page,

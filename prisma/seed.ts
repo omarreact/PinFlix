@@ -24,7 +24,7 @@ async function main() {
   await prisma.user.deleteMany();
   await prisma.appSetting.deleteMany();
 
-  const genres = await Promise.all([
+  await Promise.all([
     prisma.genre.upsert({ where: { name: "Action" }, update: {}, create: { name: "Action", slug: "action" } }),
     prisma.genre.upsert({ where: { name: "Sci‑Fi" }, update: {}, create: { name: "Sci‑Fi", slug: "sci-fi" } }),
     prisma.genre.upsert({ where: { name: "Drama" }, update: {}, create: { name: "Drama", slug: "drama" } }),
@@ -33,7 +33,7 @@ async function main() {
     prisma.genre.upsert({ where: { name: "Documentary" }, update: {}, create: { name: "Documentary", slug: "documentary" } }),
   ]);
 
-  const freePlan = await prisma.plan.create({
+  await prisma.plan.create({
     data: { slug: "free", name: "Free", priceMonthlyCents: 0, maxProfiles: 2, maxStreams: 1, maxQuality: "720p" },
   });
 
@@ -123,10 +123,11 @@ async function main() {
     }
 
     const sources = [
-      { titleId: title.id, label: "Auto HLS", protocol: "HLS", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", qualityLabel: "Auto", isDefault: true, priority: 100, isActive: true },
+      { titleId: title.id, label: "Auto HLS", protocol: "HLS", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", qualityLabel: "Auto", isDefault: true, priority: 70, isActive: true },
       { titleId: title.id, label: "720p MP4", protocol: "MP4", url: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4", qualityLabel: "720p", isDefault: false, priority: 80, isActive: true },
     ];
 
+    await prisma.subtitleTrack.create({ data: { titleId: title.id, language: "en", label: "English", url: "/subtitles/demo-en.vtt", format: "VTT" } });
     await prisma.streamSource.createMany({ data: sources });
   }
 
@@ -178,7 +179,7 @@ async function main() {
 
       await prisma.streamSource.createMany({
         data: [
-          { episodeId: episode.id, label: "Auto HLS", protocol: "HLS", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", qualityLabel: "Auto", isDefault: true, priority: 100, isActive: true },
+          { episodeId: episode.id, label: "Auto HLS", protocol: "HLS", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", qualityLabel: "Auto", isDefault: true, priority: 70, isActive: true },
           { episodeId: episode.id, label: "720p MP4", protocol: "MP4", url: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4", qualityLabel: "720p", isDefault: false, priority: 80, isActive: true },
         ],
       });

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
+import { prisma } from "@/src/lib/db";
 import { env } from "@/src/lib/env";
 import type { User } from "@prisma/client";
 
@@ -10,7 +11,12 @@ export type SessionUser = {
   role: "USER" | "EDITOR" | "ADMIN";
 };
 
-const secret = new TextEncoder().encode(env.AUTH_SECRET);
+function sessionSecret() {
+  if (env.NODE_ENV === "production" && /^(streamflix-demo-secret|change-this)/.test(env.AUTH_SECRET)) {
+    throw new Error("Set a unique AUTH_SECRET before enabling production authentication.");
+  }
+  return new TextEncoder().encode(env.AUTH_SECRET);
+}
 
 export async function createSessionToken(user: Pick<User, "id" | "email" | "name" | "role">) {
   return new SignJWT({
@@ -22,12 +28,12 @@ export async function createSessionToken(user: Pick<User, "id" | "email" | "name
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(secret);
+    .sign(sessionSecret());
 }
 
 export async function verifySessionToken(token: string): Promise<SessionUser | null> {
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, sessionSecret());
     if (!payload.sub || typeof payload.email !== "string") return null;
 
     return {
@@ -53,14 +59,22 @@ export function getCookieValue(cookieHeader: string | null | undefined, name: st
 export async function getCurrentUserFromRequest(request: Request): Promise<SessionUser | null> {
   const token = getCookieValue(request.headers.get("cookie"), env.SESSION_COOKIE_NAME);
   if (!token) return null;
-  return verifySessionToken(token);
+  const session = await verifySessionToken(token);
+  if (!session) return null;
+  const user = await prisma.user.findUnique({ where: { id: session.id } });
+  if (!user || user.status !== "ACTIVE") return null;
+  return { id: user.id, email: user.email, name: user.name, role: user.role as SessionUser["role"] };
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(env.SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
-  return verifySessionToken(token);
+  const session = await verifySessionToken(token);
+  if (!session) return null;
+  const user = await prisma.user.findUnique({ where: { id: session.id } });
+  if (!user || user.status !== "ACTIVE") return null;
+  return { id: user.id, email: user.email, name: user.name, role: user.role as SessionUser["role"] };
 }
 
 export async function requireUser(): Promise<SessionUser> {

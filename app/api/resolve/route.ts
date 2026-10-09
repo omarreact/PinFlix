@@ -32,7 +32,7 @@ export async function GET(request: Request) {
       id,
       sources: streams.map((source, sourceIndex) => {
         const streamUrl =
-          source.protocol === "native"
+          source.protocol === "native" && id.startsWith("mb-")
             ? `/api/proxy-stream?id=${encodeURIComponent(id)}&url=${encodeURIComponent(source.url)}&season=${optionalPositiveInteger(url.searchParams.get("season")) ?? 0}&episode=${optionalPositiveInteger(url.searchParams.get("episode")) ?? 0}`
             : source.url;
 
