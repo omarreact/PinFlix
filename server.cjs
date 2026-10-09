@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- cPanel Passenger requires a CommonJS startup file. */
 // cPanel/Passenger entry point. Install dependencies and run npm run build first.
 const http = require('node:http');
 const next = require('next');
