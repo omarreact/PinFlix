@@ -4,6 +4,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ALLOWED_MEDIA_HOST_SUFFIXES = ["aoneroom.com", "hakunaymatata.com"];
+const ALLOWED_MEDIA_EXTENSIONS = [
+  ".m3u8",
+  ".mp4",
+  ".m4v",
+  ".m4s",
+  ".ts",
+  ".aac",
+  ".vtt",
+  ".webvtt",
+  ".srt",
+  ".key",
+];
 const STREAM_TIMEOUT_MS = 30_000;
 
 function positiveInteger(value: string | null) {
@@ -13,9 +25,11 @@ function positiveInteger(value: string | null) {
 
 function isAllowedMediaUrl(url: URL) {
   const host = url.hostname.toLowerCase();
+  const path = url.pathname.toLowerCase();
   return (
     url.protocol === "https:" &&
-    ALLOWED_MEDIA_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))
+    ALLOWED_MEDIA_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`)) &&
+    ALLOWED_MEDIA_EXTENSIONS.some((extension) => path.endsWith(extension))
   );
 }
 
@@ -30,6 +44,18 @@ function playerReferer(id: string, season: number, episode: number) {
   url.searchParams.set("detailEp", episode > 0 ? String(episode) : "");
   url.searchParams.set("lang", "en");
   return url.toString();
+}
+
+function baseHeaders(contentType?: string) {
+  const headers = new Headers({
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+    "Access-Control-Allow-Headers": "Range, If-Range, Accept, Content-Type",
+    "Cache-Control": "private, no-store, no-cache, max-age=0",
+    "X-Content-Type-Options": "nosniff",
+  });
+  if (contentType) headers.set("Content-Type", contentType);
+  return headers;
 }
 
 function proxiedUrl(mediaUrl: URL, id: string, season: number, episode: number) {
@@ -50,12 +76,12 @@ function rewriteManifest(manifest: string, baseUrl: URL, id: string, season: num
       if (!trimmed || trimmed.startsWith("#")) {
         return line.replace(/URI="([^"]+)"/g, (_match, uri: string) => {
           const absolute = new URL(uri, baseUrl);
-          return `URI="${proxiedUrl(absolute, id, season, episode)}"`;
+          return isAllowedMediaUrl(absolute) ? `URI="${proxiedUrl(absolute, id, season, episode)}"` : `URI=""`;
         });
       }
 
       const absolute = new URL(trimmed, baseUrl);
-      return proxiedUrl(absolute, id, season, episode);
+      return isAllowedMediaUrl(absolute) ? proxiedUrl(absolute, id, season, episode) : "";
     })
     .join("\n");
 }
@@ -66,24 +92,24 @@ async function proxyStream(request: Request, method: "GET" | "HEAD") {
   const rawMediaUrl = requestUrl.searchParams.get("url") ?? "";
 
   if (!catalogProvider.canHandleId(id)) {
-    return new Response("Unsupported provider title ID", { status: 400 });
+    return new Response("Unsupported provider title ID", { status: 400, headers: baseHeaders("text/plain; charset=utf-8") });
   }
 
   let mediaUrl: URL;
   try {
     mediaUrl = new URL(rawMediaUrl);
   } catch {
-    return new Response("Invalid media URL", { status: 400 });
+    return new Response("Invalid media URL", { status: 400, headers: baseHeaders("text/plain; charset=utf-8") });
   }
 
   if (!isAllowedMediaUrl(mediaUrl)) {
-    return new Response("Media host is not allowed", { status: 403 });
+    return new Response("Media host or format is not allowed", { status: 403, headers: baseHeaders("text/plain; charset=utf-8") });
   }
 
   const season = positiveInteger(requestUrl.searchParams.get("season")) ?? 0;
   const episode = positiveInteger(requestUrl.searchParams.get("episode")) ?? 0;
   const referer = playerReferer(id, season, episode);
-  if (!referer) return new Response("Invalid provider title ID", { status: 400 });
+  if (!referer) return new Response("Invalid provider title ID", { status: 400, headers: baseHeaders("text/plain; charset=utf-8") });
 
   const headers = new Headers({
     Accept: request.headers.get("accept") ?? "*/*",
@@ -111,26 +137,24 @@ async function proxyStream(request: Request, method: "GET" | "HEAD") {
 
     clearTimeout(timeout);
 
+    const finalUrl = new URL(upstream.url || mediaUrl.toString());
+    if (!isAllowedMediaUrl(finalUrl)) {
+      return new Response("Redirect target is not allowed", { status: 403, headers: baseHeaders("text/plain; charset=utf-8") });
+    }
+
     const contentType = upstream.headers.get("content-type") ?? "";
     const isManifest =
-      /mpegurl|vnd\.apple\.mpegurl|x-mpegurl/i.test(contentType) || /\.m3u8(?:$|[?#])/i.test(mediaUrl.href);
+      /mpegurl|vnd\.apple\.mpegurl|x-mpegurl/i.test(contentType) || /\.m3u8(?:$|[?#])/i.test(finalUrl.href);
 
     if (method === "GET" && isManifest) {
       const text = await upstream.text();
-      return new Response(rewriteManifest(text, mediaUrl, id, season, episode), {
+      return new Response(rewriteManifest(text, finalUrl, id, season, episode), {
         status: upstream.status,
-        headers: {
-          "Cache-Control": "private, no-store, no-cache, max-age=0",
-          "Content-Type": "application/vnd.apple.mpegurl; charset=utf-8",
-          "X-Content-Type-Options": "nosniff",
-        },
+        headers: baseHeaders("application/vnd.apple.mpegurl; charset=utf-8"),
       });
     }
 
-    const outgoing = new Headers({
-      "Cache-Control": "private, no-store, no-cache, max-age=0",
-      "X-Content-Type-Options": "nosniff",
-    });
+    const outgoing = baseHeaders();
 
     for (const name of [
       "accept-ranges",
@@ -153,7 +177,7 @@ async function proxyStream(request: Request, method: "GET" | "HEAD") {
     console.error("MovieBox stream proxy error:", error);
     return new Response("MovieBox stream is temporarily unavailable", {
       status: 502,
-      headers: { "Cache-Control": "no-store" },
+      headers: baseHeaders("text/plain; charset=utf-8"),
     });
   }
 }
@@ -164,4 +188,8 @@ export async function GET(request: Request) {
 
 export async function HEAD(request: Request) {
   return proxyStream(request, "HEAD");
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: baseHeaders() });
 }
