@@ -8,7 +8,7 @@ export function HomeHero({item}:{item?:Entertainment}) {
   const image=item?.backdrop||item?.poster||"";
   const isTmdb=item?.provider==="tmdb"&&item.providerId;
   const details=item?(isTmdb?`/title/${item.kind==="show"?"tv":"movie"}/${item.providerId}`:`/entertainment/${item.id}`):"/movies";
-  const primary=item&&!isTmdb?`/watch/${item.id}`:details;
+  const primary=item&&!isTmdb?`${details}?autoplay=1`:details;
   return <div className="pf-container" style={mediaTheme(image||item?.title)}>
     <section className="pf-editorial-hero" aria-label="Featured cinema">
       <div className="min-w-0">
