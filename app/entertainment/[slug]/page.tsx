@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { mediaTheme } from "@/src/lib/media-theme";
 import { notFound } from "next/navigation";
 import { Play, Search } from "lucide-react";
 import { BackLink } from "@/src/components/catalog-sections";
@@ -51,7 +52,7 @@ export default async function EntertainmentDetailPage({
         {item.kind === "show" ? "Series" : "Movies"}
       </BackLink>
 
-      <section className="relative min-h-[520px] overflow-hidden rounded-[28px] border border-white/10 bg-surface">
+      <section className="relative min-h-[520px] overflow-hidden rounded-xl border border-line bg-surface" style={mediaTheme(item.backdrop || item.poster || item.title)}>
         {item.backdrop && (
           <img
             src={item.backdrop}
@@ -85,7 +86,7 @@ export default async function EntertainmentDetailPage({
               <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">
                 {tmdb ? "TMDB details · Existing PinFlix playback" : "PinFlix"} · {item.kind === "show" ? "Series" : "Movie"}
               </p>
-              <h1 className="mt-2 text-4xl font-black tracking-[-.05em] sm:text-5xl md:text-6xl">
+              <h1 className="mt-2 text-4xl font-medium tracking-[-.05em] sm:text-5xl md:text-6xl">
                 {item.title}
               </h1>
 
@@ -98,7 +99,7 @@ export default async function EntertainmentDetailPage({
               {languages.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {languages.slice(0, 8).map((language) => (
-                    <span key={language} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-300">
+                    <span key={language} className="rounded-md border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-300">
                       {language}
                     </span>
                   ))}
@@ -114,7 +115,7 @@ export default async function EntertainmentDetailPage({
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
                   href={`/watch/${item.id}`}
-                  className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white "
+                  className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-md px-7 py-3 font-bold text-white "
                 >
                   <Play size={18} fill="currentColor" />
                   Play
@@ -134,7 +135,7 @@ export default async function EntertainmentDetailPage({
 
                 <Link
                   href={`/search?q=${encodeURIComponent(item.title)}`}
-                  className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 font-semibold text-white hover:bg-white/10"
+                  className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-6 py-3 font-semibold text-white hover:bg-white/10"
                 >
                   <Search size={18} />
                   Similar titles
@@ -146,7 +147,7 @@ export default async function EntertainmentDetailPage({
       </section>
 
       {cast.length > 0 && (
-        <section className="glass-panel rounded-3xl p-6 sm:p-8">
+        <section className="glass-panel rounded-lg p-6 sm:p-8">
           <h2 className="text-xl font-bold text-white">Cast</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {cast.slice(0, 18).map((credit) => (

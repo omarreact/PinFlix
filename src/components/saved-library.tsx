@@ -27,11 +27,11 @@ export function SavedLibrary() {
 
   if (!items.length) {
     return (
-      <div className="rounded-3xl border border-dashed border-white/10 bg-white/[.02] px-6 py-20 text-center">
+      <div className="rounded-lg border border-dashed border-white/10 bg-white/[.02] px-6 py-20 text-center">
         <Bookmark className="mx-auto text-zinc-600" size={44} />
         <h2 className="mt-4 text-xl font-bold text-zinc-300">Your list is empty</h2>
         <p className="mt-2 text-sm text-zinc-500">Open a title and choose Add to My List.</p>
-        <Link href="/" className="tv-focus accent-gradient mt-6 inline-flex rounded-full px-6 py-3 text-sm font-bold text-white">
+        <Link href="/" className="tv-focus accent-gradient mt-6 inline-flex rounded-md px-6 py-3 text-sm font-bold text-white">
           Discover titles
         </Link>
       </div>
@@ -39,10 +39,10 @@ export function SavedLibrary() {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
       {items.map((item) => (
         <article key={item.id} className="group relative">
-          <Link href={`/entertainment/${item.slug}`} className="movie-card tv-focus relative block aspect-[2/3] overflow-hidden rounded-2xl border border-white/5 bg-surface">
+          <Link href={`/entertainment/${item.slug}`} className="movie-card tv-focus relative block aspect-[2/3] overflow-hidden rounded-md border border-white/5 bg-surface">
             {item.poster ? (
               <img src={item.poster} alt="" className="h-full w-full object-cover" />
             ) : (
@@ -58,7 +58,7 @@ export function SavedLibrary() {
             type="button"
             onClick={() => remove(item.id)}
             aria-label={`Remove ${item.title} from My List`}
-            className="tv-focus absolute right-2 top-2 z-20 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-black/60 text-zinc-300 opacity-100 backdrop-blur hover:bg-red-500/80 hover:text-white sm:opacity-0 sm:group-hover:opacity-100"
+            className="tv-focus absolute right-2 top-2 z-20 grid h-10 w-10 place-items-center rounded-md border border-white/10 bg-black/60 text-zinc-300 opacity-100 backdrop-blur hover:bg-red-500/80 hover:text-white sm:opacity-0 sm:group-hover:opacity-100"
           >
             <Trash2 size={16} />
           </button>

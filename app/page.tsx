@@ -26,17 +26,17 @@ export default async function HomePage() {
   return (
     <div>
       <HomeHero item={featured} />
-      <div className="relative z-20 mx-auto max-w-[1400px] space-y-10 px-6 pb-16 pt-6 md:px-12">
+      <div className="relative z-20 pf-container mx-auto space-y-10 pb-16 pt-8">
         <Suspense fallback={null}>
           <BrowseTabs active="all" />
         </Suspense>
 
         <WatchHistory compact />
-        {movies.length > 0 && <EntertainmentRail title="Now Streaming Movies" items={movies} href="/movies" />}
-        {series.length > 0 && <EntertainmentRail title="Now Streaming Series" items={series} href="/series" />}
+        {movies.length > 0 && <EntertainmentRail title="The movie collection" items={movies} href="/movies" />}
+        {series.length > 0 && <EntertainmentRail title="Stories in series" items={series} href="/series" />}
 
         {!featured && (
-          <div className="glass-panel rounded-2xl p-7 text-zinc-400">
+          <div className="glass-panel rounded-lg p-7 text-zinc-400">
             <p className="font-bold text-white">Movie catalog temporarily unavailable</p>
             <p className="mt-2 text-sm leading-6">PinFlix could not load playable provider-backed titles. Try again shortly.</p>
           </div>

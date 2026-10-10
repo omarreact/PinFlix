@@ -63,8 +63,8 @@ export function WatchClient({
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-bg text-white">
         <h1 className="text-3xl font-bold">404 - Not Found</h1>
-        <p className="mt-4 text-zinc-400">The requested title could not be found.</p>
-        <Link href="/" className="mt-8 rounded-full bg-accent px-6 py-2 font-bold text-bg">
+        <p className="mt-4 text-muted">The requested title could not be found.</p>
+        <Link href="/" className="mt-8 rounded-md bg-accent px-6 py-2 font-bold text-bg">
           Go Home
         </Link>
       </div>
@@ -74,7 +74,7 @@ export function WatchClient({
   if (loading || !item) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
-        <p className="text-sm text-zinc-400" role="status">Preparing player…</p>
+        <p className="text-sm text-muted" role="status">Preparing player…</p>
       </div>
     );
   }
@@ -105,7 +105,7 @@ export function WatchClient({
 
       <div className="mx-auto max-w-[1400px] space-y-8 px-5 py-8 sm:px-8 md:px-12 md:py-12">
         {navigation && (navigation.seasons.length > 1 || navigation.episodes > 1) && (
-          <section className="glass-panel rounded-3xl p-5 sm:p-6">
+          <section className="glass-panel rounded-xl p-5 sm:p-6">
             <div className="mb-5 flex items-center gap-2">
               <ListVideo size={18} className="text-accent" />
               <h2 className="font-bold">Episodes</h2>
@@ -117,10 +117,10 @@ export function WatchClient({
                   <Link
                     key={s}
                     href={seriesHref(item.id, s, 1)}
-                    className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors ${
+                    className={`rounded-md border px-4 py-1.5 text-sm font-semibold transition-colors ${
                       s === season
                         ? "border-accent bg-accent/10 text-accent"
-                        : "border-white/10 text-zinc-400 hover:border-white/20 hover:text-white"
+                        : "border-white/10 text-muted hover:border-white/20 hover:text-white"
                     }`}
                   >
                     Season {s}
@@ -140,7 +140,7 @@ export function WatchClient({
                     className={`flex items-center justify-center rounded-xl border p-3 text-sm font-medium transition-colors ${
                       active
                         ? "border-accent bg-accent/10 text-accent"
-                        : "border-white/5 bg-white/5 text-zinc-400 hover:border-white/20 hover:bg-white/10 hover:text-white"
+                        : "border-white/5 bg-white/5 text-muted hover:border-white/20 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     {active ? "Playing" : `Episode ${ep}`}
@@ -154,7 +154,7 @@ export function WatchClient({
         <section className="space-y-4">
           <h1 className="text-2xl font-bold">{item.title}</h1>
           {item.synopsis && (
-            <p className="max-w-4xl text-sm leading-relaxed text-zinc-400">
+            <p className="max-w-4xl text-sm leading-relaxed text-muted">
               {item.synopsis}
             </p>
           )}

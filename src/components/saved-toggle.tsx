@@ -25,7 +25,7 @@ export function SavedToggle({ item }: { item: SavedTitle }) {
     <button
       type="button"
       onClick={toggle}
-      className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 font-semibold text-white backdrop-blur hover:bg-white/10"
+      className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-md border border-line bg-surface px-6 py-3 font-semibold text-fg hover:bg-white/10"
       aria-pressed={saved}
     >
       {saved ? <Check size={18} /> : <Bookmark size={18} />}

@@ -5,7 +5,7 @@ import type { Entertainment } from "@/src/types/catalog";
 
 export function EntertainmentGrid({ items }: { items: Entertainment[] }) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-6">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-x-5">
       {items.map((item) => <EntertainmentCard key={item.id} item={item} />)}
     </div>
   );
@@ -15,7 +15,7 @@ export function EntertainmentRail({ title, items, href }: { title: string; items
   return (
     <section className="space-y-3">
       <SectionHeader title={title} href={href} />
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 md:gap-6">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 md:gap-x-5">
         {items.slice(0, 12).map((item) => <EntertainmentCard key={item.id} item={item} />)}
       </div>
     </section>
@@ -24,7 +24,7 @@ export function EntertainmentRail({ title, items, href }: { title: string; items
 
 export function BackLink({ href = "/", children = "Back" }: { href?: string; children?: React.ReactNode }) {
   return (
-    <Link href={href} className="tv-focus inline-flex min-h-11 items-center rounded-full border border-white/10 bg-white/5 px-4 text-sm font-semibold text-zinc-300 hover:bg-white/10 hover:text-white">
+    <Link href={href} className="tv-focus inline-flex min-h-11 items-center rounded-md border border-line bg-surface px-4 text-sm font-semibold text-zinc-300 hover:bg-white/10 hover:text-white">
       ← {children}
     </Link>
   );

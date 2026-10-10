@@ -15,13 +15,13 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
 
   return (
     <div className="space-y-9">
-      <section className="animate-slide-up">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold uppercase tracking-[.16em] text-accent">
+      <section className="">
+        <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-1.5 text-xs font-bold uppercase tracking-[.16em] text-accent">
           <Clapperboard size={14} />
           Playable catalog
         </div>
-        <h1 className="text-4xl font-black tracking-[-.04em] text-gradient md:text-5xl">Series</h1>
-        <p className="mt-3 max-w-2xl text-sm font-light leading-6 text-zinc-400">
+        <h1 className="text-4xl font-medium tracking-[-.055em] text-fg md:text-5xl">Series</h1>
+        <p className="mt-3 max-w-2xl text-sm font-light leading-6 text-muted">
           Browse provider-backed TV series with episode navigation and PinFlix playback.
         </p>
       </section>
@@ -29,14 +29,14 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
       {catalog.items.length > 0 ? (
         <EntertainmentGrid items={catalog.items} />
       ) : (
-        <div className="glass-panel rounded-2xl p-7 text-sm text-zinc-400">The series catalog is temporarily unavailable.</div>
+        <div className="glass-panel rounded-2xl p-7 text-sm text-muted">The series catalog is temporarily unavailable.</div>
       )}
 
       {(page > 1 || catalog.hasNextPage) && (
         <div className="flex items-center justify-between border-t border-white/10 pt-6">
-          <div>{page > 1 && <Link className="tv-focus rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold" href={`/series?page=${page - 1}`}>← Previous</Link>}</div>
+          <div>{page > 1 && <Link className="tv-focus rounded-md border border-line bg-surface px-5 py-2.5 text-sm font-semibold" href={`/series?page=${page - 1}`}>← Previous</Link>}</div>
           <span className="text-sm text-zinc-500">Page {page}</span>
-          <div>{catalog.hasNextPage && <Link className="tv-focus rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold" href={`/series?page=${page + 1}`}>Next →</Link>}</div>
+          <div>{catalog.hasNextPage && <Link className="tv-focus rounded-md border border-line bg-surface px-5 py-2.5 text-sm font-semibold" href={`/series?page=${page + 1}`}>Next →</Link>}</div>
         </div>
       )}
     </div>
