@@ -12,12 +12,18 @@ export async function GET(request: Request) {
   const page = Number.isInteger(rawPage) ? Math.max(1, Math.min(rawPage, 100)) : 1;
   if (query.length < 2) {
     return Response.json(
-      { query, kind, page, catalog: [], catalogHasMore: false },
+      { query, kind, page, catalog: [], catalogHasMore: false, status: "ok" },
       { headers: { "Cache-Control": "no-store" } },
     );
   }
   try {
     const result = await searchLibrary({ query, kind, page });
+    if (result.status === "unavailable") {
+      return Response.json(result, {
+        status: 503,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
     return Response.json(result, {
       headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" },
     });
