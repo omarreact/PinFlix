@@ -110,6 +110,11 @@ export function WatchPlayer({
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [landscapeFallback, setLandscapeFallback] = useState(false);
+  const [fillFrame, setFillFrame] = useState(false);
+  const [fullscreenMessage, setFullscreenMessage] = useState("");
+  const orientationLockedRef = useRef(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -416,9 +421,56 @@ export function WatchPlayer({
   async function toggleFullscreen() {
     const shell = shellRef.current;
     if (!shell) return;
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else await shell.requestFullscreen();
+    if (document.fullscreenElement) {
+      await document.exitFullscreen().catch(() => undefined);
+      return;
+    }
+    setFullscreenMessage("");
+    try {
+      // Android Chrome permits screen.orientation.lock after a user-activated
+      // fullscreen request. The existing streaming URL is never changed.
+      if (typeof shell.requestFullscreen !== "function") throw new Error("unsupported");
+      await shell.requestFullscreen();
+      const orientation = screen.orientation as ScreenOrientation & {
+        lock?: (direction: "landscape") => Promise<void>;
+      };
+      if (typeof orientation?.lock === "function") {
+        try {
+          await orientation.lock("landscape");
+          orientationLockedRef.current = true;
+          setLandscapeFallback(false);
+          return;
+        } catch { /* Device/browser does not permit locking orientation. */ }
+      }
+      const portrait = window.matchMedia?.("(orientation: portrait)").matches ?? false;
+      const touch = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+      setLandscapeFallback(portrait && touch);
+    } catch {
+      // iPhone Safari may allow only native video fullscreen.
+      const video = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
+      if (video && typeof video.webkitEnterFullscreen === "function") {
+        try { video.webkitEnterFullscreen(); return; } catch { /* show fallback notice */ }
+      }
+      setFullscreenMessage("Fullscreen is unavailable. Rotate your phone to view the video in landscape.");
+    }
   }
+
+  useEffect(() => {
+    const sync = () => {
+      const active = document.fullscreenElement === shellRef.current;
+      setIsFullscreen(active);
+      if (!active) {
+        setLandscapeFallback(false);
+        if (orientationLockedRef.current) {
+          orientationLockedRef.current = false;
+          try { (screen.orientation as ScreenOrientation & {unlock?: () => void})?.unlock?.(); }
+          catch { /* Browser also unlocks when leaving fullscreen. */ }
+        }
+      }
+    };
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
 
   async function togglePiP() {
     const video = videoRef.current;
@@ -486,11 +538,11 @@ export function WatchPlayer({
   return (
     <div
       ref={shellRef}
-      className="relative min-h-screen overflow-hidden bg-black text-white"
+      className={`pf-player relative min-h-screen overflow-hidden bg-black text-white ${landscapeFallback ? "pf-landscape-fallback" : ""}`}
       onMouseMove={showControls}
       onClick={showControls}
     >
-      <div className="relative min-h-[calc(100vh-88px)]">
+      <div className="pf-player-stage relative min-h-[calc(100vh-88px)]">
         {isEmbed && source ? (
           <iframe
             title={title}
@@ -507,7 +559,7 @@ export function WatchPlayer({
             controls={false}
             playsInline
             preload="auto"
-            className="absolute inset-0 h-full w-full object-contain bg-black"
+            className={`absolute inset-0 h-full w-full bg-black ${fillFrame ? "object-cover" : "object-contain"}`}
             aria-label={`Player for ${title}`}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
@@ -606,6 +658,8 @@ export function WatchPlayer({
           </div>
         )}
 
+        {fullscreenMessage && <p role="status" className="absolute left-4 top-24 z-30 max-w-[75%] rounded-md border border-white/20 bg-black/80 px-3 py-2 text-xs text-white">{fullscreenMessage}</p>}
+
         {displayBuffering && displayStatus === "ready" && !isEmbed && (
           <div className="pointer-events-none absolute left-4 top-24 z-20 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 text-xs text-zinc-300 backdrop-blur">
             Buffering…
@@ -654,7 +708,7 @@ export function WatchPlayer({
       </div>
 
       <div
-        className={`relative z-40 border-t border-white/10 bg-[#08080b]/95 backdrop-blur transition-opacity ${
+        className={`pf-player-controls relative z-40 border-t border-white/10 bg-[#0d171b]/95 transition-opacity ${
           controlsVisible ? "opacity-100" : "opacity-80"
         }`}
       >
@@ -920,17 +974,17 @@ export function WatchPlayer({
             </button>
           )}
 
-          <button
-            type="button"
-            aria-label="Fullscreen"
-            className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
-            onClick={() => void toggleFullscreen()}
-          >
-            {typeof document !== "undefined" && document.fullscreenElement ? (
-              <Minimize size={20} />
-            ) : (
-              <Maximize size={20} />
-            )}
+          {!isEmbed && (
+            <button type="button" aria-label={fillFrame ? "Fit full video without cropping" : "Fill display (may crop video)"}
+              title={fillFrame ? "Fit full video" : "Fill display"} aria-pressed={fillFrame}
+              className="media-focus inline-flex min-h-11 items-center rounded-md border border-white/20 px-3 text-xs font-semibold"
+              onClick={() => setFillFrame(value => !value)}>{fillFrame ? "Fit" : "Fill"}</button>
+          )}
+          <button type="button" aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen and rotate to landscape"}
+            title={isFullscreen ? "Exit fullscreen" : "Fullscreen · landscape where supported"}
+            className="media-focus grid min-h-11 min-w-11 place-items-center rounded-md border border-white/20 hover:bg-white/10"
+            onClick={() => void toggleFullscreen()}>
+            {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
           </button>
         </div>
       </div>
