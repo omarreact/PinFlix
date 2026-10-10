@@ -76,6 +76,7 @@ export async function tmdbFetch<T>(
   const response = await fetch(url, {
     headers: authHeaders(),
     next: { revalidate },
+    signal: AbortSignal.timeout(2500),
   });
 
   if (!response.ok) {
@@ -256,7 +257,7 @@ export async function getTmdbDetails(
     overview: data.overview ?? "",
     year: yearFrom(release),
     poster: image(data.poster_path, "w500"),
-    backdrop: image(data.backdrop_path, "original"),
+    backdrop: image(data.backdrop_path, "w1280"),
     rating: data.vote_average,
     ratingCount: data.vote_count,
     genres: data.genres?.map((genre) => genre.name) ?? [],

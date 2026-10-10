@@ -4,6 +4,7 @@ import { Play, Search } from "lucide-react";
 import { BackLink } from "@/src/components/catalog-sections";
 import { SavedToggle } from "@/src/components/saved-toggle";
 import { catalogProvider } from "@/src/lib/providers/catalog";
+import { lookupTmdbMetadata } from "@/src/lib/tmdb-bridge";
 
 export const revalidate = 300;
 
@@ -16,8 +17,19 @@ export default async function EntertainmentDetailPage({
 
   if (!catalogProvider.canHandleId(slug)) notFound();
 
-  const item = await catalogProvider.getDetails(slug);
-  if (!item) notFound();
+  const providerItem = await catalogProvider.getDetails(slug);
+  if (!providerItem) notFound();
+
+  // TMDB only enriches the presentation. IDs, streams and proxies remain provider-owned.
+  const tmdb = await lookupTmdbMetadata(providerItem);
+  const item = {
+    ...providerItem,
+    poster: tmdb?.poster || providerItem.poster,
+    backdrop: tmdb?.backdrop || providerItem.backdrop,
+    synopsis: tmdb?.synopsis || providerItem.synopsis,
+    rating: tmdb?.rating ?? providerItem.rating,
+    year: providerItem.year ?? tmdb?.year,
+  };
 
   const metadata = [
     item.kind === "show" ? "Series" : "Movie",
@@ -39,7 +51,7 @@ export default async function EntertainmentDetailPage({
         {item.kind === "show" ? "Series" : "Movies"}
       </BackLink>
 
-      <section className="relative min-h-[620px] overflow-hidden rounded-[28px] border border-white/10 bg-surface">
+      <section className="relative min-h-[520px] overflow-hidden rounded-[28px] border border-white/10 bg-surface">
         {item.backdrop && (
           <img
             src={item.backdrop}
@@ -53,7 +65,7 @@ export default async function EntertainmentDetailPage({
         <div className="hero-vignette absolute inset-0" />
         <div className="hero-side-fade absolute inset-0" />
 
-        <div className="relative z-10 flex min-h-[620px] items-end p-6 sm:p-10 md:items-center md:p-12">
+        <div className="relative z-10 flex min-h-[520px] items-end p-6 sm:p-10 md:items-center md:p-12">
           <div className="grid w-full gap-8 md:grid-cols-[180px_minmax(0,1fr)] md:items-end lg:grid-cols-[220px_minmax(0,1fr)]">
             <div className="hidden overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-2xl md:block">
               {item.poster ? (
@@ -71,9 +83,9 @@ export default async function EntertainmentDetailPage({
 
             <div className="max-w-3xl">
               <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">
-                {item.provider === "moviebox" ? "MovieBox" : "PinFlix"} · {item.kind === "show" ? "Series" : "Movie"}
+                {tmdb ? "TMDB details · Existing PinFlix playback" : "PinFlix"} · {item.kind === "show" ? "Series" : "Movie"}
               </p>
-              <h1 className="text-gradient mt-2 text-4xl font-black tracking-[-.05em] sm:text-5xl md:text-6xl">
+              <h1 className="mt-2 text-4xl font-black tracking-[-.05em] sm:text-5xl md:text-6xl">
                 {item.title}
               </h1>
 
@@ -102,7 +114,7 @@ export default async function EntertainmentDetailPage({
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
                   href={`/watch/${item.id}`}
-                  className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white shadow-[0_0_30px_rgba(168,85,247,.22)]"
+                  className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white "
                 >
                   <Play size={18} fill="currentColor" />
                   Play
@@ -122,7 +134,7 @@ export default async function EntertainmentDetailPage({
 
                 <Link
                   href={`/search?q=${encodeURIComponent(item.title)}`}
-                  className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 font-semibold text-white backdrop-blur hover:bg-white/10"
+                  className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 font-semibold text-white hover:bg-white/10"
                 >
                   <Search size={18} />
                   Similar titles
