@@ -20,6 +20,7 @@ export function AppShell({children}:{children:React.ReactNode}) {
   const pathname=usePathname();
   const [expanded,setExpanded]=useState(false);
   const watching=pathname.startsWith("/watch/");
+  const isSearchPage = pathname === "/search";
   if(watching) return <div className="min-h-screen bg-black">{children}</div>;
 
   return <div className="min-h-screen bg-bg text-fg">
@@ -44,14 +45,14 @@ export function AppShell({children}:{children:React.ReactNode}) {
             </details>
           ) : <Link key={link.href} href={link.href} aria-current={link.href==="/" ? pathname==="/"?"page":undefined : pathname.startsWith(link.href)?"page":undefined}>{link.label}</Link>)}
         </nav>
-        <div className="pf-search ml-auto hidden w-[min(30vw,310px)] md:block"><LiveSearch/></div>
+        {!isSearchPage && <div className="pf-search ml-auto hidden w-[min(30vw,310px)] md:block"><LiveSearch/></div>}
         <div className="hidden items-center gap-3 lg:flex">
           <Link href="/saved" className="media-focus inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line" aria-label="Open My List"><Bookmark size={17}/></Link>
           <Link href="/login" className="media-focus inline-flex items-center gap-2 rounded-md border border-line px-4 py-2.5 text-xs font-semibold">Sign in <ArrowUpRight size={15}/></Link>
         </div>
         <button type="button" className="media-focus inline-flex h-11 w-11 items-center justify-center rounded-md border border-line lg:hidden" aria-label={expanded?"Close menu":"Open menu"} aria-expanded={expanded} aria-controls="pinflix-menu" onClick={()=>setExpanded(p=>!p)}>{expanded?<X size={21}/>:<Menu size={21}/>}</button>
       </div>
-      <div className="pf-container pb-3 md:hidden"><LiveSearch/></div>
+      {!isSearchPage && <div className="pf-container pb-3 md:hidden"><LiveSearch/></div>}
       {expanded&&<nav id="pinflix-menu" aria-label="Mobile navigation" className="pf-container pf-nav flex flex-col gap-1 border-t border-line py-3 lg:hidden">
         {links.map(link=><Link key={link.href} href={link.href} onClick={()=>setExpanded(false)} aria-current={link.href==="/" ? pathname==="/"?"page":undefined : pathname.startsWith(link.href)?"page":undefined} className="media-focus rounded-md px-3 py-3 hover:bg-white/5">{link.label}</Link>)}
         <div className="mt-1 border-t border-line pt-3">

@@ -53,7 +53,7 @@ function providerId(subjectId: string | number, detailPath: string) {
 function mapItem(item: any, kindFallback?: "movie" | "show"): Entertainment {
   const kind =
     kindFallback ??
-    (item.subjectType === 2 || item.subject?.subjectType === 2 ? "show" : "movie");
+    (Number(item.subjectType ?? item.subject?.subjectType) === 2 ? "show" : "movie");
   const subj = item.subject ?? item;
   const subjectId = subj.subjectId ?? item.subjectId;
   const detailPath =
