@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { notFound, useRouter } from "next/navigation";
 import { ListVideo } from "lucide-react";
 import { WatchPlayer } from "@/src/components/watch-player";
 import { catalogProvider } from "@/src/lib/providers/catalog";
@@ -26,7 +25,6 @@ export function WatchClient({
   requestedSeason: number;
   requestedEpisode: number;
 }) {
-  const router = useRouter();
   const [item, setItem] = useState<Entertainment | null>(null);
   const [navigation, setNavigation] = useState<SeriesNavigation | null>(null);
   const [loading, setLoading] = useState(true);

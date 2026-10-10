@@ -113,8 +113,12 @@ export function WatchPlayer({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const savedSpeed = Number(window.localStorage.getItem("pinflix-playback-rate"));
-    if ([0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].includes(savedSpeed)) setPlaybackRate(savedSpeed);
+    // Apply persisted preference after hydration without a cascading synchronous effect.
+    const timer = window.setTimeout(() => {
+      const savedSpeed = Number(window.localStorage.getItem("pinflix-playback-rate"));
+      if ([0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].includes(savedSpeed)) setPlaybackRate(savedSpeed);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -344,7 +348,6 @@ export function WatchPlayer({
   useEffect(() => {
     const video = videoRef.current;
     if (video) video.playbackRate = playbackRate;
-    window.localStorage.setItem("pinflix-playback-rate", String(playbackRate));
   }, [playbackRate]);
 
   useEffect(() => {
@@ -890,6 +893,7 @@ export function WatchPlayer({
                       }`}
                       onClick={() => {
                         setPlaybackRate(rate);
+                        window.localStorage.setItem("pinflix-playback-rate", String(rate));
                         setSpeedOpen(false);
                       }}
                     >
