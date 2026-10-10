@@ -4,7 +4,6 @@ import { EntertainmentRail } from "@/src/components/catalog-sections";
 import { HomeHero } from "@/src/components/home-hero";
 import { BrowseTabs } from "@/src/components/browse-tabs";
 import { catalogProvider } from "@/src/lib/providers/catalog";
-import { getHomeSections } from "@/src/lib/providers/moviebox/web";
 import type { Entertainment } from "@/src/types/catalog";
 
 export const revalidate = 120;
@@ -15,27 +14,19 @@ function uniqueItems(items: Entertainment[]) {
 }
 
 export default async function HomePage() {
-  const [homeSections, movieCatalog, seriesCatalog] = await Promise.all([
-    getHomeSections().catch(() => []),
+  // Render from the two catalog requests shown on this page: no extra home-feed fetch.
+  const [movieCatalog, seriesCatalog] = await Promise.all([
     catalogProvider.getLatestPage("movie", 1).catch(() => ({ items: [], page: 1, hasNextPage: false })),
     catalogProvider.getLatestPage("show", 1).catch(() => ({ items: [], page: 1, hasNextPage: false })),
   ]);
-
-  const featuredItems = uniqueItems(homeSections.flatMap((section) => section.items));
-  const movies = uniqueItems([
-    ...featuredItems.filter((item) => item.kind === "movie"),
-    ...movieCatalog.items,
-  ]).slice(0, 12);
-  const series = uniqueItems([
-    ...featuredItems.filter((item) => item.kind === "show"),
-    ...seriesCatalog.items,
-  ]).slice(0, 12);
-  const featured = featuredItems[0] ?? movies[0] ?? series[0];
+  const movies = uniqueItems(movieCatalog.items).slice(0, 12);
+  const series = uniqueItems(seriesCatalog.items).slice(0, 12);
+  const featured = movies[0] ?? series[0];
 
   return (
     <div>
       <HomeHero item={featured} />
-      <div className="relative z-20 mx-auto -mt-8 max-w-[1400px] space-y-12 px-6 pb-24 md:-mt-14 md:px-12">
+      <div className="relative z-20 mx-auto max-w-[1400px] space-y-10 px-6 pb-16 pt-6 md:px-12">
         <Suspense fallback={null}>
           <BrowseTabs active="all" />
         </Suspense>

@@ -13,7 +13,7 @@ export function EntertainmentGrid({ items }: { items: Entertainment[] }) {
 
 export function EntertainmentRail({ title, items, href }: { title: string; items: Entertainment[]; href?: string }) {
   return (
-    <section className="animate-slide-up">
+    <section className="space-y-3">
       <SectionHeader title={title} href={href} />
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 md:gap-6">
         {items.slice(0, 12).map((item) => <EntertainmentCard key={item.id} item={item} />)}
