@@ -2,79 +2,59 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, Clapperboard, Film, PlayCircle, UserRound } from "lucide-react";
-import { cn } from "@/src/lib/utils";
+import { useState } from "react";
+import { ArrowUpRight, Bookmark, History, Menu, X } from "lucide-react";
 import { LiveSearch } from "@/src/components/live-search";
 
-const nav = [
-  { href: "/", label: "Discover" },
-  { href: "/movies", label: "Movies" },
-  { href: "/series", label: "Series" },
-  { href: "/saved", label: "My List" },
-  { href: "/history", label: "History" },
-  { href: "/login", label: "Login" },
+const links = [
+  {href:"/",label:"Discover"},
+  {href:"/movies",label:"Movies"},
+  {href:"/series",label:"TV Shows"},
+  {href:"/saved",label:"My List"},
+  {href:"/history",label:"History"},
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isWatchRoute = pathname.startsWith("/watch/");
+export function AppShell({children}:{children:React.ReactNode}) {
+  const pathname=usePathname();
+  const [expanded,setExpanded]=useState(false);
+  const watching=pathname.startsWith("/watch/");
+  if(watching) return <div className="min-h-screen bg-black">{children}</div>;
 
-  if (isWatchRoute) return <div className="min-h-screen bg-black">{children}</div>;
-
-  return (
-    <div className="min-h-screen bg-bg text-fg">
-      <header className="fixed inset-x-0 top-4 z-50 px-3 sm:px-5">
-        <div className="glass-nav mx-auto flex min-h-[64px] w-full max-w-7xl items-center justify-between gap-3 rounded-2xl px-4 py-2.5 sm:px-6">
-          <div className="flex min-w-0 items-center gap-4 lg:gap-8">
-            <Link href="/" className="media-focus flex min-h-11 shrink-0 items-center gap-2 rounded-full font-black tracking-tight">
-              <PlayCircle className="text-brand" size={29} fill="currentColor" />
-              <span className="text-xl sm:text-2xl">PIN<span className="font-light text-coral">FLIX</span></span>
-            </Link>
-            <nav className="hidden items-center gap-5 lg:flex">
-              {nav.map((item) => {
-                const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-                return (
-                  <Link key={item.href} href={item.href} className={cn("media-focus rounded-full px-1 py-2 text-sm font-semibold transition", active ? "text-white" : "text-zinc-400 hover:text-white")}>
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-
-          <div className="ml-auto flex w-[min(48vw,420px)] min-w-[150px] items-center gap-2">
-            <LiveSearch />
-            <Link href="/saved" aria-label="Open My List" className="media-focus hidden h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-white hover:bg-white/10 sm:grid">
-              <UserRound size={17} />
-            </Link>
-          </div>
-        </div>
-
-        <nav className="mx-auto mt-2 flex max-w-md items-center justify-center gap-2 rounded-full border border-white/10 bg-bg/75 px-2 py-1.5 text-xs text-zinc-400 backdrop-blur-xl lg:hidden">
-          {[
-            { href: "/", label: "Discover", icon: PlayCircle },
-            { href: "/movies", label: "Movies", icon: Film },
-            { href: "/series", label: "Series", icon: Clapperboard },
-            { href: "/saved", label: "My List", icon: Bookmark },
-          ].map(({ href, label, icon: Icon }) => {
-            const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-            return (
-              <Link key={href} href={href} className={cn("media-focus flex min-h-9 items-center gap-1.5 rounded-full px-2.5 font-semibold", active ? "bg-white/10 text-white" : "hover:text-white")}>
-                <Icon size={14} />
-                <span>{label}</span>
-              </Link>
-            );
-          })}
+  return <div className="min-h-screen bg-bg text-fg">
+    <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[99] focus:bg-brand focus:px-4 focus:py-3 focus:text-bg">Skip to content</a>
+    <header className="glass-nav sticky top-0 z-50">
+      <div className="pf-container flex min-h-[76px] items-center justify-between gap-4">
+        <Link href="/" aria-label="PinFlix home" onClick={()=>setExpanded(false)} className="pf-wordmark shrink-0 media-focus">
+          <span className="pf-symbol" aria-hidden="true">p</span>
+          <span>pinflix<span className="pf-dot">.</span></span>
+        </Link>
+        <nav aria-label="Primary navigation" className="pf-nav hidden items-center gap-6 lg:flex">
+          {links.map(link=><Link key={link.href} href={link.href} aria-current={link.href==="/" ? pathname==="/"?"page":undefined : pathname.startsWith(link.href)?"page":undefined}>{link.label}</Link>)}
         </nav>
-      </header>
-
-      <main className={cn(pathname === "/" ? "min-h-screen" : "mx-auto min-h-screen max-w-[1400px] px-5 pb-24 pt-32 sm:px-8 md:px-12")}>
-        {children}
-      </main>
-
-      <footer className="border-t border-white/5 px-5 py-8 text-center text-xs text-zinc-600">
-        <p>PinFlix keeps discovery minimal, artwork-led, and focused on playable provider-backed titles.</p>
-      </footer>
-    </div>
-  );
+        <div className="pf-search ml-auto hidden w-[min(30vw,310px)] md:block"><LiveSearch/></div>
+        <div className="hidden items-center gap-3 lg:flex">
+          <Link href="/saved" className="media-focus inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line" aria-label="Open My List"><Bookmark size={17}/></Link>
+          <Link href="/login" className="media-focus inline-flex items-center gap-2 rounded-md border border-line px-4 py-2.5 text-xs font-semibold">Sign in <ArrowUpRight size={15}/></Link>
+        </div>
+        <button type="button" className="media-focus inline-flex h-11 w-11 items-center justify-center rounded-md border border-line lg:hidden" aria-label={expanded?"Close menu":"Open menu"} aria-expanded={expanded} aria-controls="pinflix-menu" onClick={()=>setExpanded(p=>!p)}>{expanded?<X size={21}/>:<Menu size={21}/>}</button>
+      </div>
+      <div className="pf-container pb-3 md:hidden"><LiveSearch/></div>
+      {expanded&&<nav id="pinflix-menu" aria-label="Mobile navigation" className="pf-container pf-nav flex flex-col gap-1 border-t border-line py-3 lg:hidden">
+        {links.map(link=><Link key={link.href} href={link.href} onClick={()=>setExpanded(false)} aria-current={link.href==="/" ? pathname==="/"?"page":undefined : pathname.startsWith(link.href)?"page":undefined} className="media-focus rounded-md px-3 py-3 hover:bg-white/5">{link.label}</Link>)}
+        <Link href="/login" onClick={()=>setExpanded(false)} className="media-focus rounded-md px-3 py-3 text-sm">Sign in</Link>
+      </nav>}
+    </header>
+    <main id="main-content" className={pathname==="/"?"min-h-[65vh] pt-8":"pf-container min-h-[65vh] pb-20 pt-10"}>{children}</main>
+    <footer className="pf-footer mt-14">
+      <div className="pf-container grid gap-8 py-10 sm:grid-cols-[1fr_auto] sm:items-start">
+        <div><Link href="/" className="pf-wordmark"><span className="pf-symbol" aria-hidden="true">p</span><span>pinflix<span className="pf-dot">.</span></span></Link>
+          <p className="mt-4 text-sm text-muted">A little less scrolling. A little more cinema.</p></div>
+        <div className="flex flex-wrap gap-6 text-xs text-muted"><Link href="/movies" className="hover:text-fg">Find a film <ArrowUpRight size={13} className="inline"/></Link><Link href="/series" className="hover:text-fg">TV Shows</Link><Link href="/saved" className="hover:text-fg">Your watchlist <Bookmark size={13} className="inline"/></Link><Link href="/history" className="hover:text-fg">Watch history <History size={13} className="inline"/></Link></div>
+      </div>
+      <div className="pf-container flex flex-wrap justify-between gap-3 border-t border-line py-5 text-[11px] text-subtle">
+        <span>Film metadata where available via TMDB. Not endorsed or certified by TMDB.</span>
+        <span>© {new Date().getFullYear()} PinFlix · Pincode IT</span>
+      </div>
+    </footer>
+  </div>;
 }
