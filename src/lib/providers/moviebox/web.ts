@@ -94,9 +94,9 @@ function mapItem(item: any, kindFallback?: "movie" | "show"): Entertainment {
   };
 }
 
-async function fetchJson<T>(url: URL | string, init: RequestInit = {}): Promise<T> {
+async function fetchJson<T>(url: URL | string, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const headers = new Headers(init.headers);
@@ -156,27 +156,40 @@ export function canHandleId(id: string): boolean {
 }
 
 export async function search(query: string, page = 1): Promise<Entertainment[]> {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
+  const keyword = query.trim().slice(0, 100);
+  if (keyword.length < 2) return [];
+  const safePage = Number.isInteger(page) ? Math.max(1, Math.min(page, 100)) : 1;
 
+  // Search the complete provider index, not just the 28 newest films and shows.
+  // This does not resolve or manufacture streaming URLs.
+  const url = new URL("/wefeed-h5api-bff/subject/search", API_BASE);
   try {
-    const [movies, shows] = await Promise.all([
-      getLatestPage("movie", page),
-      getLatestPage("show", page),
-    ]);
+    const res = await fetchJson<H5ApiResponse<any>>(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keyword, page: safePage, perPage: 30, subjectType: 0 }),
+    }, 8_000);
 
-    const pool = [...movies.items, ...shows.items];
-    const matched = pool.filter(
-      (item) =>
-        item.title.toLowerCase().includes(q) ||
-        item.synopsis.toLowerCase().includes(q) ||
-        item.genres.some((g) => g.toLowerCase().includes(q)),
-    );
+    if (res.code !== 0) throw new Error(`Provider search returned ${res.code}`);
+    const data = res.data;
+    const rawItems = Array.isArray(data) ? data :
+      data?.items ?? data?.subjects ?? data?.results ?? data?.data?.items ?? [];
+    if (!Array.isArray(rawItems)) throw new Error("Unexpected provider search response");
 
-    return [...new Map(matched.map((item) => [item.id, item])).values()];
+    return [...new Map(rawItems
+      .filter((item: any) => item && (item.subjectId || item.subject?.subjectId))
+      .map((item: any) => mapItem(item))
+      .map((item: Entertainment) => [item.id, item])).values()] as Entertainment[];
   } catch (error) {
-    console.error("MovieBox search error:", formatError(error));
-    return [];
+    console.warn("MovieBox full-index search unavailable, using page fallback:", formatError(error));
+    const [movies, shows] = await Promise.all([
+      getLatestPage("movie", safePage), getLatestPage("show", safePage),
+    ]);
+    const normalized = keyword.toLowerCase();
+    return [...new Map([...movies.items,...shows.items]
+      .filter(item => item.title.toLowerCase().includes(normalized) ||
+        item.genres.some(genre => genre.toLowerCase().includes(normalized)))
+      .map(item => [item.id,item])).values()];
   }
 }
 
