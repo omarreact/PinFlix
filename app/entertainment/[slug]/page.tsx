@@ -1,20 +1,22 @@
 import Link from "next/link";
 import { mediaTheme } from "@/src/lib/media-theme";
 import { notFound } from "next/navigation";
-import { Play, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { BackLink } from "@/src/components/catalog-sections";
 import { SavedToggle } from "@/src/components/saved-toggle";
 import { catalogProvider } from "@/src/lib/providers/catalog";
 import { lookupTmdbMetadata } from "@/src/lib/tmdb-bridge";
+import { InlinePlaybackBanner, InlinePlayButton } from "@/src/components/inline-playback";
 
 export const revalidate = 300;
 
 export default async function EntertainmentDetailPage({
-  params,
+  params, searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ autoplay?: string; season?: string; episode?: string }>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
 
   if (!catalogProvider.canHandleId(slug)) notFound();
 
@@ -22,7 +24,12 @@ export default async function EntertainmentDetailPage({
   if (!providerItem) notFound();
 
   // TMDB only enriches the presentation. IDs, streams and proxies remain provider-owned.
-  const tmdb = await lookupTmdbMetadata(providerItem);
+  const [tmdb, navigation] = await Promise.all([
+    lookupTmdbMetadata(providerItem),
+    providerItem.kind === "show"
+      ? catalogProvider.getSeriesNavigation(providerItem.id, Math.max(1, Number(query.season) || 1)).catch(() => null)
+      : Promise.resolve(null),
+  ]);
   const item = {
     ...providerItem,
     poster: tmdb?.poster || providerItem.poster,
@@ -52,6 +59,15 @@ export default async function EntertainmentDetailPage({
         {item.kind === "show" ? "Series" : "Movies"}
       </BackLink>
 
+      <InlinePlaybackBanner
+        mediaId={providerItem.id} title={item.title}
+        backHref={`/entertainment/${encodeURIComponent(item.id)}`}
+        initialPlay={query.autoplay === "1"}
+        initialSeason={Math.max(1, Number(query.season) || 1)}
+        initialEpisode={Math.max(1, Number(query.episode) || 1)}
+        navigation={navigation}
+        historyItem={{ slug: providerItem.slug, kind: providerItem.kind, poster: item.poster, year: item.year, genres: item.genres }}
+      >
       <section className="relative min-h-[520px] overflow-hidden rounded-xl border border-line bg-surface" style={mediaTheme(item.backdrop || item.poster || item.title)}>
         {item.backdrop && (
           <img
@@ -113,13 +129,7 @@ export default async function EntertainmentDetailPage({
               )}
 
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link
-                  href={`/watch/${item.id}`}
-                  className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-md px-7 py-3 font-bold text-white "
-                >
-                  <Play size={18} fill="currentColor" />
-                  Play
-                </Link>
+                <InlinePlayButton className="pf-action media-focus min-h-12 px-7">Play here</InlinePlayButton>
 
                 <SavedToggle
                   item={{
@@ -145,6 +155,7 @@ export default async function EntertainmentDetailPage({
           </div>
         </div>
       </section>
+      </InlinePlaybackBanner>
 
       {cast.length > 0 && (
         <section className="glass-panel rounded-lg p-6 sm:p-8">

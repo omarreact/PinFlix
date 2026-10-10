@@ -17,5 +17,6 @@ export function historyHref(entry: HistoryEntry) {
   const params = new URLSearchParams();
   if (entry.season) params.set("season", String(entry.season));
   if (entry.episode) params.set("episode", String(entry.episode));
-  return `/watch/${encodeURIComponent(entry.id)}${params.size ? `?${params}` : ""}`;
+  params.set("autoplay", "1");
+  return `/entertainment/${encodeURIComponent(entry.slug || entry.id)}?${params}`;
 }

@@ -1,34 +1,21 @@
 import Link from "next/link";
 import { mediaTheme } from "@/src/lib/media-theme";
 import { notFound } from "next/navigation";
-import { CalendarDays, Clock3, Database, Play, Star } from "lucide-react";
+import { CalendarDays, Clock3, Database, Star } from "lucide-react";
 import { getTmdbDetails } from "@/src/lib/tmdb";
+import { InlinePlaybackBanner, InlinePlayButton } from "@/src/components/inline-playback";
 import { SavedToggle } from "@/src/components/saved-toggle";
-import { Suspense } from "react";
 import { findPlayableProviderMatch } from "@/src/lib/tmdb-bridge";
 
 export const revalidate = 300;
 
-async function PlayableMatchAction({ title, year, kind }: { title: string; year?: number; kind: "movie" | "show" }) {
-  const playable = await findPlayableProviderMatch({ title, year, kind });
-  return playable ? (
-    <Link href={`/watch/${encodeURIComponent(playable.id)}`} className="media-focus inline-flex min-h-12 items-center gap-2 rounded-md bg-white px-6 py-3 text-sm font-bold text-black hover:bg-zinc-200">
-      <Play size={17} fill="currentColor" /> Watch on PinFlix
-    </Link>
-  ) : (
-    <span className="inline-flex min-h-12 items-center rounded-md border border-white/10 bg-white/5 px-5 py-3 text-sm text-muted">
-      No verified playback match in the current catalog
-    </span>
-  );
-}
-
-
 export default async function TmdbTitlePage({
-  params,
+  params, searchParams,
 }: {
   params: Promise<{ mediaType: string; tmdbId: string }>;
+  searchParams: Promise<{ autoplay?: string; season?: string; episode?: string }>;
 }) {
-  const { mediaType, tmdbId } = await params;
+  const [{ mediaType, tmdbId }, query] = await Promise.all([params, searchParams]);
   if (mediaType !== "movie" && mediaType !== "tv") notFound();
 
   const id = Number(tmdbId);
@@ -42,6 +29,7 @@ export default async function TmdbTitlePage({
   }
 
   const kind = mediaType === "tv" ? "show" : "movie";
+  const playable = await findPlayableProviderMatch({ title: item.title, year: item.year, kind });
   const savedItem = {
     id: `tmdb-${mediaType}-${item.id}`,
     slug: `tmdb-${mediaType}-${item.id}`,
@@ -58,6 +46,14 @@ export default async function TmdbTitlePage({
         ← {mediaType === "tv" ? "Series" : "Movies"}
       </Link>
 
+      <InlinePlaybackBanner
+        mediaId={playable?.id ?? ""} title={item.title}
+        backHref={`/title/${mediaType}/${tmdbId}`}
+        initialPlay={Boolean(playable && query.autoplay === "1")}
+        initialSeason={Math.max(1, Number(query.season) || 1)}
+        initialEpisode={Math.max(1, Number(query.episode) || 1)}
+        historyItem={playable ? {slug: playable.slug, kind: playable.kind, poster: item.poster, year: item.year, genres: item.genres} : undefined}
+      >
       <section className="relative min-h-[520px] overflow-hidden rounded-xl border border-line bg-surface" style={mediaTheme(item.backdrop || item.poster || item.title)}>
         {item.backdrop ? (
           <img src={item.backdrop} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
@@ -112,14 +108,19 @@ export default async function TmdbTitlePage({
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <SavedToggle item={savedItem} />
-                <Suspense fallback={<span className="inline-flex min-h-12 items-center px-4 text-sm text-muted">Checking available streams…</span>}>
-                  <PlayableMatchAction title={item.title} year={item.year} kind={kind} />
-                </Suspense>
+                {playable ? (
+                  <InlinePlayButton className="pf-action media-focus min-h-12 px-7">Play here</InlinePlayButton>
+                ) : (
+                  <span className="inline-flex min-h-12 items-center rounded-md border border-line bg-surface px-5 py-3 text-sm text-muted">
+                    No verified playback source in the current catalog
+                  </span>
+                )}
               </div>
             </div>
           </div>
         </div>
       </section>
+      </InlinePlaybackBanner>
 
       {item.cast.length > 0 && (
         <section className="glass-panel rounded-lg p-6 sm:p-8">
