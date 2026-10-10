@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft, ArrowRight, Clapperboard, Film, Layers3 } from "lucide-react";
 import { EntertainmentGrid } from "@/src/components/catalog-sections";
 import { catalogProvider } from "@/src/lib/providers/catalog";
@@ -20,6 +21,8 @@ export default async function CataloguePage({searchParams}:{searchParams:Params}
   const params = await searchParams;
   const kind = parseCatalogueKind(params.kind);
   const genre = parseCatalogueGenre(params.genre);
+  // Legacy adult-filter URLs cannot bypass the dedicated 18+ confirmation route.
+  if (genre === "adult") redirect(catalogueHref(parseCatalogueKind(params.kind),"adult"));
   const rawPage = Number(params.page ?? "1");
   const page = Number.isInteger(rawPage) ? Math.min(30, Math.max(1, rawPage)) : 1;
   // A catalogue page explores two consecutive provider pages for the requested
@@ -58,6 +61,7 @@ export default async function CataloguePage({searchParams}:{searchParams:Params}
         {allGenres.map(group=><Link key={group.slug} href={catalogueHref(kind,group.slug)}
           aria-current={genre === group.slug ? "page" : undefined}
           className={`media-focus inline-flex min-h-9 items-center rounded-md px-3 text-xs font-semibold ${genre === group.slug ? "bg-elevated text-brand ring-1 ring-brand/40" : "text-muted hover:bg-surface hover:text-fg"}`}>{group.label}</Link>)}
+        <Link href={catalogueHref(kind,"adult")} className="media-focus inline-flex min-h-9 items-center rounded-md border border-line px-3 text-xs font-semibold text-warning hover:border-warning">Adult (18+) · Verify age</Link>
       </nav>
     </section>
     <section aria-label="Catalogue results" className="space-y-5">

@@ -7,7 +7,7 @@ import { catalogProvider } from "@/src/lib/providers/catalog";
 import type { Entertainment } from "@/src/types/catalog";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { availableGenres, catalogueHref, catalogueRails } from "@/src/lib/catalogue";
+import { availableGenres, catalogueHref, catalogueRails, filterCatalogue } from "@/src/lib/catalogue";
 
 export const revalidate = 120;
 export const preferredRegion = "sin1";
@@ -22,8 +22,8 @@ export default async function HomePage() {
     catalogProvider.getLatestPage("movie", 1).catch(() => ({ items: [], page: 1, hasNextPage: false })),
     catalogProvider.getLatestPage("show", 1).catch(() => ({ items: [], page: 1, hasNextPage: false })),
   ]);
-  const movies = uniqueItems(movieCatalog.items).slice(0, 12);
-  const series = uniqueItems(seriesCatalog.items).slice(0, 12);
+  const movies = filterCatalogue(uniqueItems(movieCatalog.items),"movie",null).slice(0, 12);
+  const series = filterCatalogue(uniqueItems(seriesCatalog.items),"show",null).slice(0, 12);
   const featured = movies[0] ?? series[0];
   const inventory = uniqueItems([...movieCatalog.items, ...seriesCatalog.items]);
   const genres = availableGenres(inventory);
@@ -46,6 +46,7 @@ export default async function HomePage() {
             <Link href={catalogueHref("movie")} className="media-focus shrink-0 rounded-md border border-line bg-surface px-4 py-2.5 text-sm font-medium">Movies</Link>
             <Link href={catalogueHref("show")} className="media-focus shrink-0 rounded-md border border-line bg-surface px-4 py-2.5 text-sm font-medium">TV Shows</Link>
             {genres.map(genre => <Link key={genre.slug} href={catalogueHref("all",genre.slug)} className="media-focus shrink-0 rounded-md border border-line bg-surface px-4 py-2.5 text-sm font-medium hover:border-brand">{genre.label}</Link>)}
+            <Link href={catalogueHref("all","adult")} className="media-focus shrink-0 rounded-md border border-line bg-surface px-4 py-2.5 text-sm font-medium text-warning hover:border-warning">Adult (18+)</Link>
           </nav>
         </section>
         <WatchHistory compact />
