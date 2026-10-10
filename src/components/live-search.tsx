@@ -54,7 +54,7 @@ export function LiveSearch() {
   return (
     <div className="relative w-full">
       <form onSubmit={submit}>
-        <label className="flex h-10 items-center rounded-full border border-white/10 bg-white/5 px-3 transition focus-within:border-brand/60 focus-within:bg-white/10">
+        <label className="flex h-10 items-center rounded-md border border-line bg-surface px-3 transition focus-within:border-brand/60 focus-within:bg-white/10">
           <Search size={16} className="shrink-0 text-zinc-500" />
           <input
             value={query}
@@ -79,7 +79,7 @@ export function LiveSearch() {
       </form>
 
       {open && (
-        <div className="absolute right-0 top-12 z-[80] w-[min(92vw,440px)] overflow-hidden rounded-2xl border border-white/10 bg-[#120303]/95 shadow-2xl backdrop-blur-2xl">
+        <div className="absolute right-0 top-12 z-[80] w-[min(92vw,440px)] overflow-hidden rounded-lg border border-line bg-panel shadow-xl">
           {loading ? (
             <div className="p-4 text-sm text-zinc-400">Searching playable catalog…</div>
           ) : results.length ? (

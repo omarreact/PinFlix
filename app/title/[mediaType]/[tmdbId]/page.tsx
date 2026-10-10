@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { mediaTheme } from "@/src/lib/media-theme";
 import { notFound } from "next/navigation";
 import { CalendarDays, Clock3, Database, Play, Star } from "lucide-react";
 import { getTmdbDetails } from "@/src/lib/tmdb";
@@ -11,11 +12,11 @@ export const revalidate = 300;
 async function PlayableMatchAction({ title, year, kind }: { title: string; year?: number; kind: "movie" | "show" }) {
   const playable = await findPlayableProviderMatch({ title, year, kind });
   return playable ? (
-    <Link href={`/watch/${encodeURIComponent(playable.id)}`} className="media-focus inline-flex min-h-12 items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-black hover:bg-zinc-200">
+    <Link href={`/watch/${encodeURIComponent(playable.id)}`} className="media-focus inline-flex min-h-12 items-center gap-2 rounded-md bg-white px-6 py-3 text-sm font-bold text-black hover:bg-zinc-200">
       <Play size={17} fill="currentColor" /> Watch on PinFlix
     </Link>
   ) : (
-    <span className="inline-flex min-h-12 items-center rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm text-zinc-400">
+    <span className="inline-flex min-h-12 items-center rounded-md border border-white/10 bg-white/5 px-5 py-3 text-sm text-muted">
       No verified playback match in the current catalog
     </span>
   );
@@ -53,11 +54,11 @@ export default async function TmdbTitlePage({
 
   return (
     <div className="space-y-8">
-      <Link href={mediaType === "tv" ? "/series" : "/movies"} className="tv-focus text-sm font-semibold text-zinc-400 hover:text-white">
+      <Link href={mediaType === "tv" ? "/series" : "/movies"} className="tv-focus text-sm font-semibold text-muted hover:text-white">
         ← {mediaType === "tv" ? "Series" : "Movies"}
       </Link>
 
-      <section className="relative min-h-[520px] overflow-hidden rounded-[30px] border border-white/10 bg-surface">
+      <section className="relative min-h-[520px] overflow-hidden rounded-xl border border-line bg-surface" style={mediaTheme(item.backdrop || item.poster || item.title)}>
         {item.backdrop ? (
           <img src={item.backdrop} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
         ) : (
@@ -73,30 +74,30 @@ export default async function TmdbTitlePage({
             </div>
 
             <div className="max-w-3xl">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[.15em] text-accent">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-md border border-brand/30 bg-brand/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[.15em] text-accent">
                 <Database size={13} />
                 TMDB metadata
               </div>
 
-              <h1 className="text-4xl font-black tracking-[-.05em] sm:text-5xl md:text-6xl">{item.title}</h1>
+              <h1 className="text-4xl font-medium tracking-[-.05em] sm:text-5xl md:text-6xl">{item.title}</h1>
 
               <div className="mt-5 flex flex-wrap gap-2 text-sm text-zinc-300">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                <span className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5">
                   {mediaType === "tv" ? "TV Series" : "Movie"}
                 </span>
                 {item.year && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5"><CalendarDays size={14} />{item.year}</span>
+                  <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5"><CalendarDays size={14} />{item.year}</span>
                 )}
                 {item.rating !== undefined && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1.5 text-amber-200"><Star size={14} fill="currentColor" />{item.rating.toFixed(1)}</span>
+                  <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/20 bg-amber-500/10 px-3 py-1.5 text-amber-200"><Star size={14} fill="currentColor" />{item.rating.toFixed(1)}</span>
                 )}
                 {item.runtimeMinutes && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5"><Clock3 size={14} />{item.runtimeMinutes} min</span>
+                  <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5"><Clock3 size={14} />{item.runtimeMinutes} min</span>
                 )}
               </div>
 
               {item.genres.length > 0 && (
-                <p className="mt-4 text-sm font-medium text-zinc-400">{item.genres.join(" · ")}</p>
+                <p className="mt-4 text-sm font-medium text-muted">{item.genres.join(" · ")}</p>
               )}
 
               {item.overview && (
@@ -104,14 +105,14 @@ export default async function TmdbTitlePage({
               )}
 
               {mediaType === "tv" && (
-                <p className="mt-4 text-sm text-zinc-400">
+                <p className="mt-4 text-sm text-muted">
                   {[item.numberOfSeasons ? `${item.numberOfSeasons} seasons` : "", item.numberOfEpisodes ? `${item.numberOfEpisodes} episodes` : ""].filter(Boolean).join(" · ")}
                 </p>
               )}
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <SavedToggle item={savedItem} />
-                <Suspense fallback={<span className="inline-flex min-h-12 items-center px-4 text-sm text-zinc-400">Checking available streams…</span>}>
+                <Suspense fallback={<span className="inline-flex min-h-12 items-center px-4 text-sm text-muted">Checking available streams…</span>}>
                   <PlayableMatchAction title={item.title} year={item.year} kind={kind} />
                 </Suspense>
               </div>
@@ -121,7 +122,7 @@ export default async function TmdbTitlePage({
       </section>
 
       {item.cast.length > 0 && (
-        <section className="glass-panel rounded-3xl p-6 sm:p-8">
+        <section className="glass-panel rounded-lg p-6 sm:p-8">
           <h2 className="text-xl font-bold text-white">Cast</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {item.cast.map((credit) => (
