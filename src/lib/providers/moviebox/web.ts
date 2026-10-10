@@ -168,7 +168,7 @@ export async function search(query: string, page = 1): Promise<Entertainment[]> 
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ keyword, page: safePage, perPage: 30, subjectType: 0 }),
-    }, 8_000);
+    }, 5_000);
 
     if (res.code !== 0) throw new Error(`Provider search returned ${res.code}`);
     const data = res.data;
@@ -183,7 +183,7 @@ export async function search(query: string, page = 1): Promise<Entertainment[]> 
   } catch (error) {
     console.warn("MovieBox full-index search unavailable, using page fallback:", formatError(error));
     const [movies, shows] = await Promise.all([
-      getLatestPage("movie", safePage), getLatestPage("show", safePage),
+      getLatestPage("movie", safePage, 3_000), getLatestPage("show", safePage, 3_000),
     ]);
     const normalized = keyword.toLowerCase();
     return [...new Map([...movies.items,...shows.items]
@@ -193,7 +193,7 @@ export async function search(query: string, page = 1): Promise<Entertainment[]> 
   }
 }
 
-export async function getLatestPage(kind: "movie" | "show", page = 1) {
+export async function getLatestPage(kind: "movie" | "show", page = 1, timeoutMs = REQUEST_TIMEOUT_MS) {
   const channelId = kind === "movie" ? 1 : 2;
   const url = new URL("/wefeed-h5api-bff/subject/filter", API_BASE);
 
@@ -202,7 +202,7 @@ export async function getLatestPage(kind: "movie" | "show", page = 1) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ page, perPage: 28, channelId }),
-    });
+    }, timeoutMs);
 
     if (res.code !== 0 || !res.data?.items) {
       console.error("MovieBox getLatestPage non-ok", res.code, res.message);
