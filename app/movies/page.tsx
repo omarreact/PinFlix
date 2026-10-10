@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Film } from "lucide-react";
 import { EntertainmentGrid } from "@/src/components/catalog-sections";
 import { catalogProvider } from "@/src/lib/providers/catalog";
+import { filterCatalogue } from "@/src/lib/catalogue";
 
 export const revalidate = 180;
 export const preferredRegion = "sin1";
@@ -12,6 +13,7 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
   const params = await searchParams;
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
   const catalog = await catalogProvider.getLatestPage("movie", page).catch(() => ({ items: [], page, hasNextPage: false }));
+  const titles = filterCatalogue(catalog.items, "movie", null);
 
   return (
     <div className="space-y-9">
@@ -26,8 +28,8 @@ export default async function MoviesPage({ searchParams }: { searchParams: Searc
         </p>
       </section>
 
-      {catalog.items.length > 0 ? (
-        <EntertainmentGrid items={catalog.items} />
+      {titles.length > 0 ? (
+        <EntertainmentGrid items={titles} />
       ) : (
         <div className="glass-panel rounded-2xl p-7 text-sm text-muted">The movie catalog is temporarily unavailable.</div>
       )}

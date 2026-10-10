@@ -2,6 +2,7 @@ import "server-only";
 import { catalogProvider } from "@/src/lib/providers/catalog";
 import { rankSearch, safeSearchKind, safeSearchQuery, type SearchKind } from "@/src/lib/search-ranking";
 import type { Entertainment } from "@/src/types/catalog";
+import { isAdultTitle } from "@/src/lib/catalogue";
 
 export type SearchResultSet = {
   query: string;
@@ -28,7 +29,7 @@ export async function searchLibrary(input: {
   }
   const data = await catalogProvider.search(query, page);
   // Trust only provider-issued playback identifiers, never a TMDB metadata ID.
-  const provider = data.filter((item) => catalogProvider.canHandleId(item.id));
+  const provider = data.filter((item) => catalogProvider.canHandleId(item.id) && !isAdultTitle(item));
   return {
     query, kind, page,
     catalog: rankSearch(provider, query, kind),

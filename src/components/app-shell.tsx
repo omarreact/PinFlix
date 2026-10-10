@@ -38,7 +38,8 @@ export function AppShell({children}:{children:React.ReactNode}) {
                 <Link href="/catalogue" className="media-focus col-span-2 rounded-md border-b border-line px-3 py-2 font-semibold text-fg hover:bg-white/10">Browse all genres</Link>
                 <Link href={catalogueHref("movie")} className="media-focus rounded-md px-3 py-2 hover:bg-white/10">Movies</Link>
                 <Link href={catalogueHref("show")} className="media-focus rounded-md px-3 py-2 hover:bg-white/10">TV Shows</Link>
-                {CATALOGUE_GENRES.slice(0,8).map(genre => <Link key={genre.slug} href={catalogueHref("all",genre.slug)} className="media-focus rounded-md px-3 py-2 hover:bg-white/10">{genre.label}</Link>)}
+                {CATALOGUE_GENRES.filter(genre => genre.slug !== "adult").slice(0,8).map(genre => <Link key={genre.slug} href={catalogueHref("all",genre.slug)} className="media-focus rounded-md px-3 py-2 hover:bg-white/10">{genre.label}</Link>)}
+                <Link href={catalogueHref("all","adult")} className="media-focus col-span-2 rounded-md border-t border-line px-3 py-2 text-warning hover:bg-white/10">Adult (18+) · Age confirmation</Link>
               </div>
             </details>
           ) : <Link key={link.href} href={link.href} aria-current={link.href==="/" ? pathname==="/"?"page":undefined : pathname.startsWith(link.href)?"page":undefined}>{link.label}</Link>)}
@@ -56,7 +57,8 @@ export function AppShell({children}:{children:React.ReactNode}) {
         <div className="mt-1 border-t border-line pt-3">
           <p className="pf-eyebrow mb-2 px-3">Browse by genre</p>
           <div className="grid grid-cols-2 gap-1">
-            {CATALOGUE_GENRES.slice(0,10).map(genre => <Link key={genre.slug} href={catalogueHref("all",genre.slug)} onClick={()=>setExpanded(false)} className="media-focus rounded-md px-3 py-2 text-xs text-muted hover:bg-white/5 hover:text-fg">{genre.label}</Link>)}
+            {CATALOGUE_GENRES.filter(genre => genre.slug !== "adult").slice(0,10).map(genre => <Link key={genre.slug} href={catalogueHref("all",genre.slug)} onClick={()=>setExpanded(false)} className="media-focus rounded-md px-3 py-2 text-xs text-muted hover:bg-white/5 hover:text-fg">{genre.label}</Link>)}
+            <Link href={catalogueHref("all","adult")} onClick={()=>setExpanded(false)} className="media-focus col-span-2 rounded-md border border-line px-3 py-2 text-xs font-semibold text-warning hover:bg-white/5">Adult (18+) · Age confirmation</Link>
           </div>
         </div>
         <Link href="/login" onClick={()=>setExpanded(false)} className="media-focus rounded-md px-3 py-3 text-sm">Sign in</Link>
