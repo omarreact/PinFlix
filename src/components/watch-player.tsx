@@ -103,11 +103,19 @@ export function WatchPlayer({
   const [subtitleOpen, setSubtitleOpen] = useState(false);
   const [speedOpen, setSpeedOpen] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const resumePositionRef = useRef(0);
+  const lastReportedTimeRef = useRef(-1);
+  const lastSavedAtRef = useRef(-1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const savedSpeed = Number(window.localStorage.getItem("pinflix-playback-rate"));
+    if ([0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].includes(savedSpeed)) setPlaybackRate(savedSpeed);
+  }, []);
 
   useEffect(() => {
     if (!historyItem) return;
@@ -231,15 +239,7 @@ export function WatchPlayer({
       video.muted = muted;
       video.volume = volume;
       video.playbackRate = playbackRate;
-
-      const resumeKey = `pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`;
-      const savedTime = Number(window.localStorage.getItem(resumeKey));
-      if (savedTime > 5 && video.currentTime === 0) {
-        video.currentTime = savedTime;
-      }
-
-      video
-        .play()
+      video.play()
         .then(() => {
           if (cancelled) return;
           setPlaying(true);
@@ -248,46 +248,34 @@ export function WatchPlayer({
         })
         .catch(() => {
           if (cancelled) return;
+          // User gesture can start an autoplay-blocked stream.
           setStatus("ready");
           setBuffering(false);
           setPlaying(false);
         });
     };
 
-    let isRefreshing = false;
+    let failed = false;
     const failover = () => {
-      if (cancelled || isRefreshing) return;
-
-      if (video.currentTime > 5) {
-        isRefreshing = true;
-        setStatus("switching");
-        const resumeKey = `pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`;
-        window.localStorage.setItem(resumeKey, String(video.currentTime));
-
-        resolveStreams()
-          .then((resolved) => {
-            if (cancelled) return;
-            if (resolved.length > 0) setSources(resolved);
-            else {
-              setStatus("error");
-              setError("Playback is unavailable right now.");
-            }
-          })
-          .catch((reason: Error) => {
-            if (cancelled) return;
-            setStatus("error");
-            setError(reason.message);
-          });
-        return;
+      if (cancelled || failed) return;
+      failed = true;
+      const position = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+      if (position > 0) {
+        resumePositionRef.current = position;
+        window.localStorage.setItem(
+          `pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`,
+          String(position),
+        );
       }
-
-      const nextPosition = sourcePosition + 1;
-      if (nextPosition < sources.length) {
+      // Do not re-resolve the same URL in a loop. Fail over once per source;
+      // a manual retry explicitly asks the server for fresh signed sources.
+      if (sourcePosition + 1 < sources.length) {
         setStatus("switching");
-        setSourcePosition(nextPosition);
+        setSourcePosition(sourcePosition + 1);
       } else {
+        setBuffering(false);
         setStatus("error");
-        setError("Playback is unavailable right now.");
+        setError("This stream stopped. Try again to request fresh playback links.");
       }
     };
     failoverRef.current = failover;
@@ -303,12 +291,19 @@ export function WatchPlayer({
           hlsRef.current = hls;
           hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
             if (cancelled) return;
-            setHlsLevels(
-              data.levels.map((level, index) => ({
-                index,
-                label: level.height ? `${level.height}p` : `Level ${index + 1}`,
-              })),
-            );
+            const levels = data.levels.map((level, index) => ({
+              index,
+              label: level.height ? `${level.height}p` : `Level ${index + 1}`,
+            }));
+            setHlsLevels(levels);
+            try {
+              const preference = window.localStorage.getItem("pinflix-hls-quality");
+              const preferred = levels.find(level => level.label === preference);
+              if (preferred) {
+                hls.nextLevel = preferred.index;
+                setSelectedLevel(preferred.index);
+              }
+            } catch { /* private mode can deny storage */ }
             playResolved();
           });
           hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -349,6 +344,7 @@ export function WatchPlayer({
   useEffect(() => {
     const video = videoRef.current;
     if (video) video.playbackRate = playbackRate;
+    window.localStorage.setItem("pinflix-playback-rate", String(playbackRate));
   }, [playbackRate]);
 
   useEffect(() => {
@@ -356,7 +352,8 @@ export function WatchPlayer({
       const video = videoRef.current;
       if (!video || isEmbed) return;
       const tag = (event.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+      if (["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A"].includes(tag)) return;
 
       showControls();
       if (event.key === "Escape") {
@@ -369,8 +366,8 @@ export function WatchPlayer({
         event.preventDefault();
         void togglePlayback();
       }
-      if (event.key === "ArrowRight") video.currentTime = Math.min(duration, video.currentTime + 10);
-      if (event.key === "ArrowLeft") video.currentTime = Math.max(0, video.currentTime - 10);
+      if (event.key === "ArrowRight") { event.preventDefault(); video.currentTime = Math.min(duration || video.duration, video.currentTime + 10); }
+      if (event.key === "ArrowLeft") { event.preventDefault(); video.currentTime = Math.max(0, video.currentTime - 10); }
       if (event.key === "ArrowUp") {
         event.preventDefault();
         setVolume((v) => Math.min(1, Math.round((v + 0.05) * 100) / 100));
@@ -405,8 +402,8 @@ export function WatchPlayer({
     const video = videoRef.current;
     if (!video || isEmbed) return;
     if (video.paused) {
-      try { await video.play(); } catch(e) {}
-      setPlaying(true);
+      try { await video.play(); setPlaying(true); }
+      catch { setPlaying(false); }
     } else {
       video.pause();
       setPlaying(false);
@@ -438,17 +435,21 @@ export function WatchPlayer({
   }
 
   function chooseSource(position: number) {
+    if (position === sourcePosition) { setQualityOpen(false); return; }
+    const video = videoRef.current;
+    if (video && Number.isFinite(video.currentTime)) resumePositionRef.current = video.currentTime;
     window.localStorage.setItem("pinflix-quality", sources[position]?.quality ?? "");
     setQualityOpen(false);
     setSourcePosition(position);
   }
 
   function chooseLevel(index: number) {
-    if (hlsRef.current) hlsRef.current.currentLevel = index;
+    // nextLevel allows a switch at the next segment instead of flushing the active buffer.
+    if (hlsRef.current) hlsRef.current.nextLevel = index;
     setSelectedLevel(index);
     window.localStorage.setItem(
-      "pinflix-quality",
-      hlsLevels.find((level) => level.index === index)?.label ?? "",
+      "pinflix-hls-quality",
+      hlsLevels.find(level => level.index === index)?.label ?? "auto",
     );
     setQualityOpen(false);
   }
@@ -520,35 +521,46 @@ export function WatchPlayer({
             onTimeUpdate={() => {
               const video = videoRef.current;
               if (!video) return;
-              setCurrentTime(video.currentTime);
-              if (video.buffered.length > 0) {
-                setBuffered(video.buffered.end(video.buffered.length - 1));
+              // Limit React renders on high-frequency timeupdate events.
+              if (Math.abs(video.currentTime - lastReportedTimeRef.current) >= 0.25) {
+                lastReportedTimeRef.current = video.currentTime;
+                setCurrentTime(video.currentTime);
+                if (video.buffered.length > 0) setBuffered(video.buffered.end(video.buffered.length - 1));
               }
-              const resumeKey = `pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`;
-              if (Math.floor(video.currentTime) % 5 === 0) {
-                window.localStorage.setItem(resumeKey, String(video.currentTime));
+              if (Math.abs(video.currentTime - lastSavedAtRef.current) >= 5) {
+                lastSavedAtRef.current = video.currentTime;
+                window.localStorage.setItem(`pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`, String(video.currentTime));
               }
             }}
             onDurationChange={() => setDuration(videoRef.current?.duration || 0)}
-            onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+            onLoadedMetadata={() => {
+              const video = videoRef.current;
+              if (!video) return;
+              setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+              const saved = Number(window.localStorage.getItem(`pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`));
+              const requested = resumePositionRef.current > 5 ? resumePositionRef.current : saved;
+              if (requested > 5 && Number.isFinite(requested) && requested < video.duration - 3) {
+                video.currentTime = requested;
+              }
+              resumePositionRef.current = 0;
+            }}
             onError={() => failoverRef.current()}
             onEnded={() => {
               if (nextHref) router.push(nextHref);
             }}
             onClick={() => void togglePlayback()}
-          />
+          >
+            {subtitleTracks.map((track) => (
+              <track
+                key={track.language}
+                kind="subtitles"
+                srcLang={track.language}
+                label={track.label}
+                src={track.blobUrl || track.url}
+              />
+            ))}
+          </video>
         )}
-
-        {!isEmbed &&
-          subtitleTracks.map((track) => (
-            <track
-              key={track.language}
-              kind="subtitles"
-              srcLang={track.language}
-              label={track.label}
-              src={track.blobUrl || track.url}
-            />
-          ))}
 
         <div
           className={`absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 bg-gradient-to-b from-black/90 via-black/35 to-transparent px-4 pb-16 pt-4 transition-opacity md:px-8 md:pt-6 ${
@@ -583,7 +595,7 @@ export function WatchPlayer({
         {isBusy && (
           <div className="absolute inset-0 z-10 grid place-items-center bg-black/75 text-center backdrop-blur-sm">
             <div>
-              <div className="mx-auto h-14 w-14 animate-spin rounded-full border-4 border-white/10 border-t-brand" />
+              <div className="mx-auto h-1 w-20 rounded-full bg-white/30" />
               <p className="mt-4 text-xs font-bold uppercase tracking-[.18em] text-accent">
                 {displayStatus === "switching" ? "Trying another source" : "Loading stream"}
               </p>
@@ -753,7 +765,7 @@ export function WatchPlayer({
                   setSpeedOpen(false);
                 }}
               >
-                {hlsLevels[selectedLevel]?.label ?? source?.quality ?? "Auto"}
+                {selectedLevel >= 0 ? hlsLevels.find(level => level.index === selectedLevel)?.label : (hlsLevels.length ? "Best · Auto" : source?.quality ?? "Auto")}
                 <ChevronDown size={14} />
               </button>
               {qualityOpen && (
@@ -774,11 +786,19 @@ export function WatchPlayer({
                       {item.quality}
                     </button>
                   ))}
+                  {hlsLevels.length > 0 && (
+                    <button type="button" role="menuitemradio" aria-checked={selectedLevel === -1}
+                      className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-white hover:bg-white/10"
+                      onClick={() => chooseLevel(-1)}>
+                      Best · Auto
+                    </button>
+                  )}
                   {hlsLevels.map((level) => (
                     <button
                       key={level.index}
                       type="button"
-                      role="menuitem"
+                      role="menuitemradio"
+                      aria-checked={selectedLevel === level.index}
                       className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
                       onClick={() => chooseLevel(level.index)}
                     >
