@@ -9,8 +9,7 @@ import type { Entertainment } from "@/src/types/catalog";
 
 type SearchResponse={
   query:string;kind:SearchKind;
-  catalog:Entertainment[];discovery:Entertainment[];
-  warnings?:string[];tmdbConfigured?:boolean;
+  catalog:Entertainment[];
 };
 const filters=[["all","All"],["movie","Movies"],["show","TV Shows"]] as const;
 const STORAGE_KEY="pinflix-search-history-v1";
@@ -23,9 +22,8 @@ function saveRecent(value:string){
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify([value,...getRecent().filter(v=>v.toLowerCase()!==value.toLowerCase())].slice(0,5)));}
   catch{ /* private browsing can disable storage */ }
 }
-function searchUrl(q:string,kind:SearchKind,source="all"){
+function searchUrl(q:string,kind:SearchKind){
   const params=new URLSearchParams({q,kind});
-  if(source!=="all")params.set("source",source);
   return `/search?${params}`;
 }
 
@@ -45,8 +43,7 @@ export function LiveSearch(){
   const [recent,setRecent]=useState<string[]>([]);
 
   const provider=useMemo(()=>data?.catalog.slice(0,6)??[],[data]);
-  const discovered=useMemo(()=>data?.discovery.slice(0,4)??[],[data]);
-  const combined=useMemo(()=>[...provider,...discovered],[provider,discovered]);
+  const combined=provider;
   const term=query.trim();
   const ready=term.length>=2;
 
@@ -106,7 +103,7 @@ export function LiveSearch(){
       event.preventDefault();saveRecent(term);close();router.push(searchHref(combined[active]));
     }else if(event.key==="Escape")close();
   }
-  function renderItem(item:Entertainment,index:number,isProvider:boolean){
+  function renderItem(item:Entertainment,index:number){
     const href=searchHref(item);
     return <Link key={`${item.provider}-${item.id}`} id={`${listId}-item-${index}`}
       role="option" aria-selected={index===active}
@@ -118,7 +115,7 @@ export function LiveSearch(){
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-fg">{item.title}</p>
-        <p className="mt-1 truncate text-xs text-muted">{item.kind==="show"?"TV Series":"Movie"}{item.year?` · ${item.year}`:""}{isProvider?" · Provider catalog":" · TMDB"}</p>
+        <p className="mt-1 truncate text-xs text-muted">{item.kind==="show"?"TV Series":"Movie"}{item.year?` · ${item.year}`:""} · PinFlix</p>
       </div>
       <ArrowRight size={15} className="shrink-0 text-muted"/>
     </Link>;
@@ -159,12 +156,14 @@ export function LiveSearch(){
         {loading&&<p role="status" className="px-4 py-5 text-sm text-muted">Searching movies and TV shows…</p>}
         {error&&!loading&&<p role="alert" className="px-4 py-5 text-sm text-muted">Search is temporarily unavailable. Press Enter to view full results.</p>}
         {!loading&&!error&&<>
-          {provider.length>0&&<section aria-label="Provider catalog matches"><p className="pf-eyebrow bg-bg/50 px-3 py-2">From the PinFlix provider catalog</p>{provider.map((item,i)=>renderItem(item,i,true))}</section>}
-          {discovered.length>0&&<section aria-label="TMDB title discovery"><p className="pf-eyebrow bg-bg/50 px-3 py-2">Discover more · TMDB metadata</p>{discovered.map((item,i)=>renderItem(item,provider.length+i,false))}</section>}
+          {provider.length>0&&<section aria-label="PinFlix catalogue matches"><p className="pf-eyebrow bg-bg/50 px-3 py-2">PinFlix video catalogue</p>{provider.map((item,i)=>renderItem(item,i))}</section>}
           {!combined.length&&<p className="px-4 py-5 text-sm text-muted">No matching titles. Try different spelling or the full search.</p>}
         </>}
-        <button type="button" onClick={()=>performSearch()}
-          className="media-focus sticky bottom-0 flex min-h-12 w-full items-center justify-center gap-2 border-t border-line bg-panel px-4 py-3 text-sm font-semibold text-brand hover:bg-surface">See all search results <ArrowRight size={16}/></button>
+        <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-line bg-panel px-3 py-2">
+          <Link href="/catalogue" onClick={close} className="media-focus rounded-md px-3 py-2 text-xs font-semibold text-muted hover:bg-surface">Browse categories</Link>
+          <button type="button" onClick={()=>performSearch()}
+            className="media-focus flex min-h-10 items-center gap-2 rounded-md px-3 text-sm font-semibold text-brand hover:bg-surface">See all results <ArrowRight size={16}/></button>
+        </div>
       </>}
     </div>}
   </div>;
