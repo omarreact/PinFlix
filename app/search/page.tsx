@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { EntertainmentGrid } from "@/src/components/catalog-sections";
+import { LiveSearch } from "@/src/components/live-search";
 import { searchLibrary } from "@/src/lib/search-service";
 import { safeSearchQuery, safeSearchKind, type SearchKind } from "@/src/lib/search-ranking";
 
@@ -31,13 +32,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
       <p className="pf-eyebrow mt-7">THE PINFLIX COLLECTION</p>
       <h1 className="pf-title mt-3">Find something <span className="pf-serif">to watch.</span></h1>
       <p className="mt-4 text-sm leading-7 text-muted">Search only movies and TV shows from the existing PinFlix video provider. No TMDB-only results or unavailable metadata-only listings.</p>
-      <form action="/search" role="search" className="mt-7 flex items-center gap-2 rounded-md border border-line bg-surface p-2 focus-within:border-brand">
-        <Search size={20} className="ml-2 shrink-0 text-muted"/>
-        <input name="q" defaultValue={query} maxLength={100} aria-label="Search movies and TV shows"
-          placeholder="Enter a movie or TV show title…" className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm text-fg outline-none"/>
-        <input type="hidden" name="kind" value={kind}/>
-        <button type="submit" className="pf-action min-h-10 shrink-0">Search <ArrowRight size={16}/></button>
-      </form>
+      <div className="mt-7 max-w-2xl">
+        <LiveSearch key={`${query}:${kind}`} initialQuery={query} initialKind={kind}/>
+      </div>
     </section>
     <nav aria-label="Filter by type" className="flex flex-wrap gap-2 border-b border-line pb-5">
       {kinds.map(([value, label]) => <Link key={value} href={searchUrl(query, value)}
@@ -52,14 +49,21 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
     ) : <section className="space-y-6" aria-label="Provider search results">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="text-xl font-semibold text-fg">
-          {results.catalog.length ? `${results.catalog.length} results` : "No matching titles"} for “{query}”
+          {results.status === "unavailable" ? "Search temporarily unavailable" :
+            results.catalog.length ? `${results.catalog.length} results` : "No matching provider results"} for “{query}”
         </h2>
         <span className="text-xs text-muted">Page {page}</span>
       </div>
-      {results.catalog.length ? <EntertainmentGrid items={results.catalog}/> : (
+      {results.status === "unavailable" ? (
+        <div role="status" className="glass-panel rounded-lg px-5 py-10 text-center">
+          <p className="text-lg font-medium text-fg">The video provider could not complete this search</p>
+          <p className="mt-2 text-sm text-muted">This does not mean the title is absent. Please try again in a moment.</p>
+          <Link href={searchUrl(query,kind)} className="pf-action mt-5">Retry search <ArrowRight size={15}/></Link>
+        </div>
+      ) : results.catalog.length ? <EntertainmentGrid items={results.catalog}/> : (
         <div className="glass-panel rounded-lg px-5 py-12 text-center">
-          <p className="text-lg font-medium text-fg">Not in the current provider catalogue</p>
-          <p className="mt-2 text-sm text-muted">Try a shorter title, a different spelling, or browse by genre.</p>
+          <p className="text-lg font-medium text-fg">No matches returned by the provider</p>
+          <p className="mt-2 text-sm text-muted">Try a shorter title, a different spelling, or browse by genre. Title availability can change.</p>
           <Link href="/catalogue" className="pf-action mt-5">Browse catalogue <ArrowRight size={15}/></Link>
         </div>
       )}
@@ -68,7 +72,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
         <span className="text-xs text-muted">Page {page}</span>
         {results.catalogHasMore && <Link className="pf-action pf-action-outline" href={searchUrl(query, kind, page + 1)}>Next <ArrowRight size={15}/></Link>}
       </nav>}
-      <p className="text-xs text-muted">Results come from the video provider. Individual playback availability is confirmed when the player resolves its source.</p>
+      <p className="text-xs text-muted">Results come from the video provider, not TMDB. Individual playback availability is checked when Play is pressed.</p>
     </section>}
   </div>;
 }

@@ -2,6 +2,7 @@
 
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
 import type { SeriesNavigation } from "../contracts";
+import { extractSearchItems, validSearchSubject } from "./search-response";
 
 const API_BASE = "https://h5-api.aoneroom.com";
 const SITE_BASE = "https://movibox.net";
@@ -52,7 +53,7 @@ function providerId(subjectId: string | number, detailPath: string) {
 function mapItem(item: any, kindFallback?: "movie" | "show"): Entertainment {
   const kind =
     kindFallback ??
-    (item.subjectType === 2 || item.subject?.subjectType === 2 ? "show" : "movie");
+    (Number(item.subjectType ?? item.subject?.subjectType) === 2 ? "show" : "movie");
   const subj = item.subject ?? item;
   const subjectId = subj.subjectId ?? item.subjectId;
   const detailPath =
@@ -155,42 +156,64 @@ export function canHandleId(id: string): boolean {
   return parseProviderId(id) !== null;
 }
 
-export async function search(query: string, page = 1): Promise<Entertainment[]> {
+export class ProviderSearchUnavailable extends Error {
+  constructor() { super("Video provider search is temporarily unavailable"); this.name = "ProviderSearchUnavailable"; }
+}
+
+export async function search(
+  query: string,
+  page = 1,
+  kind: "all" | "movie" | "show" = "all",
+): Promise<Entertainment[]> {
   const keyword = query.trim().slice(0, 100);
   if (keyword.length < 2) return [];
   const safePage = Number.isInteger(page) ? Math.max(1, Math.min(page, 100)) : 1;
-
-  // Search the complete provider index, not just the 28 newest films and shows.
-  // This does not resolve or manufacture streaming URLs.
   const url = new URL("/wefeed-h5api-bff/subject/search", API_BASE);
-  try {
-    const res = await fetchJson<H5ApiResponse<any>>(url, {
+
+  async function queryType(subjectType: number): Promise<Entertainment[]> {
+    const res = await fetchJson<H5ApiResponse<unknown>>(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ keyword, page: safePage, perPage: 30, subjectType: 0 }),
-    }, 5_000);
-
-    if (res.code !== 0) throw new Error(`Provider search returned ${res.code}`);
-    const data = res.data;
-    const rawItems = Array.isArray(data) ? data :
-      data?.items ?? data?.subjects ?? data?.results ?? data?.data?.items ?? [];
-    if (!Array.isArray(rawItems)) throw new Error("Unexpected provider search response");
-
-    return [...new Map(rawItems
-      .filter((item: any) => item && (item.subjectId || item.subject?.subjectId))
-      .map((item: any) => mapItem(item))
-      .map((item: Entertainment) => [item.id, item])).values()] as Entertainment[];
-  } catch (error) {
-    console.warn("MovieBox full-index search unavailable, using page fallback:", formatError(error));
-    const [movies, shows] = await Promise.all([
-      getLatestPage("movie", safePage, 3_000), getLatestPage("show", safePage, 3_000),
-    ]);
-    const normalized = keyword.toLowerCase();
-    return [...new Map([...movies.items,...shows.items]
-      .filter(item => item.title.toLowerCase().includes(normalized) ||
-        item.genres.some(genre => genre.toLowerCase().includes(normalized)))
-      .map(item => [item.id,item])).values()];
+      body: JSON.stringify({ keyword, page: safePage, perPage: 30, subjectType }),
+    }, 4_000);
+    if (res.code !== 0) throw new Error("Provider returned a non-success search status");
+    const items = extractSearchItems(res.data);
+    if (items === null) throw new Error("Provider returned an unrecognized search response");
+    return items
+      .filter(validSearchSubject)
+      .map(item => mapItem(item))
+      .filter(item => item.title !== "Untitled" && (item.kind === "movie" || item.kind === "show"));
   }
+
+  const mainType = kind === "movie" ? 1 : kind === "show" ? 2 : 0;
+  let initial: Entertainment[] = [];
+  let succeeded = false;
+  try {
+    initial = await queryType(mainType);
+    succeeded = true;
+  } catch (error) {
+    console.warn("Primary provider search failed:", formatError(error));
+  }
+  if (initial.length > 0) {
+    return [...new Map(initial.map(item => [item.id, item])).values()];
+  }
+
+  // A zero-result generic query is not proof that an indexed series is absent.
+  // Retry the same provider using its movie/TV-specific indexes. Unlike the old
+  // first-page fallback, this searches by title across the provider index.
+  const secondary = kind === "all" ? [1, 2] : [0];
+  const variants = await Promise.allSettled(secondary.map(queryType));
+  const results = [...initial];
+  for (const variant of variants) {
+    if (variant.status === "fulfilled") {
+      succeeded = true;
+      results.push(...variant.value);
+    } else {
+      console.warn("Alternate provider search failed:", formatError(variant.reason));
+    }
+  }
+  if (!succeeded) throw new ProviderSearchUnavailable();
+  return [...new Map(results.map(item => [item.id, item])).values()];
 }
 
 export async function getLatestPage(kind: "movie" | "show", page = 1, timeoutMs = REQUEST_TIMEOUT_MS) {

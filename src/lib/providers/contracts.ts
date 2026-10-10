@@ -27,7 +27,7 @@ export type SeriesNavigation = {
 export interface PinFlixProvider {
   readonly name: string;
   canHandleId(id: string): boolean;
-  search(query: string, page?: number): Promise<Entertainment[]>;
+  search(query: string, page?: number, kind?: "all" | ProviderKind): Promise<Entertainment[]>;
   getLatestPage(kind: ProviderKind, page?: number): Promise<ProviderCatalogPage>;
   getCategories(kind: ProviderKind): Promise<ProviderCategory[]>;
   getCategoryPage(categoryId: string, page?: number): Promise<ProviderCatalogPage | null>;

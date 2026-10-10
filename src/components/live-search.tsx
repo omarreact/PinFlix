@@ -27,14 +27,19 @@ function searchUrl(q:string,kind:SearchKind){
   return `/search?${params}`;
 }
 
-export function LiveSearch(){
+export function LiveSearch({
+  initialQuery = "", initialKind = "all",
+}: {
+  initialQuery?: string;
+  initialKind?: SearchKind;
+} = {}){
   const router=useRouter();
   const inputRef=useRef<HTMLInputElement>(null);
   const rootRef=useRef<HTMLDivElement>(null);
   const id=useId();
   const listId=`pinflix-search-results-${id.replaceAll(":","")}`;
-  const [query,setQuery]=useState("");
-  const [kind,setKind]=useState<SearchKind>("all");
+  const [query,setQuery]=useState(initialQuery);
+  const [kind,setKind]=useState<SearchKind>(initialKind);
   const [open,setOpen]=useState(false);
   const [data,setData]=useState<SearchResponse|null>(null);
   const [loading,setLoading]=useState(false);
@@ -125,12 +130,12 @@ export function LiveSearch(){
     <form onSubmit={performSearch} role="search">
       <div className="flex h-11 items-center gap-2 rounded-md border border-line bg-surface px-3 focus-within:border-brand">
         <Search size={18} className="shrink-0 text-muted" aria-hidden="true"/>
-        <input ref={inputRef} type="search" value={query} maxLength={100}
+        <input ref={inputRef} type="text" inputMode="search" enterKeyHint="search" value={query} maxLength={100}
           role="combobox" aria-label="Search movies and TV series" aria-autocomplete="list"
           aria-expanded={open} aria-controls={listId}
           aria-activedescendant={open&&active>=0?`${listId}-item-${active}`:undefined}
           autoComplete="off" placeholder="Search movies & TV shows…"
-          onFocus={()=>{setOpen(true);setRecent(getRecent());if(ready)setLoading(true);}}
+          onFocus={()=>{setOpen(true);setRecent(getRecent());if(ready && !data)setLoading(true);}}
           onKeyDown={handleKey}
           onChange={event=>{setQuery(event.target.value);setData(null);setActive(-1);setError(false);setOpen(true);setLoading(event.target.value.trim().length>=2);}}
           className="min-w-0 flex-1 bg-transparent py-2 text-sm text-fg outline-none placeholder:text-muted"/>
@@ -157,7 +162,7 @@ export function LiveSearch(){
         {error&&!loading&&<p role="alert" className="px-4 py-5 text-sm text-muted">Search is temporarily unavailable. Press Enter to view full results.</p>}
         {!loading&&!error&&<>
           {provider.length>0&&<section aria-label="PinFlix catalogue matches"><p className="pf-eyebrow bg-bg/50 px-3 py-2">PinFlix video catalogue</p>{provider.map((item,i)=>renderItem(item,i))}</section>}
-          {!combined.length&&<p className="px-4 py-5 text-sm text-muted">No matching titles. Try different spelling or the full search.</p>}
+          {!combined.length&&<p className="px-4 py-5 text-sm text-muted">The video provider returned no matching titles. Try a shorter name or another category.</p>}
         </>}
         <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-line bg-panel px-3 py-2">
           <Link href="/catalogue" onClick={close} className="media-focus rounded-md px-3 py-2 text-xs font-semibold text-muted hover:bg-surface">Browse categories</Link>

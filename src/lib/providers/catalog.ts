@@ -19,8 +19,8 @@ export const catalogProvider: PinFlixProvider = {
     return movieboxWeb.canHandleId(id);
   },
 
-  async search(query, page = 1) {
-    return movieboxWeb.search(query, page);
+  async search(query, page = 1, kind = "all") {
+    return movieboxWeb.search(query, page, kind);
   },
 
   async getLatestPage(kind, page = 1) {
