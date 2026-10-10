@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Clapperboard, Film, Layers3 } from "lucide-react
 import { EntertainmentGrid } from "@/src/components/catalog-sections";
 import { catalogProvider } from "@/src/lib/providers/catalog";
 import {
-  availableGenres, catalogueHref, filterCatalogue,
+  CATALOGUE_GENRES, availableGenres, catalogueHref, filterCatalogue,
   parseCatalogueGenre, parseCatalogueKind, type CatalogueKind,
 } from "@/src/lib/catalogue";
 
@@ -32,7 +32,7 @@ export default async function CataloguePage({searchParams}:{searchParams:Params}
   const raw = results.flatMap(result => result.items);
   const items = filterCatalogue(raw, kind, genre);
   const allGenres = availableGenres(raw);
-  const selectedGenre = allGenres.find(item => item.slug === genre);
+  const selectedGenre = CATALOGUE_GENRES.find(item => item.slug === genre);
   const canAdvance = results.some((result, index) => index % 2 === 1 && result.hasNextPage);
   const title = selectedGenre ? selectedGenre.label : kind === "movie" ? "Movies" : kind === "show" ? "TV Shows" : "Every kind of story";
 

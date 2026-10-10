@@ -8,6 +8,7 @@ const tabs = [
   { id: "all", label: "Discover", href: "/" },
   { id: "movies", label: "Movies", href: "/movies" },
   { id: "series", label: "Series", href: "/series" },
+  { id: "catalogue", label: "Categories", href: "/catalogue" },
   { id: "saved", label: "My List", href: "/saved" },
 ];
 
@@ -19,7 +20,9 @@ export function BrowseTabs({ active }: { active?: string }) {
       ? "movies"
       : pathname.startsWith("/series")
         ? "series"
-        : pathname.startsWith("/saved")
+        : pathname.startsWith("/catalogue")
+          ? "catalogue"
+          : pathname.startsWith("/saved")
           ? "saved"
           : "all");
 
