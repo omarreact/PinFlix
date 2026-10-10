@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { notFound, useRouter } from "next/navigation";
-import { ListVideo, Loader2 } from "lucide-react";
+import { ListVideo } from "lucide-react";
 import { WatchPlayer } from "@/src/components/watch-player";
 import { catalogProvider } from "@/src/lib/providers/catalog";
 import type { Entertainment } from "@/src/types/catalog";
@@ -26,7 +25,6 @@ export function WatchClient({
   requestedSeason: number;
   requestedEpisode: number;
 }) {
-  const router = useRouter();
   const [item, setItem] = useState<Entertainment | null>(null);
   const [navigation, setNavigation] = useState<SeriesNavigation | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,7 +74,7 @@ export function WatchClient({
   if (loading || !item) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
-        <Loader2 className="h-10 w-10 animate-spin text-zinc-500" />
+        <p className="text-sm text-zinc-400" role="status">Preparing player…</p>
       </div>
     );
   }
@@ -139,7 +137,7 @@ export function WatchClient({
                   <Link
                     key={ep}
                     href={seriesHref(item.id, season, ep)}
-                    className={`flex items-center justify-center rounded-xl border p-3 text-sm font-medium transition-all ${
+                    className={`flex items-center justify-center rounded-xl border p-3 text-sm font-medium transition-colors ${
                       active
                         ? "border-accent bg-accent/10 text-accent"
                         : "border-white/5 bg-white/5 text-zinc-400 hover:border-white/20 hover:bg-white/10 hover:text-white"

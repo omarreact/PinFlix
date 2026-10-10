@@ -15,17 +15,17 @@ export function EntertainmentCard({ item }: { item: Entertainment }) {
       aria-label={`View ${item.title}`}
     >
       {item.poster ? (
-        <img src={item.poster} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
+        <img src={item.poster} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
       ) : (
         <div className="poster-fallback grid h-full place-items-center p-5 text-center text-lg font-bold text-white/70">{item.title}</div>
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/25 to-transparent opacity-75" />
       <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-        <span className="rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-zinc-200 backdrop-blur-md">
+        <span className="rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-zinc-200">
           {item.kind === "show" ? "Series" : "Movie"}
         </span>
         {item.rating !== undefined && item.rating > 0 && (
-          <span className="rounded-full border border-brand/30 bg-brand/20 px-2.5 py-1 text-[10px] font-bold text-accent backdrop-blur-md">★ {item.rating.toFixed(1)}</span>
+          <span className="rounded-full border border-brand/30 bg-brand/20 px-2.5 py-1 text-[10px] font-bold text-accent">★ {item.rating.toFixed(1)}</span>
         )}
       </div>
       <div className="meta-overlay absolute inset-0 flex flex-col justify-end p-4">

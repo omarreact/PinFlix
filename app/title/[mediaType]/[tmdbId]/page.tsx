@@ -1,10 +1,26 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BookmarkPlus, CalendarDays, Clock3, Database, Star } from "lucide-react";
+import { CalendarDays, Clock3, Database, Play, Star } from "lucide-react";
 import { getTmdbDetails } from "@/src/lib/tmdb";
 import { SavedToggle } from "@/src/components/saved-toggle";
+import { Suspense } from "react";
+import { findPlayableProviderMatch } from "@/src/lib/tmdb-bridge";
 
 export const revalidate = 300;
+
+async function PlayableMatchAction({ title, year, kind }: { title: string; year?: number; kind: "movie" | "show" }) {
+  const playable = await findPlayableProviderMatch({ title, year, kind });
+  return playable ? (
+    <Link href={`/watch/${encodeURIComponent(playable.id)}`} className="media-focus inline-flex min-h-12 items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-black hover:bg-zinc-200">
+      <Play size={17} fill="currentColor" /> Watch on PinFlix
+    </Link>
+  ) : (
+    <span className="inline-flex min-h-12 items-center rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm text-zinc-400">
+      No verified playback match in the current catalog
+    </span>
+  );
+}
+
 
 export default async function TmdbTitlePage({
   params,
@@ -41,7 +57,7 @@ export default async function TmdbTitlePage({
         ← {mediaType === "tv" ? "Series" : "Movies"}
       </Link>
 
-      <section className="relative min-h-[640px] overflow-hidden rounded-[30px] border border-white/10 bg-surface">
+      <section className="relative min-h-[520px] overflow-hidden rounded-[30px] border border-white/10 bg-surface">
         {item.backdrop ? (
           <img src={item.backdrop} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
         ) : (
@@ -50,7 +66,7 @@ export default async function TmdbTitlePage({
         <div className="hero-vignette absolute inset-0" />
         <div className="hero-side-fade absolute inset-0" />
 
-        <div className="relative z-10 flex min-h-[640px] items-end p-6 sm:p-10 md:items-center md:p-12">
+        <div className="relative z-10 flex min-h-[520px] items-end p-6 sm:p-10 md:items-center md:p-12">
           <div className="grid w-full gap-8 md:grid-cols-[210px_minmax(0,1fr)] md:items-end">
             <div className="hidden overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-2xl md:block">
               {item.poster ? <img src={item.poster} alt="" className="aspect-[2/3] w-full object-cover" /> : <div className="poster-fallback aspect-[2/3]" />}
@@ -62,7 +78,7 @@ export default async function TmdbTitlePage({
                 TMDB metadata
               </div>
 
-              <h1 className="text-gradient text-4xl font-black tracking-[-.05em] sm:text-5xl md:text-6xl">{item.title}</h1>
+              <h1 className="text-4xl font-black tracking-[-.05em] sm:text-5xl md:text-6xl">{item.title}</h1>
 
               <div className="mt-5 flex flex-wrap gap-2 text-sm text-zinc-300">
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
@@ -95,10 +111,9 @@ export default async function TmdbTitlePage({
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <SavedToggle item={savedItem} />
-                <div className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm text-zinc-400">
-                  <BookmarkPlus size={17} />
-                  Playback source not configured for this TMDB title
-                </div>
+                <Suspense fallback={<span className="inline-flex min-h-12 items-center px-4 text-sm text-zinc-400">Checking available streams…</span>}>
+                  <PlayableMatchAction title={item.title} year={item.year} kind={kind} />
+                </Suspense>
               </div>
             </div>
           </div>
