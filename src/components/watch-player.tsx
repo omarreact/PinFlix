@@ -66,6 +66,9 @@ export function WatchPlayer({
   subtitle,
   backHref,
   nextHref,
+  inline = false,
+  onClose,
+  onNext,
   season,
   episode,
   historyItem,
@@ -75,6 +78,9 @@ export function WatchPlayer({
   subtitle?: string;
   backHref: string;
   nextHref?: string;
+  inline?: boolean;
+  onClose?: () => void;
+  onNext?: () => void;
   season?: number;
   episode?: number;
   historyItem?: { slug: string; kind: "movie" | "show"; poster?: string; year?: number; genres?: string[] };
@@ -182,10 +188,20 @@ export function WatchPlayer({
   const showControls = useCallback(() => {
     setControlsVisible(true);
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => {
-      if (displayPlaying && !qualityOpen && !subtitleOpen && !speedOpen) setControlsVisible(false);
-    }, 3200);
+    if (displayPlaying && !qualityOpen && !subtitleOpen && !speedOpen) {
+      hideTimer.current = setTimeout(() => setControlsVisible(false), 3000);
+    }
   }, [displayPlaying, qualityOpen, subtitleOpen, speedOpen]);
+
+  useEffect(() => {
+    if (!displayPlaying || qualityOpen || subtitleOpen || speedOpen) return;
+    const timer = window.setTimeout(() => setControlsVisible(false), 3500);
+    return () => window.clearTimeout(timer);
+  }, [displayPlaying, qualityOpen, subtitleOpen, speedOpen]);
+
+  useEffect(() => () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -538,11 +554,12 @@ export function WatchPlayer({
   return (
     <div
       ref={shellRef}
-      className={`pf-player relative min-h-screen overflow-hidden bg-black text-white ${landscapeFallback ? "pf-landscape-fallback" : ""}`}
+      className={`pf-player ${inline ? "pf-inline-player" : "pf-legacy-player"} relative overflow-hidden bg-black text-white ${landscapeFallback ? "pf-landscape-fallback" : ""}`}
       onMouseMove={showControls}
+      onTouchStart={showControls}
       onClick={showControls}
     >
-      <div className="pf-player-stage relative min-h-[calc(100vh-88px)]">
+      <div className="pf-player-stage absolute inset-0">
         {isEmbed && source ? (
           <iframe
             title={title}
@@ -558,7 +575,7 @@ export function WatchPlayer({
             muted={muted}
             controls={false}
             playsInline
-            preload="auto"
+            preload="metadata"
             className={`absolute inset-0 h-full w-full bg-black ${fillFrame ? "object-cover" : "object-contain"}`}
             aria-label={`Player for ${title}`}
             onPlay={() => setPlaying(true)}
@@ -601,7 +618,8 @@ export function WatchPlayer({
             }}
             onError={() => failoverRef.current()}
             onEnded={() => {
-              if (nextHref) router.push(nextHref);
+              if (onNext) onNext();
+              else if (nextHref) router.push(nextHref);
             }}
             onClick={() => void togglePlayback()}
           >
@@ -618,7 +636,7 @@ export function WatchPlayer({
         )}
 
         <div
-          className={`absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 bg-gradient-to-b from-black/90 via-black/35 to-transparent px-4 pb-16 pt-4 transition-opacity md:px-8 md:pt-6 ${
+          className={`pf-player-top absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 bg-gradient-to-b from-black/85 via-black/35 to-transparent px-4 pb-10 pt-3 transition-opacity md:px-6 md:pt-4 ${
             controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
         >
@@ -628,27 +646,31 @@ export function WatchPlayer({
             {subtitle && <p className="mt-1 truncate text-xs text-zinc-400 md:text-sm">{subtitle}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {nextHref && (
-              <Link
-                href={nextHref}
-                className="media-focus hidden min-h-11 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/15 sm:inline-flex"
-              >
-                Next episode
-                <SkipForward size={16} />
+            {(onNext || nextHref) && (onNext ? (
+              <button type="button" onClick={onNext} className="media-focus inline-flex min-h-10 items-center gap-2 rounded-md border border-white/20 bg-black/50 px-3 text-xs text-white">
+                Next <SkipForward size={16}/>
+              </button>
+            ) : (
+              <Link href={nextHref!} className="media-focus inline-flex min-h-10 items-center gap-2 rounded-md border border-white/20 bg-black/50 px-3 text-xs text-white">
+                Next <SkipForward size={16}/>
+              </Link>
+            ))}
+            {onClose ? (
+              <button type="button" onClick={onClose} aria-label="Return to movie details"
+                className="media-focus grid h-10 w-10 place-items-center rounded-md border border-white/20 bg-black/50 text-white">
+                <X size={20}/>
+              </button>
+            ) : (
+              <Link href={backHref} aria-label="Close player"
+                className="media-focus grid h-10 w-10 place-items-center rounded-md border border-white/20 bg-black/50 text-white">
+                <X size={20}/>
               </Link>
             )}
-            <Link
-              href={backHref}
-              aria-label="Close player"
-              className="media-focus grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-white/10 text-white backdrop-blur hover:bg-white/15"
-            >
-              <X size={20} />
-            </Link>
           </div>
         </div>
 
         {isBusy && (
-          <div className="absolute inset-0 z-10 grid place-items-center bg-black/75 text-center backdrop-blur-sm">
+          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black/40 text-center">
             <div>
               <div className="mx-auto h-1 w-20 rounded-full bg-white/30" />
               <p className="mt-4 text-xs font-bold uppercase tracking-[.18em] text-accent">
@@ -697,7 +719,7 @@ export function WatchPlayer({
                 <button
                   type="button"
                   className="media-focus min-h-11 rounded-full border border-white/10 bg-white/5 px-5 py-2.5 font-semibold text-zinc-300 hover:bg-white/10"
-                  onClick={() => window.history.back()}
+                  onClick={() => onClose ? onClose() : window.history.back()}
                 >
                   Back to catalog
                 </button>
@@ -705,20 +727,37 @@ export function WatchPlayer({
             </div>
           </div>
         )}
-      </div>
-
       <div
-        className={`pf-player-controls relative z-40 border-t border-white/10 bg-[#0d171b]/95 transition-opacity ${
-          controlsVisible ? "opacity-100" : "opacity-80"
+        className={`pf-player-controls absolute inset-x-0 bottom-0 z-40 bg-gradient-to-t from-black/95 via-black/65 to-transparent pt-8 transition-opacity duration-150 ${
+          controlsVisible || qualityOpen || subtitleOpen || speedOpen || !displayPlaying
+          ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
         {!isEmbed && (
           <div className="px-3 pt-2 md:px-6">
             <div
-              className="group relative h-1.5 cursor-pointer rounded-full bg-white/15"
-              onClick={(e) => {
+              role="slider" tabIndex={0} aria-label="Seek video"
+              aria-valuemin={0} aria-valuemax={Math.max(1, Math.floor(duration))}
+              aria-valuenow={Math.floor(currentTime)}
+              className="group relative h-2 cursor-pointer rounded-full bg-white/20 touch-none"
+              onPointerDown={(e) => {
+                const target = e.currentTarget;
+                target.setPointerCapture(e.pointerId);
+                const rect = target.getBoundingClientRect();
+                seekTo((e.clientX - rect.left) / rect.width);
+                showControls();
+              }}
+              onPointerMove={(e) => {
+                if (e.buttons !== 1) return;
                 const rect = e.currentTarget.getBoundingClientRect();
                 seekTo((e.clientX - rect.left) / rect.width);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  const video = videoRef.current;
+                  if (video) video.currentTime = Math.max(0, Math.min(duration, video.currentTime + (e.key === "ArrowRight" ? 5 : -5)));
+                }
               }}
             >
               <div
@@ -741,7 +780,7 @@ export function WatchPlayer({
           </div>
         )}
 
-        <div className="flex min-h-[56px] flex-wrap items-center gap-0.5 px-2 py-1 md:px-4">
+        <div className="pf-player-actions flex min-h-[48px] flex-wrap items-center gap-0.5 px-2 pb-2 md:gap-1 md:px-4">
           {!isEmbed && (
             <>
               <button
@@ -793,7 +832,7 @@ export function WatchPlayer({
                 step={0.01}
                 value={muted ? 0 : volume}
                 aria-label="Volume"
-                className="hidden w-24 accent-[var(--pinflix-accent,#e63946)] sm:block"
+                className="hidden w-20 accent-brand lg:block"
                 onChange={(e) => {
                   const next = Number(e.target.value);
                   setVolume(next);
@@ -987,6 +1026,7 @@ export function WatchPlayer({
             {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
           </button>
         </div>
+      </div>
       </div>
     </div>
   );
