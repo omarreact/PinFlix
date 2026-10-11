@@ -240,7 +240,7 @@ export async function getLatestPage(kind: "movie" | "show", page = 1, timeoutMs 
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ page, perPage: 28, channelId }),
-    }, Math.min(timeoutMs, 5000));
+    }, Math.min(timeoutMs, 3500));
 
     if (res.code === 0) {
       const raw = extractSearchItems(res.data);
@@ -495,24 +495,26 @@ export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
   // The second host is an H5 domain published for the same provider; do not
   // manufacture movie records or use TMDB listings as playable titles.
   const origins = [API_BASE, "https://h5.aoneroom.com"];
-  let operations: any[] | null = null;
-  for (const origin of origins) {
+  async function readHome(origin: string): Promise<any[]> {
     const url = new URL("/wefeed-h5api-bff/home", origin);
     url.searchParams.set("host", "movibox.net");
     url.searchParams.set("channel", "1");
-    try {
-      const res = await fetchJson<H5ApiResponse<any>>(url, {}, 4000);
-      const raw = res.data?.operatingList;
-      if (res.code === 0 && Array.isArray(raw)) {
-        operations = raw;
-        if (operations.length > 0) break;
-      }
-    } catch (error) {
-      console.warn("MovieBox home feed unavailable:", origin, formatError(error));
+    const res = await fetchJson<H5ApiResponse<any>>(url, {}, 3500);
+    const operations = res.data?.operatingList;
+    if (res.code !== 0 || !Array.isArray(operations) || !operations.length) {
+      throw new Error("Provider homepage returned no usable sections");
     }
+    return operations;
   }
-
-  if (!operations?.length) return [];
+  let operations: any[];
+  try {
+    // Either provider host may serve the same read-only H5 feed. The first
+    // usable response wins; a slow/broken mirror does not stall the UI.
+    operations = await Promise.any(origins.map(readHome));
+  } catch (error) {
+    console.warn("All MovieBox home-feed endpoints unavailable:", formatError(error));
+    return [];
+  }
   try {
     const sections: MovieBoxHomeSection[] = [];
 
