@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Clapperboard, Film, Search, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { searchHref, type SearchKind } from "@/src/lib/search-ranking";
+import { safeReleaseYear } from "@/src/lib/year-search";
 import type { Entertainment } from "@/src/types/catalog";
 
 type SearchResponse={
@@ -22,16 +23,19 @@ function saveRecent(value:string){
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify([value,...getRecent().filter(v=>v.toLowerCase()!==value.toLowerCase())].slice(0,5)));}
   catch{ /* private browsing can disable storage */ }
 }
-function searchUrl(q:string,kind:SearchKind){
-  const params=new URLSearchParams({q,kind});
+function searchUrl(q:string,kind:SearchKind,year:string){
+  const params=new URLSearchParams({kind});
+  if(q)params.set("q",q);
+  if(safeReleaseYear(year)!==null)params.set("year",year.trim());
   return `/search?${params}`;
 }
 
 export function LiveSearch({
-  initialQuery = "", initialKind = "all",
+  initialQuery = "", initialKind = "all", initialYear = "",
 }: {
   initialQuery?: string;
   initialKind?: SearchKind;
+  initialYear?: string;
 } = {}){
   const router=useRouter();
   const inputRef=useRef<HTMLInputElement>(null);
@@ -40,6 +44,7 @@ export function LiveSearch({
   const listId=`pinflix-search-results-${id.replaceAll(":","")}`;
   const [query,setQuery]=useState(initialQuery);
   const [kind,setKind]=useState<SearchKind>(initialKind);
+  const [year,setYear]=useState(initialYear);
   const [open,setOpen]=useState(false);
   const [data,setData]=useState<SearchResponse|null>(null);
   const [loading,setLoading]=useState(false);
@@ -50,7 +55,8 @@ export function LiveSearch({
   const provider=useMemo(()=>data?.catalog.slice(0,6)??[],[data]);
   const combined=provider;
   const term=query.trim();
-  const ready=term.length>=2;
+  const validYear=safeReleaseYear(year);
+  const ready=term.length>=2 || validYear!==null;
 
   const close=useCallback(()=>{setOpen(false);setActive(-1);},[]);
   useEffect(()=>{
@@ -77,6 +83,7 @@ export function LiveSearch({
     const timer=window.setTimeout(async()=>{
       try{
         const params=new URLSearchParams({q:term,kind});
+        if(validYear!==null)params.set("year",String(validYear));
         const response=await fetch(`/api/search/live?${params}`,{signal:controller.signal});
         if(!response.ok)throw Error("Search unavailable");
         const body=await response.json() as SearchResponse;
@@ -86,13 +93,14 @@ export function LiveSearch({
       }
     },220);
     return ()=>{window.clearTimeout(timer);controller.abort();};
-  },[term,kind,open,ready]);
+  },[term,kind,validYear,open,ready]);
 
   function performSearch(event?:FormEvent){
     event?.preventDefault();
-    if(!term)return;
-    saveRecent(term);setRecent(getRecent());close();
-    router.push(searchUrl(term,kind));
+    if(!term && validYear===null)return;
+    if(term)saveRecent(term);
+    setRecent(getRecent());close();
+    router.push(searchUrl(term,kind,year));
   }
   function switchKind(value:SearchKind){
     setKind(value);setData(null);setError(false);setActive(-1);
@@ -146,13 +154,25 @@ export function LiveSearch({
 
     {open&&<div id={listId} role="listbox" aria-label="Live movie and TV search suggestions"
       className="absolute right-0 top-[calc(100%+8px)] z-[80] w-[min(92vw,490px)] max-h-[min(75dvh,600px)] overflow-y-auto rounded-xl border border-line bg-panel shadow-[0_24px_65px_rgba(0,0,0,.65)]">
-      <div className="sticky top-0 z-10 flex gap-1 border-b border-line bg-panel p-2" role="group" aria-label="Media type">
-        {filters.map(([value,label])=><button key={value} type="button" aria-pressed={kind===value}
-          onClick={()=>switchKind(value)}
-          className={`media-focus min-h-9 flex-1 rounded-md px-3 text-xs font-semibold ${kind===value?"bg-brand text-bg":"bg-surface text-muted hover:text-fg"}`}>{label}</button>)}
+      <div className="sticky top-0 z-10 border-b border-line bg-panel p-2">
+        <div className="flex gap-1" role="group" aria-label="Media type">
+          {filters.map(([value,label])=><button key={value} type="button" aria-pressed={kind===value}
+            onClick={()=>switchKind(value)}
+            className={`media-focus min-h-9 flex-1 rounded-md px-3 text-xs font-semibold ${kind===value?"bg-brand text-bg":"bg-surface text-muted hover:text-fg"}`}>{label}</button>)}
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-3 px-1">
+          <label htmlFor={`${listId}-year`} className="shrink-0 text-xs text-muted">Release year</label>
+          <input id={`${listId}-year`} type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+            aria-label="Filter search results by release year"
+            value={year} placeholder="Any year"
+            onChange={event=>{setYear(event.target.value.replace(/[^0-9]/g,"").slice(0,4));setData(null);setError(false);setActive(-1);setLoading(Boolean(event.target.value && event.target.value.length===4)||term.length>=2);}}
+            className="min-h-9 w-28 rounded-md border border-line bg-surface px-3 text-sm text-fg outline-none focus:border-brand"/>
+          {validYear!==null&&<button type="button" onClick={()=>performSearch()}
+            className="media-focus shrink-0 rounded-md bg-brand px-3 py-2 text-xs font-semibold text-bg">Find {year}</button>}
+        </div>
       </div>
       {!ready?<div className="p-4">
-        <p className="text-xs text-muted">Type at least 2 characters to search the whole catalog. Press <kbd>/</kbd> to search from anywhere.</p>
+        <p className="text-xs text-muted">Type a title or select a release year. Press <kbd>/</kbd> to search from anywhere.</p>
         {recent.length>0&&<div className="mt-4"><p className="pf-eyebrow mb-2">Recent searches</p>
           {recent.map(value=><button type="button" key={value} onClick={()=>{setQuery(value);setOpen(true);setLoading(true);setData(null);inputRef.current?.focus();}}
             className="media-focus block min-h-9 w-full truncate rounded px-2 text-left text-sm text-fg hover:bg-white/5">{value}</button>)}
@@ -162,7 +182,7 @@ export function LiveSearch({
         {error&&!loading&&<p role="alert" className="px-4 py-5 text-sm text-muted">Search is temporarily unavailable. Press Enter to view full results.</p>}
         {!loading&&!error&&<>
           {provider.length>0&&<section aria-label="PinFlix catalogue matches"><p className="pf-eyebrow bg-bg/50 px-3 py-2">PinFlix video catalogue</p>{provider.map((item,i)=>renderItem(item,i))}</section>}
-          {!combined.length&&<p className="px-4 py-5 text-sm text-muted">The video provider returned no matching titles. Try a shorter name or another category.</p>}
+          {!combined.length&&<p className="px-4 py-5 text-sm text-muted">{validYear!==null ? "No matching titles found in the provider pages searched for this year." : "The video provider returned no matching titles. Try a shorter name or another category."}</p>}
         </>}
         <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-line bg-panel px-3 py-2">
           <Link href="/catalogue" onClick={close} className="media-focus rounded-md px-3 py-2 text-xs font-semibold text-muted hover:bg-surface">Browse categories</Link>
