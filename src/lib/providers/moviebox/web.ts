@@ -2,6 +2,7 @@
 
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
 import type { SeriesNavigation } from "../contracts";
+import { cache } from "react";
 import { extractSearchItems, validSearchSubject } from "./search-response";
 
 const API_BASE = "https://h5-api.aoneroom.com";
@@ -216,33 +217,52 @@ export async function search(
   return [...new Map(results.map(item => [item.id, item])).values()];
 }
 
+function distinctById(items: Entertainment[]): Entertainment[] {
+  return [...new Map(items.filter(item => canHandleId(item.id)).map(item => [item.id, item])).values()];
+}
+
+async function homepagePageFallback(kind: "movie" | "show", page: number) {
+  // The provider's H5 homepage feed is independent of the subject/filter API.
+  // It can repopulate movie and TV shelves when filtering is down.
+  if (page !== 1) return { items: [], page, hasNextPage: false };
+  const sections = await getHomeSectionsCached();
+  const items = distinctById(sections.flatMap(section => section.items))
+    .filter(item => item.kind === kind).slice(0, 56);
+  if (items.length) console.info("PinFlix catalogue recovered using provider home feed:", kind, items.length);
+  return { items, page, hasNextPage: false };
+}
+
 export async function getLatestPage(kind: "movie" | "show", page = 1, timeoutMs = REQUEST_TIMEOUT_MS) {
   const channelId = kind === "movie" ? 1 : 2;
   const url = new URL("/wefeed-h5api-bff/subject/filter", API_BASE);
-
   try {
-    const res = await fetchJson<H5ApiResponse<any>>(url, {
+    const res = await fetchJson<H5ApiResponse<unknown>>(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ page, perPage: 28, channelId }),
-    }, timeoutMs);
+    }, Math.min(timeoutMs, 5000));
 
-    if (res.code !== 0 || !res.data?.items) {
-      console.error("MovieBox getLatestPage non-ok", res.code, res.message);
-      return { items: [], page, hasNextPage: false };
+    if (res.code === 0) {
+      const raw = extractSearchItems(res.data);
+      if (raw !== null) {
+        const items = distinctById(raw.filter(validSearchSubject).map(item => mapItem(item, kind)));
+        if (items.length || page > 1) {
+          const pager = res.data && typeof res.data === "object"
+            ? (res.data as {pager?:{page?:string|number;hasMore?:boolean}}).pager
+            : undefined;
+          return {
+            items, page: Number(pager?.page) || page,
+            hasNextPage: Boolean(pager?.hasMore),
+          };
+        }
+      }
     }
-
-    const items: Entertainment[] = res.data.items.map((item: any) => mapItem(item, kind));
-
-    return {
-      items,
-      page: parseInt(res.data.pager?.page || String(page), 10),
-      hasNextPage: Boolean(res.data.pager?.hasMore),
-    };
+    console.warn("MovieBox category filter returned no usable items:", kind, res.code);
   } catch (error) {
-    console.error("MovieBox getLatestPage error:", formatError(error));
-    return { items: [], page, hasNextPage: false };
+    console.warn("MovieBox category filter unavailable:", kind, formatError(error));
   }
+
+  return homepagePageFallback(kind, page);
 }
 
 export async function getCategories(_kind: "movie" | "show") {
@@ -471,20 +491,32 @@ export async function resolveStreams(
 }
 
 export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
-  const url = new URL("/wefeed-h5api-bff/home", API_BASE);
-  url.searchParams.set("host", "movibox.net");
-  url.searchParams.set("channel", "1");
-
-  try {
-    const res = await fetchJson<H5ApiResponse<any>>(url);
-    if (res.code !== 0 || !res.data?.operatingList) {
-      console.error("MovieBox getHomeSections non-ok", res.code, res.message);
-      return [];
+  // Read-only provider discovery fallback. No change to playback origin/CDN.
+  // The second host is an H5 domain published for the same provider; do not
+  // manufacture movie records or use TMDB listings as playable titles.
+  const origins = [API_BASE, "https://h5.aoneroom.com"];
+  let operations: any[] | null = null;
+  for (const origin of origins) {
+    const url = new URL("/wefeed-h5api-bff/home", origin);
+    url.searchParams.set("host", "movibox.net");
+    url.searchParams.set("channel", "1");
+    try {
+      const res = await fetchJson<H5ApiResponse<any>>(url, {}, 4000);
+      const raw = res.data?.operatingList;
+      if (res.code === 0 && Array.isArray(raw)) {
+        operations = raw;
+        if (operations.length > 0) break;
+      }
+    } catch (error) {
+      console.warn("MovieBox home feed unavailable:", origin, formatError(error));
     }
+  }
 
+  if (!operations?.length) return [];
+  try {
     const sections: MovieBoxHomeSection[] = [];
 
-    for (const op of res.data.operatingList) {
+    for (const op of operations) {
       const rawItems: any[] =
         (Array.isArray(op.banner?.items) && op.banner.items.length > 0
           ? op.banner.items
@@ -520,3 +552,7 @@ export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
     return [];
   }
 }
+
+// Request-scoped deduplication: movie and TV shelves reuse one provider home
+// fetch if the category filter fails in both branches on the same page.
+const getHomeSectionsCached = cache(getHomeSections);
