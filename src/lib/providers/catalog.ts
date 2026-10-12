@@ -1,4 +1,3 @@
-
 import * as movieboxWeb from "./moviebox/web";
 import type {
   PinFlixProvider,
@@ -21,6 +20,10 @@ export const catalogProvider: PinFlixProvider = {
 
   async search(query, page = 1, kind = "all") {
     return movieboxWeb.search(query, page, kind);
+  },
+
+  async searchPage(query, page = 1, kind = "all") {
+    return movieboxWeb.searchPage(query, page, kind);
   },
 
   async getLatestPage(kind, page = 1) {
