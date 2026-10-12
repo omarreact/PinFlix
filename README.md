@@ -98,10 +98,31 @@ npm run build:vinext
 
 ## Production
 
-- Worker: `pinflix`
+- Vercel project: `omarreacts-projects/pinflix`, Functions region: Singapore (`sin1`)
 - Domain: `pinflix.pincodeit.com`
 - Source of truth: GitHub `main`
-- Do **not** add Vercel as a production target
+- Cloudflare Worker/R2 remains a separate media-delivery integration; the vinext
+  commands above are the alternative Cloudflare application build.
+
+## Provider search
+
+Title search first establishes the provider's normal anonymous session through
+its homepage endpoint. The issued `x-user` token stays in server memory for up
+to five minutes and is attached to search requests as a bearer token. Concurrent
+searches share the handshake; rejected tokens are invalidated and refreshed once
+per upstream query. Bootstrap, index queries and retries fit within an eight-second
+search budget. No user cookie, committed token or TMDB result is used as a
+playable provider title.
+
+Movie/TV filters exclude other provider subject types. Search ranking drops
+unrelated recommendations, and pagination follows the provider's `hasMore`
+flag rather than the number of visible results. A successful zero-match response
+is distinct from an upstream outage; search APIs return a non-cacheable 503 for
+the latter. Year-only browsing remains a bounded catalogue window, as explained
+on the search page.
+
+`vitest.config.ts` isolates unit tests from the Cloudflare/vinext dev plugins so
+running tests does not overwrite Next.js's generated route types before a build.
 
 ## Media boundary
 

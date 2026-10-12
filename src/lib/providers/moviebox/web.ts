@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
-import type { SeriesNavigation } from "../contracts";
+import type { ProviderCatalogPage, SeriesNavigation } from "../contracts";
 import { cache } from "react";
 import { extractSearchItems, validSearchSubject } from "./search-response";
+import { getSearchSession, invalidateSearchSession } from "./search-session";
 
 const API_BASE = "https://h5-api.aoneroom.com";
 const SITE_BASE = "https://movibox.net";
@@ -31,6 +32,15 @@ type H5ApiResponse<T> = {
   data: T;
 };
 
+class ProviderHttpError extends Error {
+  constructor(
+    message: string,
+    readonly tokenRejected: boolean,
+  ) {
+    super(message);
+  }
+}
+
 export type MovieBoxHomeSection = {
   id: string;
   label: string;
@@ -54,11 +64,16 @@ function providerId(subjectId: string | number, detailPath: string) {
 function mapItem(item: any, kindFallback?: "movie" | "show"): Entertainment {
   const kind =
     kindFallback ??
-    (Number(item.subjectType ?? item.subject?.subjectType) === 2 ? "show" : "movie");
+    (Number(item.subjectType ?? item.subject?.subjectType) === 2
+      ? "show"
+      : "movie");
   const subj = item.subject ?? item;
   const subjectId = subj.subjectId ?? item.subjectId;
   const detailPath =
-    item.detailPath ?? subj.detailPath ?? item.subject?.detailPath ?? String(subjectId);
+    item.detailPath ??
+    subj.detailPath ??
+    item.subject?.detailPath ??
+    String(subjectId);
   const id = providerId(subjectId, detailPath);
 
   return {
@@ -81,12 +96,13 @@ function mapItem(item: any, kindFallback?: "movie" | "show"): Entertainment {
       subj.cover?.url ??
       item.cover?.url ??
       "",
-    genres: (subj.genre ?? item.genre)
-      ? String(subj.genre ?? item.genre)
-          .split(",")
-          .map((g: string) => g.trim())
-          .filter(Boolean)
-      : [],
+    genres:
+      (subj.genre ?? item.genre)
+        ? String(subj.genre ?? item.genre)
+            .split(",")
+            .map((g: string) => g.trim())
+            .filter(Boolean)
+        : [],
     rating: subj.imdbRatingValue
       ? parseFloat(subj.imdbRatingValue)
       : item.imdbRatingValue
@@ -96,7 +112,11 @@ function mapItem(item: any, kindFallback?: "movie" | "show"): Entertainment {
   };
 }
 
-async function fetchJson<T>(url: URL | string, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
+async function fetchJson<T>(
+  url: URL | string,
+  init: RequestInit = {},
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -120,14 +140,17 @@ async function fetchJson<T>(url: URL | string, init: RequestInit = {}, timeoutMs
     }
     if (!headers.has("Origin")) headers.set("Origin", SITE_BASE);
     if (!headers.has("Referer")) headers.set("Referer", `${SITE_BASE}/`);
-    if (!headers.has("sec-fetch-site")) headers.set("sec-fetch-site", "same-site");
+    if (!headers.has("sec-fetch-site"))
+      headers.set("sec-fetch-site", "same-site");
     if (!headers.has("sec-fetch-mode")) headers.set("sec-fetch-mode", "cors");
     if (!headers.has("sec-fetch-dest")) headers.set("sec-fetch-dest", "empty");
 
     const response = await fetch(url, {
       ...init,
       headers,
-      signal: controller.signal,
+      signal: init.signal
+        ? AbortSignal.any([controller.signal, init.signal])
+        : controller.signal,
       // Edge/Workers: avoid Next data-cache holding empty failures
       cache: "no-store",
     });
@@ -136,8 +159,17 @@ async function fetchJson<T>(url: URL | string, init: RequestInit = {}, timeoutMs
     const target = upstreamLabel(url);
 
     if (!response.ok) {
-      throw new Error(
+      let tokenRejected = response.status === 401;
+      if (response.status === 400) {
+        try {
+          tokenRejected = JSON.parse(body).message === "invalid token";
+        } catch {
+          /* Non-JSON upstream error. */
+        }
+      }
+      throw new ProviderHttpError(
         `${target} returned HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`,
+        tokenRejected,
       );
     }
 
@@ -158,7 +190,10 @@ export function canHandleId(id: string): boolean {
 }
 
 export class ProviderSearchUnavailable extends Error {
-  constructor() { super("Video provider search is temporarily unavailable"); this.name = "ProviderSearchUnavailable"; }
+  constructor() {
+    super("Video provider search is temporarily unavailable");
+    this.name = "ProviderSearchUnavailable";
+  }
 }
 
 export async function search(
@@ -166,28 +201,90 @@ export async function search(
   page = 1,
   kind: "all" | "movie" | "show" = "all",
 ): Promise<Entertainment[]> {
-  const keyword = query.trim().slice(0, 100);
-  if (keyword.length < 2) return [];
-  const safePage = Number.isInteger(page) ? Math.max(1, Math.min(page, 100)) : 1;
-  const url = new URL("/wefeed-h5api-bff/subject/search", API_BASE);
+  return (await searchPage(query, page, kind)).items;
+}
 
-  async function queryType(subjectType: number): Promise<Entertainment[]> {
-    const res = await fetchJson<H5ApiResponse<unknown>>(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ keyword, page: safePage, perPage: 30, subjectType }),
-    }, 4_000);
-    if (res.code !== 0) throw new Error("Provider returned a non-success search status");
+export async function searchPage(
+  query: string,
+  page = 1,
+  kind: "all" | "movie" | "show" = "all",
+): Promise<ProviderCatalogPage> {
+  const keyword = query.trim().slice(0, 100);
+  const safePage = Number.isInteger(page)
+    ? Math.max(1, Math.min(page, 100))
+    : 1;
+  if (keyword.length < 2)
+    return { items: [], page: safePage, hasNextPage: false };
+  const url = new URL("/wefeed-h5api-bff/subject/search", API_BASE);
+  const signal = AbortSignal.timeout(8000);
+
+  async function queryType(subjectType: number): Promise<ProviderCatalogPage> {
+    let res: H5ApiResponse<unknown> | undefined;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const token = await getSearchSession(signal);
+      try {
+        res = await fetchJson<H5ApiResponse<unknown>>(
+          url,
+          {
+            method: "POST",
+            signal,
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              keyword,
+              page: safePage,
+              perPage: 30,
+              subjectType,
+            }),
+          },
+          4_000,
+        );
+        break;
+      } catch (error) {
+        if (
+          !(error instanceof ProviderHttpError) ||
+          !error.tokenRejected ||
+          attempt
+        )
+          throw error;
+        invalidateSearchSession(token);
+      }
+    }
+    if (!res) throw new ProviderSearchUnavailable();
+    if (res.code !== 0)
+      throw new Error("Provider returned a non-success search status");
     const items = extractSearchItems(res.data);
-    if (items === null) throw new Error("Provider returned an unrecognized search response");
-    return items
+    if (items === null)
+      throw new Error("Provider returned an unrecognized search response");
+    const mapped = items
       .filter(validSearchSubject)
-      .map(item => mapItem(item))
-      .filter(item => item.title !== "Untitled" && (item.kind === "movie" || item.kind === "show"));
+      .map((item) => mapItem(item))
+      .filter(
+        (item) =>
+          item.title !== "Untitled" && (kind === "all" || item.kind === kind),
+      );
+    const pager =
+      res.data && typeof res.data === "object"
+        ? (res.data as { pager?: { hasMore?: boolean } }).pager
+        : undefined;
+    return {
+      items: mapped,
+      page: safePage,
+      hasNextPage:
+        typeof pager?.hasMore === "boolean"
+          ? pager.hasMore
+          : items.length >= 30,
+    };
   }
 
   const mainType = kind === "movie" ? 1 : kind === "show" ? 2 : 0;
-  let initial: Entertainment[] = [];
+  let initial: ProviderCatalogPage = {
+    items: [],
+    page: safePage,
+    hasNextPage: false,
+  };
   let succeeded = false;
   try {
     initial = await queryType(mainType);
@@ -195,8 +292,8 @@ export async function search(
   } catch (error) {
     console.warn("Primary provider search failed:", formatError(error));
   }
-  if (initial.length > 0) {
-    return [...new Map(initial.map(item => [item.id, item])).values()];
+  if (initial.items.length > 0) {
+    return { ...initial, items: distinctById(initial.items) };
   }
 
   // A zero-result generic query is not proof that an indexed series is absent.
@@ -204,21 +301,32 @@ export async function search(
   // first-page fallback, this searches by title across the provider index.
   const secondary = kind === "all" ? [1, 2] : [0];
   const variants = await Promise.allSettled(secondary.map(queryType));
-  const results = [...initial];
+  const results = [...initial.items];
+  let hasNextPage = initial.hasNextPage;
   for (const variant of variants) {
     if (variant.status === "fulfilled") {
       succeeded = true;
-      results.push(...variant.value);
+      results.push(...variant.value.items);
+      hasNextPage ||= variant.value.hasNextPage;
     } else {
-      console.warn("Alternate provider search failed:", formatError(variant.reason));
+      console.warn(
+        "Alternate provider search failed:",
+        formatError(variant.reason),
+      );
     }
   }
   if (!succeeded) throw new ProviderSearchUnavailable();
-  return [...new Map(results.map(item => [item.id, item])).values()];
+  return { items: distinctById(results), page: safePage, hasNextPage };
 }
 
 function distinctById(items: Entertainment[]): Entertainment[] {
-  return [...new Map(items.filter(item => canHandleId(item.id)).map(item => [item.id, item])).values()];
+  return [
+    ...new Map(
+      items
+        .filter((item) => canHandleId(item.id))
+        .map((item) => [item.id, item]),
+    ).values(),
+  ];
 }
 
 async function homepagePageFallback(kind: "movie" | "show", page: number) {
@@ -226,40 +334,70 @@ async function homepagePageFallback(kind: "movie" | "show", page: number) {
   // It can repopulate movie and TV shelves when filtering is down.
   if (page !== 1) return { items: [], page, hasNextPage: false };
   const sections = await getHomeSectionsCached();
-  const items = distinctById(sections.flatMap(section => section.items))
-    .filter(item => item.kind === kind).slice(0, 56);
-  if (items.length) console.info("PinFlix catalogue recovered using provider home feed:", kind, items.length);
+  const items = distinctById(sections.flatMap((section) => section.items))
+    .filter((item) => item.kind === kind)
+    .slice(0, 56);
+  if (items.length)
+    console.info(
+      "PinFlix catalogue recovered using provider home feed:",
+      kind,
+      items.length,
+    );
   return { items, page, hasNextPage: false };
 }
 
-export async function getLatestPage(kind: "movie" | "show", page = 1, timeoutMs = REQUEST_TIMEOUT_MS) {
+export async function getLatestPage(
+  kind: "movie" | "show",
+  page = 1,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+) {
   const channelId = kind === "movie" ? 1 : 2;
   const url = new URL("/wefeed-h5api-bff/subject/filter", API_BASE);
   try {
-    const res = await fetchJson<H5ApiResponse<unknown>>(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ page, perPage: 28, channelId }),
-    }, Math.min(timeoutMs, 3500));
+    const res = await fetchJson<H5ApiResponse<unknown>>(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ page, perPage: 28, channelId }),
+      },
+      Math.min(timeoutMs, 3500),
+    );
 
     if (res.code === 0) {
       const raw = extractSearchItems(res.data);
       if (raw !== null) {
-        const items = distinctById(raw.filter(validSearchSubject).map(item => mapItem(item, kind)));
+        const items = distinctById(
+          raw.filter(validSearchSubject).map((item) => mapItem(item, kind)),
+        );
         if (items.length || page > 1) {
-          const pager = res.data && typeof res.data === "object"
-            ? (res.data as {pager?:{page?:string|number;hasMore?:boolean}}).pager
-            : undefined;
+          const pager =
+            res.data && typeof res.data === "object"
+              ? (
+                  res.data as {
+                    pager?: { page?: string | number; hasMore?: boolean };
+                  }
+                ).pager
+              : undefined;
           return {
-            items, page: Number(pager?.page) || page,
+            items,
+            page: Number(pager?.page) || page,
             hasNextPage: Boolean(pager?.hasMore),
           };
         }
       }
     }
-    console.warn("MovieBox category filter returned no usable items:", kind, res.code);
+    console.warn(
+      "MovieBox category filter returned no usable items:",
+      kind,
+      res.code,
+    );
   } catch (error) {
-    console.warn("MovieBox category filter unavailable:", kind, formatError(error));
+    console.warn(
+      "MovieBox category filter unavailable:",
+      kind,
+      formatError(error),
+    );
   }
 
   return homepagePageFallback(kind, page);
@@ -300,16 +438,22 @@ export async function getDetails(id: string): Promise<Entertainment | null> {
       providerId: String(subj.subjectId),
       title: subj.title,
       synopsis: subj.description || "",
-      year: subj.releaseDate ? parseInt(String(subj.releaseDate).split("-")[0], 10) : undefined,
+      year: subj.releaseDate
+        ? parseInt(String(subj.releaseDate).split("-")[0], 10)
+        : undefined,
       poster: subj.cover?.url || "",
-      backdrop: Array.isArray(subj.stills) ? subj.stills[0]?.url : subj.stills?.url || "",
+      backdrop: Array.isArray(subj.stills)
+        ? subj.stills[0]?.url
+        : subj.stills?.url || "",
       genres: subj.genre
         ? String(subj.genre)
             .split(",")
             .map((g: string) => g.trim())
             .filter(Boolean)
         : [],
-      rating: subj.imdbRatingValue ? parseFloat(subj.imdbRatingValue) : undefined,
+      rating: subj.imdbRatingValue
+        ? parseFloat(subj.imdbRatingValue)
+        : undefined,
       cast,
       detailUrl: new URL(`/detail/${parsed.detailPath}`, SITE_BASE).toString(),
     };
@@ -324,7 +468,9 @@ export async function getSeriesNavigation(
   requestedSeason = 1,
 ): Promise<SeriesNavigation> {
   const fallbackSeason =
-    Number.isInteger(requestedSeason) && requestedSeason > 0 ? requestedSeason : 1;
+    Number.isInteger(requestedSeason) && requestedSeason > 0
+      ? requestedSeason
+      : 1;
 
   const parsed = parseProviderId(id);
   if (!parsed) {
@@ -342,10 +488,15 @@ export async function getSeriesNavigation(
       .map((item: any) => Number(item.se))
       .filter((value: number) => Number.isInteger(value) && value >= 0)
       .map((value: number) => (value === 0 ? 1 : value))
-      .filter((value: number, index: number, arr: number[]) => arr.indexOf(value) === index)
+      .filter(
+        (value: number, index: number, arr: number[]) =>
+          arr.indexOf(value) === index,
+      )
       .sort((a: number, b: number) => a - b);
 
-    const season = seasons.includes(fallbackSeason) ? fallbackSeason : (seasons[0] ?? fallbackSeason);
+    const season = seasons.includes(fallbackSeason)
+      ? fallbackSeason
+      : (seasons[0] ?? fallbackSeason);
 
     const seasonMeta =
       rawSeasons.find((item: any) => Number(item.se) === season) ??
@@ -360,7 +511,10 @@ export async function getSeriesNavigation(
           .map((v: string) => Number(v.trim()))
           .filter((v: number) => Number.isInteger(v) && v > 0);
         if (epArr.length) episodes = Math.max(...epArr);
-      } else if (Number.isInteger(seasonMeta.maxEp) && Number(seasonMeta.maxEp) > 0) {
+      } else if (
+        Number.isInteger(seasonMeta.maxEp) &&
+        Number(seasonMeta.maxEp) > 0
+      ) {
         episodes = Number(seasonMeta.maxEp);
       }
     }
@@ -396,9 +550,13 @@ export async function resolveStreams(
   if (!parsed) return [];
 
   const season =
-    Number.isInteger(options.season) && Number(options.season) > 0 ? Number(options.season) : 0;
+    Number.isInteger(options.season) && Number(options.season) > 0
+      ? Number(options.season)
+      : 0;
   const episode =
-    Number.isInteger(options.episode) && Number(options.episode) > 0 ? Number(options.episode) : 0;
+    Number.isInteger(options.episode) && Number(options.episode) > 0
+      ? Number(options.episode)
+      : 0;
 
   const validSources: StreamSource[] = [];
   let topStreamId: string | null = null;
@@ -457,7 +615,6 @@ export async function resolveStreams(
     console.error("MovieBox resolveStreams play error:", formatError(error));
   }
 
-
   if (validSources.length > 0 && topStreamId) {
     try {
       const capUrl = new URL("/wefeed-h5api-bff/subject/caption", API_BASE);
@@ -512,7 +669,10 @@ export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
     // usable response wins; a slow/broken mirror does not stall the UI.
     operations = await Promise.any(origins.map(readHome));
   } catch (error) {
-    console.warn("All MovieBox home-feed endpoints unavailable:", formatError(error));
+    console.warn(
+      "All MovieBox home-feed endpoints unavailable:",
+      formatError(error),
+    );
     return [];
   }
   try {
@@ -523,7 +683,9 @@ export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
         (Array.isArray(op.banner?.items) && op.banner.items.length > 0
           ? op.banner.items
           : null) ??
-        (Array.isArray(op.subjects) && op.subjects.length > 0 ? op.subjects : null) ??
+        (Array.isArray(op.subjects) && op.subjects.length > 0
+          ? op.subjects
+          : null) ??
         [];
 
       if (!rawItems.length) continue;
