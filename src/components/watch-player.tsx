@@ -5,8 +5,8 @@ import { saveProgress } from "@/src/lib/history";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Captions,
-  ChevronDown,
+  LoaderCircle,
+  Tv,
   Maximize,
   Minimize,
   Pause,
@@ -34,6 +34,8 @@ type ResolveResponse = {
   sources?: Array<Omit<ResolvedSource, "sourceIndex">>;
   error?: string;
 };
+type NativeAudioTrack = { label?: string; language?: string; enabled: boolean };
+type VideoWithAudio = HTMLVideoElement & { audioTracks?: ArrayLike<NativeAudioTrack> };
 type HlsLevel = { index: number; label: string };
 
 function formatTime(seconds: number) {
@@ -90,13 +92,12 @@ export function WatchPlayer({
   const shellRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<import("hls.js").default | null>(null);
   const failoverRef = useRef<() => void>(() => undefined);
-  const qualityMenuRef = useRef<HTMLDivElement>(null);
-  const subtitleMenuRef = useRef<HTMLDivElement>(null);
-  const speedMenuRef = useRef<HTMLDivElement>(null);
   const [sources, setSources] = useState<ResolvedSource[]>([]);
   const [sourcePosition, setSourcePosition] = useState(0);
   const [hlsLevels, setHlsLevels] = useState<HlsLevel[]>([]);
   const [selectedLevel, setSelectedLevel] = useState(-1);
+  const [audioTracks, setAudioTracks] = useState<{ index: number; label: string }[]>([]);
+  const [selectedAudio, setSelectedAudio] = useState(-1);
   const [subtitleTracks, setSubtitleTracks] = useState<ResolvedSubtitle[]>([]);
   const [selectedSubtitle, setSelectedSubtitle] = useState("off");
   const [playing, setPlaying] = useState(false);
@@ -105,20 +106,21 @@ export function WatchPlayer({
   const [buffering, setBuffering] = useState(true);
   const [status, setStatus] = useState<"loading" | "ready" | "switching" | "error">("loading");
   const [error, setError] = useState("");
-  const [qualityOpen, setQualityOpen] = useState(false);
-  const [subtitleOpen, setSubtitleOpen] = useState(false);
-  const [speedOpen, setSpeedOpen] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const resumePositionRef = useRef(0);
   const lastReportedTimeRef = useRef(-1);
   const lastSavedAtRef = useRef(-1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [buffered, setBuffered] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [landscapeFallback, setLandscapeFallback] = useState(false);
-  const [fillFrame, setFillFrame] = useState(false);
+  const [fit, setFit] = useState<"contain" | "cover" | "fill">("contain");
+  const [touchIndicator, setTouchIndicator] = useState<"left" | "right" | null>(null);
+  const lastTap = useRef<{ time: number; side: "left" | "right" } | null>(null);
+  const lastTouchTime = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const indicatorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fullscreenMessage, setFullscreenMessage] = useState("");
   const orientationLockedRef = useRef(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -188,19 +190,21 @@ export function WatchPlayer({
   const showControls = useCallback(() => {
     setControlsVisible(true);
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    if (displayPlaying && !qualityOpen && !subtitleOpen && !speedOpen) {
-      hideTimer.current = setTimeout(() => setControlsVisible(false), 3000);
+    if (displayPlaying) {
+      hideTimer.current = setTimeout(() => { if (!shellRef.current?.contains(document.activeElement)) setControlsVisible(false); }, 3000);
     }
-  }, [displayPlaying, qualityOpen, subtitleOpen, speedOpen]);
+  }, [displayPlaying]);
 
   useEffect(() => {
-    if (!displayPlaying || qualityOpen || subtitleOpen || speedOpen) return;
-    const timer = window.setTimeout(() => setControlsVisible(false), 3500);
+    if (!displayPlaying) return;
+    const timer = window.setTimeout(() => { if (!shellRef.current?.contains(document.activeElement)) setControlsVisible(false); }, 3500);
     return () => window.clearTimeout(timer);
-  }, [displayPlaying, qualityOpen, subtitleOpen, speedOpen]);
+  }, [displayPlaying]);
 
   useEffect(() => () => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    if (indicatorTimer.current) clearTimeout(indicatorTimer.current);
   }, []);
 
   useEffect(() => {
@@ -252,6 +256,8 @@ export function WatchPlayer({
       setError("");
       setHlsLevels([]);
       setSelectedLevel(-1);
+      setAudioTracks([]);
+      setSelectedAudio(-1);
       setSubtitleTracks(source.subtitles ?? []);
       setSelectedSubtitle("off");
     }, 0);
@@ -331,6 +337,14 @@ export function WatchPlayer({
             } catch { /* private mode can deny storage */ }
             playResolved();
           });
+          hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_event, data) => {
+            if (cancelled) return;
+            setAudioTracks(data.audioTracks.map((track, index) => ({ index, label: track.name || track.lang || `Audio ${index + 1}` })));
+            setSelectedAudio(hls.audioTrack);
+          });
+          hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_event, data) => {
+            if (!cancelled) setSelectedAudio(data.id);
+          });
           hls.on(Hls.Events.ERROR, (_event, data) => {
             if (data.fatal) failover();
           });
@@ -381,9 +395,6 @@ export function WatchPlayer({
 
       showControls();
       if (event.key === "Escape") {
-        setQualityOpen(false);
-        setSubtitleOpen(false);
-        setSpeedOpen(false);
         return;
       }
       if (event.key === " " || event.key.toLowerCase() === "k") {
@@ -411,16 +422,6 @@ export function WatchPlayer({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   });
-
-  useEffect(() => {
-    const closeMenus = (event: MouseEvent) => {
-      if (!qualityMenuRef.current?.contains(event.target as Node)) setQualityOpen(false);
-      if (!subtitleMenuRef.current?.contains(event.target as Node)) setSubtitleOpen(false);
-      if (!speedMenuRef.current?.contains(event.target as Node)) setSpeedOpen(false);
-    };
-    document.addEventListener("mousedown", closeMenus);
-    return () => document.removeEventListener("mousedown", closeMenus);
-  }, []);
 
   async function togglePlayback() {
     const video = videoRef.current;
@@ -506,11 +507,10 @@ export function WatchPlayer({
   }
 
   function chooseSource(position: number) {
-    if (position === sourcePosition) { setQualityOpen(false); return; }
+    if (position === sourcePosition) return;
     const video = videoRef.current;
     if (video && Number.isFinite(video.currentTime)) resumePositionRef.current = video.currentTime;
     window.localStorage.setItem("pinflix-quality", sources[position]?.quality ?? "");
-    setQualityOpen(false);
     setSourcePosition(position);
   }
 
@@ -522,12 +522,10 @@ export function WatchPlayer({
       "pinflix-hls-quality",
       hlsLevels.find(level => level.index === index)?.label ?? "auto",
     );
-    setQualityOpen(false);
   }
 
   async function chooseSubtitle(value: string) {
     setSelectedSubtitle(value);
-    setSubtitleOpen(false);
 
     const trackObj = subtitleTracks.find((t) => t.language === value);
     if (trackObj && !trackObj.blobUrl && trackObj.url) {
@@ -548,16 +546,41 @@ export function WatchPlayer({
   }
 
   const isBusy = !isEmbed && (displayStatus === "loading" || displayStatus === "switching");
-  const progress = duration > 0 ? currentTime / duration : 0;
-  const bufferRatio = duration > 0 ? buffered / duration : 0;
+  function handleSurfaceTap(event: React.TouchEvent<HTMLDivElement>) {
+    if (isEmbed || (event.target as Element).closest("button,select,input,a,label") || event.changedTouches.length !== 1) return;
+    const now = Date.now();
+    lastTouchTime.current = now;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const side = event.changedTouches[0].clientX < bounds.left + bounds.width / 2 ? "left" : "right";
+    const previous = lastTap.current;
+    if (previous && now - previous.time < 320 && previous.side === side) {
+      if (tapTimer.current) clearTimeout(tapTimer.current);
+      lastTap.current = null;
+      const video = videoRef.current;
+      if (video) video.currentTime = Math.max(0, Math.min(duration || Infinity, video.currentTime + (side === "left" ? -5 : 5)));
+      setTouchIndicator(side);
+      if (indicatorTimer.current) clearTimeout(indicatorTimer.current);
+      indicatorTimer.current = setTimeout(() => setTouchIndicator(null), 600);
+      showControls();
+    } else {
+      if (tapTimer.current) clearTimeout(tapTimer.current);
+      lastTap.current = { time: now, side };
+      tapTimer.current = setTimeout(() => {
+        lastTap.current = null;
+        if (!controlsVisible) showControls();
+        else void togglePlayback();
+      }, 320);
+    }
+  }
 
   return (
     <div
       ref={shellRef}
       className={`pf-player ${inline ? "pf-inline-player" : "pf-legacy-player"} relative overflow-hidden bg-black text-white ${landscapeFallback ? "pf-landscape-fallback" : ""}`}
       onMouseMove={showControls}
-      onTouchStart={showControls}
-      onClick={showControls}
+      onTouchEnd={handleSurfaceTap}
+      onFocus={showControls}
+      onBlur={showControls}
     >
       <div className="pf-player-stage absolute inset-0">
         {isEmbed && source ? (
@@ -576,7 +599,8 @@ export function WatchPlayer({
             controls={false}
             playsInline
             preload="metadata"
-            className={`absolute inset-0 h-full w-full bg-black ${fillFrame ? "object-cover" : "object-contain"}`}
+            className="absolute inset-0 h-full w-full bg-black"
+            style={{ objectFit: fit }}
             aria-label={`Player for ${title}`}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
@@ -597,18 +621,23 @@ export function WatchPlayer({
               if (Math.abs(video.currentTime - lastReportedTimeRef.current) >= 0.25) {
                 lastReportedTimeRef.current = video.currentTime;
                 setCurrentTime(video.currentTime);
-                if (video.buffered.length > 0) setBuffered(video.buffered.end(video.buffered.length - 1));
               }
               if (Math.abs(video.currentTime - lastSavedAtRef.current) >= 5) {
                 lastSavedAtRef.current = video.currentTime;
                 window.localStorage.setItem(`pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`, String(video.currentTime));
               }
             }}
-            onDurationChange={() => setDuration(videoRef.current?.duration || 0)}
+            onDurationChange={() => { const length = videoRef.current?.duration; setDuration(length && Number.isFinite(length) ? length : 0); }}
             onLoadedMetadata={() => {
               const video = videoRef.current;
               if (!video) return;
               setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+              const nativeTracks = (video as VideoWithAudio).audioTracks;
+              if (nativeTracks?.length) {
+                const tracks = Array.from(nativeTracks);
+                setAudioTracks(tracks.map((track, index) => ({ index, label: track.label || track.language || `Audio ${index + 1}` })));
+                setSelectedAudio(tracks.findIndex(track => track.enabled));
+              }
               const saved = Number(window.localStorage.getItem(`pinflix-resume-${mediaId}-${season || 0}-${episode || 0}`));
               const requested = resumePositionRef.current > 5 ? resumePositionRef.current : saved;
               if (requested > 5 && Number.isFinite(requested) && requested < video.duration - 3) {
@@ -621,7 +650,7 @@ export function WatchPlayer({
               if (onNext) onNext();
               else if (nextHref) router.push(nextHref);
             }}
-            onClick={() => void togglePlayback()}
+            onClick={() => { if (Date.now() - lastTouchTime.current > 450) { showControls(); void togglePlayback(); } }}
           >
             {subtitleTracks.map((track) => (
               <track
@@ -672,7 +701,7 @@ export function WatchPlayer({
         {isBusy && (
           <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black/40 text-center">
             <div>
-              <div className="mx-auto h-1 w-20 rounded-full bg-white/30" />
+              <LoaderCircle size={32} className="mx-auto animate-spin" />
               <p className="mt-4 text-xs font-bold uppercase tracking-[.18em] text-accent">
                 {displayStatus === "switching" ? "Trying another source" : "Loading stream"}
               </p>
@@ -727,281 +756,45 @@ export function WatchPlayer({
             </div>
           </div>
         )}
-      <div
-        className={`pf-player-controls absolute inset-x-0 bottom-0 z-40 bg-gradient-to-t from-black/95 via-black/65 to-transparent pt-8 transition-opacity duration-150 ${
-          controlsVisible || qualityOpen || subtitleOpen || speedOpen || !displayPlaying
-          ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-      >
-        {!isEmbed && (
-          <div className="px-3 pt-2 md:px-6">
-            <div
-              role="slider" tabIndex={0} aria-label="Seek video"
-              aria-valuemin={0} aria-valuemax={Math.max(1, Math.floor(duration))}
-              aria-valuenow={Math.floor(currentTime)}
-              className="group relative h-2 cursor-pointer rounded-full bg-white/20 touch-none"
-              onPointerDown={(e) => {
-                const target = e.currentTarget;
-                target.setPointerCapture(e.pointerId);
-                const rect = target.getBoundingClientRect();
-                seekTo((e.clientX - rect.left) / rect.width);
-                showControls();
-              }}
-              onPointerMove={(e) => {
-                if (e.buttons !== 1) return;
-                const rect = e.currentTarget.getBoundingClientRect();
-                seekTo((e.clientX - rect.left) / rect.width);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-                  e.preventDefault();
-                  const video = videoRef.current;
-                  if (video) video.currentTime = Math.max(0, Math.min(duration, video.currentTime + (e.key === "ArrowRight" ? 5 : -5)));
-                }
-              }}
-            >
-              <div
-                className="absolute inset-y-0 left-0 rounded-full bg-white/25"
-                style={{ width: `${bufferRatio * 100}%` }}
-              />
-              <div
-                className="absolute inset-y-0 left-0 rounded-full bg-accent"
-                style={{ width: `${progress * 100}%` }}
-              />
-              <div
-                className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white shadow opacity-0 transition group-hover:opacity-100"
-                style={{ left: `calc(${progress * 100}% - 7px)` }}
-              />
+      {touchIndicator && <div role="status" className={`pf-touch-indicator ${touchIndicator}`}>{touchIndicator === "left" ? "−5 seconds" : "+5 seconds"}</div>}
+      {!displayPlaying && !isBusy && displayStatus !== "error" && !isEmbed && <button type="button" aria-label="Start playback" className="pf-center-play media-focus" onClick={() => void togglePlayback()}><Play size={28} fill="currentColor" /></button>}
+      <div className={`pf-player-controls pf-copied-controls ${controlsVisible || !displayPlaying ? "" : "pf-controls-idle"}`}>
+        {!isEmbed && <input className="pf-seek" type="range" aria-label="Seek video" min={0} max={Math.max(duration, 1)} step={0.1} value={Math.min(currentTime, duration || 1)} disabled={!duration} onChange={(event) => seekTo(Number(event.target.value) / duration)} />}
+        <div className="pf-player-actions pf-control-row">
+          {!isEmbed && <>
+            <button type="button" aria-label={displayPlaying ? "Pause" : "Play"} onClick={() => void togglePlayback()}>{displayPlaying ? <Pause size={20}/> : <Play size={20}/>}</button>
+            <button type="button" aria-label="Rewind 10 seconds" onClick={() => { const video = videoRef.current; if (video) video.currentTime = Math.max(0, video.currentTime - 10); }}><RotateCcw size={18}/></button>
+            <button type="button" aria-label="Forward 10 seconds" onClick={() => { const video = videoRef.current; if (video) video.currentTime = Math.min(duration, video.currentTime + 10); }}><RotateCw size={18}/></button>
+            <span className="pf-player-time">{formatTime(currentTime)} <i>/</i> {formatTime(duration)}</span>
+            <div className="pf-player-volume">
+              <button type="button" aria-label={muted ? "Unmute" : "Mute"} onClick={() => setMuted(value => !value)}>{muted || volume === 0 ? <VolumeX size={18}/> : <Volume2 size={18}/>}</button>
+              <input type="range" aria-label="Volume" min={0} max={1} step={0.01} value={muted ? 0 : volume} onChange={(event) => { const value = Number(event.target.value); setVolume(value); setMuted(value === 0); }}/>
             </div>
-            <div className="mt-1 flex justify-between text-[11px] tabular-nums text-zinc-500">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
-          </div>
-        )}
-
-        <div className="pf-player-actions flex min-h-[48px] flex-wrap items-center gap-0.5 px-2 pb-2 md:gap-1 md:px-4">
-          {!isEmbed && (
-            <>
-              <button
-                type="button"
-                aria-label={displayPlaying ? "Pause" : "Play"}
-                className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
-                onClick={() => void togglePlayback()}
-              >
-                {displayPlaying ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
-              </button>
-
-              <button
-                type="button"
-                aria-label="Rewind 10 seconds"
-                className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
-                onClick={() => {
-                  const v = videoRef.current;
-                  if (v) v.currentTime = Math.max(0, v.currentTime - 10);
-                }}
-              >
-                <RotateCcw size={18} />
-              </button>
-
-              <button
-                type="button"
-                aria-label="Forward 10 seconds"
-                className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
-                onClick={() => {
-                  const v = videoRef.current;
-                  if (v) v.currentTime = Math.min(duration, v.currentTime + 10);
-                }}
-              >
-                <RotateCw size={18} />
-              </button>
-
-              <button
-                type="button"
-                aria-label={muted ? "Unmute" : "Mute"}
-                className="media-focus grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-white/10"
-                onClick={() => setMuted((value) => !value)}
-              >
-                {muted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
-              </button>
-
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={muted ? 0 : volume}
-                aria-label="Volume"
-                className="hidden w-20 accent-brand lg:block"
-                onChange={(e) => {
-                  const next = Number(e.target.value);
-                  setVolume(next);
-                  setMuted(next === 0);
-                }}
-              />
-            </>
-          )}
-
+          </>}
           {isEmbed && (
             <p className="px-3 text-xs text-zinc-400">
               Playing via movibox.net player · switch quality above if available
             </p>
           )}
 
-          {(sources.length > 1 || hlsLevels.length > 1) && (
-            <div ref={qualityMenuRef} className="relative">
-              <button
-                type="button"
-                aria-haspopup="menu"
-                aria-expanded={qualityOpen}
-                className="media-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
-                onClick={() => {
-                  setQualityOpen((value) => !value);
-                  setSubtitleOpen(false);
-                  setSpeedOpen(false);
-                }}
-              >
-                {selectedLevel >= 0 ? hlsLevels.find(level => level.index === selectedLevel)?.label : (hlsLevels.length ? "Best · Auto" : source?.quality ?? "Auto")}
-                <ChevronDown size={14} />
-              </button>
-              {qualityOpen && (
-                <div
-                  role="menu"
-                  className="absolute bottom-14 left-0 z-50 max-h-64 min-w-44 overflow-auto rounded-2xl border border-white/10 bg-panel/95 p-1.5 shadow-2xl backdrop-blur-xl"
-                >
-                  {sources.map((item, index) => (
-                    <button
-                      key={`${item.quality}-${item.sourceIndex}`}
-                      type="button"
-                      role="menuitem"
-                      className={`media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm hover:bg-white/10 ${
-                        index === sourcePosition ? "text-accent" : "text-zinc-300"
-                      }`}
-                      onClick={() => chooseSource(index)}
-                    >
-                      {item.quality}
-                    </button>
-                  ))}
-                  {hlsLevels.length > 0 && (
-                    <button type="button" role="menuitemradio" aria-checked={selectedLevel === -1}
-                      className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-white hover:bg-white/10"
-                      onClick={() => chooseLevel(-1)}>
-                      Best · Auto
-                    </button>
-                  )}
-                  {hlsLevels.map((level) => (
-                    <button
-                      key={level.index}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={selectedLevel === level.index}
-                      className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
-                      onClick={() => chooseLevel(level.index)}
-                    >
-                      {level.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {!isEmbed && subtitleTracks.length > 0 && (
-            <div ref={subtitleMenuRef} className="relative">
-              <button
-                type="button"
-                aria-haspopup="menu"
-                aria-expanded={subtitleOpen}
-                aria-label={`Subtitles: ${selectedSubtitle === "off" ? "off" : selectedSubtitle}`}
-                className="media-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
-                onClick={() => {
-                  setSubtitleOpen((value) => !value);
-                  setQualityOpen(false);
-                  setSpeedOpen(false);
-                }}
-              >
-                <Captions size={18} />
-                <ChevronDown size={14} />
-              </button>
-              {subtitleOpen && (
-                <div
-                  role="menu"
-                  className="absolute bottom-14 left-0 z-50 min-w-40 rounded-2xl border border-white/10 bg-panel/95 p-1.5 shadow-2xl backdrop-blur-xl"
-                >
-                  <button
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={selectedSubtitle === "off"}
-                    className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
-                    onClick={() => chooseSubtitle("off")}
-                  >
-                    Off
-                  </button>
-                  {subtitleTracks.map((track) => (
-                    <button
-                      key={track.language}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={selectedSubtitle === track.language}
-                      className="media-focus flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm text-zinc-300 hover:bg-white/10"
-                      onClick={() => chooseSubtitle(track.language)}
-                    >
-                      {track.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {!isEmbed && (
-            <div ref={speedMenuRef} className="relative">
-              <button
-                type="button"
-                aria-haspopup="menu"
-                aria-expanded={speedOpen}
-                className="media-focus inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs font-semibold text-zinc-300 hover:bg-white/10"
-                onClick={() => {
-                  setSpeedOpen((v) => !v);
-                  setQualityOpen(false);
-                  setSubtitleOpen(false);
-                }}
-              >
-                {playbackRate}x
-                <ChevronDown size={14} />
-              </button>
-              {speedOpen && (
-                <div
-                  role="menu"
-                  className="absolute bottom-14 left-0 z-50 min-w-28 rounded-2xl border border-white/10 bg-panel/95 p-1.5 shadow-2xl backdrop-blur-xl"
-                >
-                  {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
-                    <button
-                      key={rate}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={playbackRate === rate}
-                      className={`media-focus flex min-h-10 w-full items-center rounded-xl px-3 text-left text-sm hover:bg-white/10 ${
-                        playbackRate === rate ? "text-accent" : "text-zinc-300"
-                      }`}
-                      onClick={() => {
-                        setPlaybackRate(rate);
-                        window.localStorage.setItem("pinflix-playback-rate", String(rate));
-                        setSpeedOpen(false);
-                      }}
-                    >
-                      {rate}x
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <span className="ml-auto hidden px-2 text-xs text-zinc-500 sm:inline">
-            {displayStatus === "switching" ? "Switching…" : source?.quality ?? "Auto"}
-          </span>
-
+          <div className="pf-player-settings">
+            {!isEmbed && <select aria-label="Playback speed" value={playbackRate} onChange={(event) => { const rate = Number(event.target.value); setPlaybackRate(rate); window.localStorage.setItem("pinflix-playback-rate", String(rate)); }}>{[0.5,0.75,1,1.25,1.5,1.75,2].map(rate => <option key={rate} value={rate}>{rate}x</option>)}</select>}
+            {(sources.length > 1 || hlsLevels.length > 1) && <select aria-label="Video quality" value={hlsLevels.length ? `level:${selectedLevel}` : `source:${sourcePosition}`} onChange={(event) => { const [kind, value] = event.target.value.split(":"); if (kind === "level") chooseLevel(Number(value)); else chooseSource(Number(value)); }}>
+              {sources.map((item,index) => <option key={index} value={`source:${index}`}>{item.quality}</option>)}
+              {hlsLevels.length > 0 && <option value="level:-1">Auto</option>}
+              {hlsLevels.map(level => <option key={level.index} value={`level:${level.index}`}>{level.label}</option>)}
+            </select>}
+            {!isEmbed && audioTracks.length > 1 && <select aria-label="Audio track" value={selectedAudio} onChange={(event) => {
+              const index = Number(event.target.value);
+              if (hlsRef.current) hlsRef.current.audioTrack = index;
+              else {
+                const tracks = (videoRef.current as VideoWithAudio | null)?.audioTracks;
+                if (tracks) Array.from(tracks).forEach((track, position) => { track.enabled = position === index; });
+              }
+              setSelectedAudio(index);
+            }}>{selectedAudio < 0 && <option value={-1}>Default audio</option>}{audioTracks.map(track => <option key={track.index} value={track.index}>{track.label}</option>)}</select>}
+            {!isEmbed && subtitleTracks.length > 0 && <select aria-label="Subtitles" value={selectedSubtitle} onChange={(event) => void chooseSubtitle(event.target.value)}><option value="off">Subtitles off</option>{subtitleTracks.map(track => <option key={track.language} value={track.language}>{track.label}</option>)}</select>}
+          </div>
           {!isEmbed && (
             <button
               type="button"
@@ -1014,10 +807,7 @@ export function WatchPlayer({
           )}
 
           {!isEmbed && (
-            <button type="button" aria-label={fillFrame ? "Fit full video without cropping" : "Fill display (may crop video)"}
-              title={fillFrame ? "Fit full video" : "Fill display"} aria-pressed={fillFrame}
-              className="media-focus inline-flex min-h-11 items-center rounded-md border border-white/20 px-3 text-xs font-semibold"
-              onClick={() => setFillFrame(value => !value)}>{fillFrame ? "Fit" : "Fill"}</button>
+            <button type="button" aria-label={`Video fit: ${fit}`} title={`Video fit: ${fit}`} onClick={() => setFit(value => value === "contain" ? "cover" : value === "cover" ? "fill" : "contain")}><Tv size={18}/></button>
           )}
           <button type="button" aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen and rotate to landscape"}
             title={isFullscreen ? "Exit fullscreen" : "Fullscreen · landscape where supported"}
