@@ -1,35 +1,54 @@
 "use client";
-
-import { Bookmark, Check } from "lucide-react";
-import { useEffect, useState } from "react";
-import { readSavedTitles, writeSavedTitles, type SavedTitle } from "@/src/lib/saved";
-
-export function SavedToggle({ item }: { item: SavedTitle }) {
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    const nextSaved = readSavedTitles().some((entry) => entry.id === item.id);
-    const timer = window.setTimeout(() => setSaved(nextSaved), 0);
-    return () => window.clearTimeout(timer);
-  }, [item.id]);
-
+import { Check, Plus } from "lucide-react";
+import { useSyncExternalStore } from "react";
+import {
+  SAVED_KEY,
+  readSavedTitles,
+  writeSavedTitles,
+  type SavedTitle,
+} from "@/src/lib/saved";
+function subscribe(callback: () => void) {
+  window.addEventListener("pinflix:saved", callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener("pinflix:saved", callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+function snapshot() {
+  try {
+    return localStorage.getItem(SAVED_KEY) ?? "[]";
+  } catch {
+    return "[]";
+  }
+}
+export function SavedToggle({
+  item,
+  className = "secondary",
+}: {
+  item: SavedTitle;
+  className?: string;
+}) {
+  const data = useSyncExternalStore(subscribe, snapshot, () => "[]");
+  const saved =
+    data !== "[]" && readSavedTitles().some((entry) => entry.id === item.id);
   function toggle() {
     const current = readSavedTitles();
-    const exists = current.some((entry) => entry.id === item.id);
-    const next = exists ? current.filter((entry) => entry.id !== item.id) : [item, ...current];
-    writeSavedTitles(next);
-    setSaved(!exists);
+    writeSavedTitles(
+      saved
+        ? current.filter((entry) => entry.id !== item.id)
+        : [item, ...current],
+    );
   }
-
   return (
     <button
       type="button"
       onClick={toggle}
-      className="tv-focus inline-flex min-h-12 items-center gap-2 rounded-md border border-line bg-surface px-6 py-3 font-semibold text-fg hover:bg-white/10"
+      className={className}
       aria-pressed={saved}
     >
-      {saved ? <Check size={18} /> : <Bookmark size={18} />}
-      {saved ? "In My List" : "Add to My List"}
+      {saved ? <Check size={18} /> : <Plus size={18} />}{" "}
+      {saved ? "In My List" : "My List"}
     </button>
   );
 }

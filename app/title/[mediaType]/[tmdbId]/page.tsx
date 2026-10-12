@@ -1,21 +1,34 @@
 import Link from "next/link";
-import { mediaTheme } from "@/src/lib/media-theme";
+import { Artwork } from "@/src/components/source-ui/artwork";
+import { catalogProvider } from "@/src/lib/providers/catalog";
 import { notFound } from "next/navigation";
-import { CalendarDays, Clock3, Database, Star } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { getTmdbDetails } from "@/src/lib/tmdb";
-import { InlinePlaybackBanner, InlinePlayButton } from "@/src/components/inline-playback";
+import {
+  InlinePlaybackBanner,
+  InlinePlayButton,
+} from "@/src/components/inline-playback";
 import { SavedToggle } from "@/src/components/saved-toggle";
 import { findPlayableProviderMatch } from "@/src/lib/tmdb-bridge";
 
 export const revalidate = 300;
+export const preferredRegion = "sin1";
 
 export default async function TmdbTitlePage({
-  params, searchParams,
+  params,
+  searchParams,
 }: {
   params: Promise<{ mediaType: string; tmdbId: string }>;
-  searchParams: Promise<{ autoplay?: string; season?: string; episode?: string }>;
+  searchParams: Promise<{
+    autoplay?: string;
+    season?: string;
+    episode?: string;
+  }>;
 }) {
-  const [{ mediaType, tmdbId }, query] = await Promise.all([params, searchParams]);
+  const [{ mediaType, tmdbId }, query] = await Promise.all([
+    params,
+    searchParams,
+  ]);
   if (mediaType !== "movie" && mediaType !== "tv") notFound();
 
   const id = Number(tmdbId);
@@ -29,7 +42,11 @@ export default async function TmdbTitlePage({
   }
 
   const kind = mediaType === "tv" ? "show" : "movie";
-  const playable = await findPlayableProviderMatch({ title: item.title, year: item.year, kind });
+  const playable = await findPlayableProviderMatch({
+    title: item.title,
+    year: item.year,
+    kind,
+  });
   const savedItem = {
     id: `tmdb-${mediaType}-${item.id}`,
     slug: `tmdb-${mediaType}-${item.id}`,
@@ -40,101 +57,118 @@ export default async function TmdbTitlePage({
     genres: item.genres,
   };
 
+  const navigation =
+    playable && kind === "show"
+      ? await catalogProvider
+          .getSeriesNavigation(
+            playable.id,
+            Math.max(1, Number(query.season) || 1),
+          )
+          .catch(() => null)
+      : null;
   return (
-    <div className="space-y-8">
-      <Link href={mediaType === "tv" ? "/series" : "/movies"} className="tv-focus text-sm font-semibold text-muted hover:text-white">
-        ← {mediaType === "tv" ? "Series" : "Movies"}
-      </Link>
-
+    <>
+      <div className="detail-heading">
+        <Link href={kind === "show" ? "/series" : "/movies"}>
+          <ArrowLeft size={17} /> Back to{" "}
+          {kind === "show" ? "series" : "movies"}
+        </Link>
+        <span>{kind === "show" ? "THE NEXT CHAPTER" : "BEHIND THE STORY"}</span>
+      </div>
       <InlinePlaybackBanner
-        mediaId={playable?.id ?? ""} title={item.title}
+        mediaId={playable?.id ?? ""}
+        title={item.title}
         backHref={`/title/${mediaType}/${tmdbId}`}
         initialPlay={Boolean(playable && query.autoplay === "1")}
         initialSeason={Math.max(1, Number(query.season) || 1)}
         initialEpisode={Math.max(1, Number(query.episode) || 1)}
-        historyItem={playable ? {slug: playable.slug, kind: playable.kind, poster: item.poster, year: item.year, genres: item.genres} : undefined}
-      >
-      <section className="relative min-h-[520px] overflow-hidden rounded-xl border border-line bg-surface" style={mediaTheme(item.backdrop || item.poster || item.title)}>
-        {item.backdrop ? (
-          <img src={item.backdrop} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
-        ) : (
-          <div className="poster-fallback absolute inset-0" />
-        )}
-        <div className="hero-vignette absolute inset-0" />
-        <div className="hero-side-fade absolute inset-0" />
-
-        <div className="relative z-10 flex min-h-[520px] items-end p-6 sm:p-10 md:items-center md:p-12">
-          <div className="grid w-full gap-8 md:grid-cols-[210px_minmax(0,1fr)] md:items-end">
-            <div className="hidden overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-2xl md:block">
-              {item.poster ? <img src={item.poster} alt="" className="aspect-[2/3] w-full object-cover" /> : <div className="poster-fallback aspect-[2/3]" />}
-            </div>
-
-            <div className="max-w-3xl">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-md border border-brand/30 bg-brand/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[.15em] text-accent">
-                <Database size={13} />
-                TMDB metadata
-              </div>
-
-              <h1 className="text-4xl font-medium tracking-[-.05em] sm:text-5xl md:text-6xl">{item.title}</h1>
-
-              <div className="mt-5 flex flex-wrap gap-2 text-sm text-zinc-300">
-                <span className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5">
-                  {mediaType === "tv" ? "TV Series" : "Movie"}
-                </span>
-                {item.year && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5"><CalendarDays size={14} />{item.year}</span>
-                )}
-                {item.rating !== undefined && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/20 bg-amber-500/10 px-3 py-1.5 text-amber-200"><Star size={14} fill="currentColor" />{item.rating.toFixed(1)}</span>
-                )}
-                {item.runtimeMinutes && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5"><Clock3 size={14} />{item.runtimeMinutes} min</span>
-                )}
-              </div>
-
-              {item.genres.length > 0 && (
-                <p className="mt-4 text-sm font-medium text-muted">{item.genres.join(" · ")}</p>
-              )}
-
-              {item.overview && (
-                <p className="mt-5 max-w-2xl text-sm font-light leading-7 text-zinc-300 sm:text-base">{item.overview}</p>
-              )}
-
-              {mediaType === "tv" && (
-                <p className="mt-4 text-sm text-muted">
-                  {[item.numberOfSeasons ? `${item.numberOfSeasons} seasons` : "", item.numberOfEpisodes ? `${item.numberOfEpisodes} episodes` : ""].filter(Boolean).join(" · ")}
+        navigation={navigation}
+        poster={item.poster}
+        historyItem={
+          playable
+            ? {
+                slug: playable.slug,
+                kind: playable.kind,
+                poster: item.poster,
+                year: item.year,
+                genres: item.genres,
+              }
+            : undefined
+        }
+        details={
+          <div className="page-content">
+            <div className="detail-info">
+              <div>
+                <p className="eyebrow">THE STORY</p>
+                <h2>
+                  {kind === "show"
+                    ? "A world to return to."
+                    : "Take a closer look."}
+                </h2>
+                <p>
+                  {item.overview || "No synopsis is available for this title."}
                 </p>
-              )}
-
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <SavedToggle item={savedItem} />
-                {playable ? (
-                  <InlinePlayButton className="pf-action media-focus min-h-12 px-7">Play here</InlinePlayButton>
-                ) : (
-                  <span className="inline-flex min-h-12 items-center rounded-md border border-line bg-surface px-5 py-3 text-sm text-muted">
-                    No verified playback source in the current catalog
-                  </span>
-                )}
               </div>
+              <dl>
+                <dt>Genres</dt>
+                <dd>{item.genres.join(", ") || "Unavailable"}</dd>
+                {item.cast.length > 0 && (
+                  <>
+                    <dt>Starring</dt>
+                    <dd>
+                      {item.cast
+                        .slice(0, 8)
+                        .map((credit) => credit.name)
+                        .join(", ")}
+                    </dd>
+                  </>
+                )}
+                <dt>Year</dt>
+                <dd>{item.year || "Unavailable"}</dd>
+              </dl>
             </div>
           </div>
-        </div>
-      </section>
-      </InlinePlaybackBanner>
-
-      {item.cast.length > 0 && (
-        <section className="glass-panel rounded-lg p-6 sm:p-8">
-          <h2 className="text-xl font-bold text-white">Cast</h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {item.cast.map((credit) => (
-              <div key={`${credit.name}-${credit.role ?? ""}`} className="rounded-2xl border border-white/5 bg-white/[.03] p-4">
-                <p className="font-semibold text-zinc-100">{credit.name}</p>
-                {credit.role && <p className="mt-1 text-xs text-zinc-500">{credit.role}</p>}
-              </div>
-            ))}
+        }
+      >
+        <section className="detail-hero">
+          <div className="detail-art">
+            <Artwork src={item.backdrop || item.poster} alt="" priority />
+          </div>
+          <div className="hero-shade" />
+          <div className="detail-copy">
+            <p className="eyebrow">
+              {kind === "show" ? "SERIES" : "FEATURE FILM"}
+            </p>
+            <h1>{item.title}</h1>
+            <div className="detail-meta">
+              {item.year && <span>{item.year}</span>}
+              {item.rating !== undefined && (
+                <span>★ {item.rating.toFixed(1)}</span>
+              )}
+              {item.runtimeMinutes && <span>{item.runtimeMinutes} min</span>}
+              {item.numberOfSeasons && (
+                <span>{item.numberOfSeasons} seasons</span>
+              )}
+            </div>
+            <p className="hero-synopsis">
+              {item.overview ||
+                "More information about this story is currently unavailable."}
+            </p>
+            <div className="actions">
+              {playable ? (
+                <InlinePlayButton className="primary">
+                  {kind === "show" ? "Play series" : "Play movie"}
+                </InlinePlayButton>
+              ) : (
+                <button type="button" disabled className="primary">
+                  Playback unavailable
+                </button>
+              )}
+              <SavedToggle item={savedItem} className="secondary" />
+            </div>
           </div>
         </section>
-      )}
-    </div>
+      </InlinePlaybackBanner>
+    </>
   );
 }
