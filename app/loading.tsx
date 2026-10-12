@@ -1,5 +1,12 @@
-export default function Loading(){
-  return <div role="status" aria-live="polite" className="pf-container grid min-h-[40vh] place-items-center">
-    <div className="text-center"><p className="pf-eyebrow">PINFLIX</p><p className="mt-3 text-sm text-muted">Finding your next story…</p></div>
-  </div>;
+export default function Loading() {
+  return (
+    <div className="page-content skeleton-page" aria-label="Loading stories">
+      <div className="skeleton hero-skeleton" />
+      <div className="card-grid">
+        {Array.from({ length: 12 }, (_, i) => (
+          <div key={i} className="skeleton poster-skeleton" />
+        ))}
+      </div>
+    </div>
+  );
 }

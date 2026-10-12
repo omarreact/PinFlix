@@ -1,2 +1,4 @@
-import { WatchHistory } from "@/src/components/watch-history";
-export default function HistoryPage() { return <WatchHistory />; }
+import { Library } from "@/src/components/source-ui/library";
+export default function HistoryPage() {
+  return <Library initialTab="history" />;
+}
