@@ -7,6 +7,7 @@ import {
   ArrowDown,
   Film,
 } from "lucide-react";
+import { franchiseCollection } from "@/src/lib/franchise-collections";
 import { api, type Catalogue } from "@/src/lib/source-ui";
 import { Card } from "./cards";
 export function Browse({
@@ -167,6 +168,7 @@ export function Browse({
         .map((category) => [category.name, category]),
     ).values(),
   ];
+  const franchise = franchiseCollection(category);
   const languages = [
     ...new Set(
       data.items.map((t) => t.language).filter((x): x is string => !!x),
@@ -177,13 +179,15 @@ export function Browse({
       <div className="page-title">
         <p className="eyebrow">YOUR NEXT GOOD FIND</p>
         <h1>
-          {initialQuery
-            ? "Search the stories"
-            : kind === "series"
-              ? "A season for everything."
-              : kind === "movie"
-                ? "A world in every frame."
-                : "Discover something great."}
+          {franchise
+            ? `${franchise.label} collection.`
+            : initialQuery
+              ? "Search the stories"
+              : kind === "series"
+                ? "A season for everything."
+                : kind === "movie"
+                  ? "A world in every frame."
+                  : "Discover something great."}
         </h1>
         <p>
           Explore{" "}

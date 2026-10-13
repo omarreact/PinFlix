@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FRANCHISE_COLLECTIONS } from "@/src/lib/franchise-collections";
 import { ArrowUpRight } from "lucide-react";
 import { catalogProvider } from "@/src/lib/providers/catalog";
 import { Hero } from "@/src/components/source-ui/hero";
@@ -29,6 +30,14 @@ export default async function Home() {
         <div className="discovery-bar">
           <span>Find your kind of story</span>
           <div className="chips">
+            {FRANCHISE_COLLECTIONS.map((collection) => (
+              <Link
+                key={collection.slug}
+                href={`/catalogue?category=${collection.label}`}
+              >
+                {collection.label}
+              </Link>
+            ))}
             {categories.slice(0, 8).map((category) => (
               <Link
                 key={category.slug}

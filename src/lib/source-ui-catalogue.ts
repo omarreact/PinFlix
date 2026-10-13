@@ -6,6 +6,11 @@ import {
   filterCatalogue,
   matchesGenre,
 } from "@/src/lib/catalogue";
+import {
+  FRANCHISE_COLLECTIONS,
+  franchiseCollection,
+  matchesFranchise,
+} from "@/src/lib/franchise-collections";
 import { FIRST_YEAR, exactYear, parseYearSearch } from "@/src/lib/year-search";
 import { toTitle, type Catalogue } from "@/src/lib/source-ui";
 
@@ -32,10 +37,31 @@ export async function sourceCatalogue(
       (item.slug === category ||
         item.label.toLowerCase() === category?.toLowerCase()),
   );
-  if (category && !genre) throw new Error("Unknown collection");
+  const franchise = franchiseCollection(category);
+  if (category && !genre && !franchise) throw new Error("Unknown collection");
   let items;
   let hasNext;
-  if (intent.title.length >= 2 || intent.yearOnly) {
+  if (franchise && !intent.title) {
+    const results = await Promise.allSettled(
+      franchise.queries.map((query) =>
+        searchLibrary({
+          query,
+          kind,
+          year: params.get("year") ?? intent.year,
+          page,
+        }),
+      ),
+    );
+    const available = results.flatMap((result) =>
+      result.status === "fulfilled" && result.value.status === "ok"
+        ? [result.value]
+        : [],
+    );
+    if (!available.length)
+      throw new Error("This collection is temporarily unavailable");
+    items = available.flatMap((result) => result.catalog);
+    hasNext = available.some((result) => result.catalogHasMore);
+  } else if (intent.title.length >= 2 || intent.yearOnly) {
     const found = await searchLibrary({
       query,
       kind,
@@ -67,6 +93,8 @@ export async function sourceCatalogue(
     (_, index) => latestYear - index,
   );
   const language = params.get("language");
+  if (franchise)
+    items = items.filter((item) => matchesFranchise(item, franchise.slug));
   if (genre) items = items.filter((item) => matchesGenre(item, genre.slug));
   if (language)
     items = items.filter((item) => item.languages?.join(" · ") === language);
@@ -80,7 +108,10 @@ export async function sourceCatalogue(
     hasNext: Boolean(hasNext),
     years,
     categories: (["movie", "series"] as const).flatMap((type) =>
-      CATALOGUE_GENRES.filter((g) => g.slug !== "adult").map((g) => ({
+      [
+        ...FRANCHISE_COLLECTIONS,
+        ...CATALOGUE_GENRES.filter((g) => g.slug !== "adult"),
+      ].map((g) => ({
         name: g.label,
         kind: type,
         mature: false,
