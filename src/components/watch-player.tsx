@@ -101,7 +101,7 @@ export function WatchPlayer({
   const [subtitleTracks, setSubtitleTracks] = useState<ResolvedSubtitle[]>([]);
   const [selectedSubtitle, setSelectedSubtitle] = useState("off");
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.9);
   const [buffering, setBuffering] = useState(true);
   const [status, setStatus] = useState<"loading" | "ready" | "switching" | "error">("loading");
@@ -248,11 +248,14 @@ export function WatchPlayer({
     if (!video) return;
     let cancelled = false;
 
+    let playbackSettled = false;
     // Schedule state updates after paint to satisfy react-hooks/set-state-in-effect
     const boot = window.setTimeout(() => {
       if (cancelled) return;
-      setStatus("loading");
-      setBuffering(true);
+      if (!playbackSettled) {
+        setStatus("loading");
+        setBuffering(true);
+      }
       setError("");
       setHlsLevels([]);
       setSelectedLevel(-1);
@@ -273,12 +276,14 @@ export function WatchPlayer({
       video.play()
         .then(() => {
           if (cancelled) return;
+          playbackSettled = true;
           setPlaying(true);
           setStatus("ready");
           setBuffering(false);
         })
         .catch(() => {
           if (cancelled) return;
+          playbackSettled = true;
           // User gesture can start an autoplay-blocked stream.
           setStatus("ready");
           setBuffering(false);
@@ -758,6 +763,7 @@ export function WatchPlayer({
         )}
       {touchIndicator && <div role="status" className={`pf-touch-indicator ${touchIndicator}`}>{touchIndicator === "left" ? "−5 seconds" : "+5 seconds"}</div>}
       {!displayPlaying && !isBusy && displayStatus !== "error" && !isEmbed && <button type="button" aria-label="Start playback" className="pf-center-play media-focus" onClick={() => void togglePlayback()}><Play size={28} fill="currentColor" /></button>}
+      </div>
       <div className={`pf-player-controls pf-copied-controls ${controlsVisible || !displayPlaying ? "" : "pf-controls-idle"}`}>
         {!isEmbed && <input className="pf-seek" type="range" aria-label="Seek video" min={0} max={Math.max(duration, 1)} step={0.1} value={Math.min(currentTime, duration || 1)} disabled={!duration} onChange={(event) => seekTo(Number(event.target.value) / duration)} />}
         <div className="pf-player-actions pf-control-row">
@@ -816,7 +822,6 @@ export function WatchPlayer({
             {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
           </button>
         </div>
-      </div>
       </div>
     </div>
   );
