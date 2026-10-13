@@ -61,7 +61,7 @@ describe("screenshot menu and advanced filter", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
     expect(onApply).not.toHaveBeenCalled();
   });
-  it("uses working catalogue, official-resource and external-source routes", () => {
+  it("keeps every drawer collection inside PinFlix", () => {
     render(<CategoryDrawer onClose={vi.fn()} />);
     expect(
       screen.getByRole("link", { name: "4K Movies" }).getAttribute("href"),
@@ -69,7 +69,10 @@ describe("screenshot menu and advanced filter", () => {
     expect(screen.getByRole("link", { name: "Korean" })).toBeTruthy();
     expect(
       screen.getByRole("link", { name: /3D Movies/ }).getAttribute("href"),
-    ).toContain("http://cineplexbd.net/category.php?category=3D%20Movies");
+    ).toBe("/movies?category=3D%20Movies");
+    for (const link of screen.getAllByRole("link", { hidden: true })) {
+      expect(link.getAttribute("href")).toMatch(/^\//);
+    }
     expect(
       screen
         .getByRole("link", { name: "Browse games", hidden: true })

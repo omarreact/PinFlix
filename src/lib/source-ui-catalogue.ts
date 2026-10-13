@@ -66,10 +66,38 @@ export async function sourceCatalogue(
   const franchise = franchiseCollection(category);
   if (category && !genre && !franchise && !screenshot)
     throw new Error("Unknown collection");
-  if (screenshot?.unavailable) throw new Error(screenshot.unavailable);
+  const latestYear = new Date().getUTCFullYear() + 1;
+  const years = Array.from(
+    { length: latestYear - FIRST_YEAR + 1 },
+    (_, index) => latestYear - index,
+  );
+  const categories = (["movie", "series"] as const).flatMap((type) =>
+    [
+      ...FRANCHISE_COLLECTIONS,
+      ...SCREENSHOT_CATEGORIES.filter((category) => category.kind === type).map(
+        (category) => ({ label: category.name }),
+      ),
+      ...CATALOGUE_GENRES.filter((g) => g.slug !== "adult"),
+    ].map((g) => ({
+      name: g.label,
+      kind: type,
+      mature: false,
+    })),
+  );
+  if (screenshot?.unavailable)
+    return {
+      items: [],
+      page,
+      hasNext: false,
+      years,
+      categories,
+      notice: `${screenshot.unavailable} This collection will appear here when verified titles are available.`,
+      stale: false,
+      retrievedAt: new Date().toISOString(),
+    };
   let items: Entertainment[];
   let hasNext;
-  let notice: string | undefined;
+  let notice: string | undefined = screenshot?.notice;
   if (actor && !intent.title) {
     const found = await catalogProvider.searchPage!(
       actor.split(",")[0].trim(),
@@ -132,6 +160,7 @@ export async function sourceCatalogue(
   if (
     actor ||
     screenshot?.country ||
+    screenshot?.excludeCountries ||
     screenshot?.language ||
     screenshot?.excludeLanguages ||
     screenshot?.resolution ||
@@ -221,11 +250,6 @@ export async function sourceCatalogue(
     items = items.filter(
       (item) => item.year && selectedYears.includes(item.year),
     );
-  const latestYear = new Date().getUTCFullYear() + 1;
-  const years = Array.from(
-    { length: latestYear - FIRST_YEAR + 1 },
-    (_, index) => latestYear - index,
-  );
   const language = params.get("language");
   if (franchise)
     items = items.filter((item) => matchesFranchise(item, franchise.slug));
@@ -241,19 +265,7 @@ export async function sourceCatalogue(
     page,
     hasNext: Boolean(hasNext) && page < 100,
     years,
-    categories: (["movie", "series"] as const).flatMap((type) =>
-      [
-        ...FRANCHISE_COLLECTIONS,
-        ...SCREENSHOT_CATEGORIES.filter(
-          (category) => category.kind === type && !category.unavailable,
-        ).map((category) => ({ label: category.name })),
-        ...CATALOGUE_GENRES.filter((g) => g.slug !== "adult"),
-      ].map((g) => ({
-        name: g.label,
-        kind: type,
-        mature: false,
-      })),
-    ),
+    categories,
     notice,
     stale: false,
     retrievedAt: new Date().toISOString(),
