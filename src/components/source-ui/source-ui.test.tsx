@@ -68,6 +68,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("ported source UI flows", () => {
+  it("shows separate Marvel and DC collection headings", () => {
+    const initial: Catalogue = {
+      items: [],
+      categories: [
+        { name: "Marvel", kind: "movie", mature: false },
+        { name: "DC", kind: "movie", mature: false },
+      ],
+      years: [],
+      page: 1,
+      hasNext: false,
+      stale: false,
+      retrievedAt: new Date().toISOString(),
+    };
+    render(<Browse initial={initial} initialCategory="Marvel" />);
+    expect(
+      screen.getByRole("heading", { name: "Marvel collection." }),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Category"), {
+      target: { value: "DC" },
+    });
+    expect(
+      screen.getByRole("heading", { name: "DC collection." }),
+    ).toBeTruthy();
+  });
   it("recovers artwork when switching away from a failed poster", () => {
     const view = render(
       <Artwork src="https://images.example/broken.jpg" alt="First" />,

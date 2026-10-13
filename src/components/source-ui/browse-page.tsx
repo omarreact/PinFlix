@@ -1,3 +1,4 @@
+import { franchiseCollection } from "@/src/lib/franchise-collections";
 import { CATALOGUE_GENRES } from "@/src/lib/catalogue";
 import { sourceCatalogue } from "@/src/lib/source-ui-catalogue";
 import { Browse } from "./browse";
@@ -45,6 +46,7 @@ export async function BrowsePage({
         initial={initial}
         initialQuery={params.q ?? ""}
         initialCategory={
+          franchiseCollection(params.category ?? params.genre)?.label ??
           CATALOGUE_GENRES.find(
             (genre) =>
               genre.slug === params.genre ||

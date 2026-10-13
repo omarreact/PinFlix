@@ -85,6 +85,41 @@ describe("source UI provider adapter", () => {
     expect(getLatestPage).not.toHaveBeenCalled();
     expect(result.items).toEqual([]); // Movie result must not enter the series view.
   });
+  it("builds separate publisher collections from real provider searches and deduplicates IDs", async () => {
+    const marvel = {
+      ...movie,
+      id: "mb-789~avengers",
+      title: "Avengers: Endgame",
+      year: 2019,
+    };
+    const dc = {
+      ...movie,
+      id: "mb-456~batman",
+      title: "The Batman",
+      year: 2022,
+    };
+    searchLibrary.mockResolvedValue({
+      catalog: [marvel, dc],
+      catalogHasMore: true,
+      status: "ok",
+    });
+    const result = await sourceCatalogue(
+      new URLSearchParams({ category: "Marvel", page: "2" }),
+    );
+    expect(result.items.map((item) => item.id)).toEqual([marvel.id]);
+    expect(result.hasNext).toBe(true);
+    expect(searchLibrary).toHaveBeenCalledWith({
+      query: "Avengers",
+      kind: "all",
+      year: null,
+      page: 2,
+    });
+    expect(getLatestPage).not.toHaveBeenCalled();
+    const dcResult = await sourceCatalogue(
+      new URLSearchParams({ category: "DC" }),
+    );
+    expect(dcResult.items.map((item) => item.id)).toEqual([dc.id]);
+  });
   it("preserves upstream failures instead of turning them into empty search results", async () => {
     searchLibrary.mockResolvedValue({
       catalog: [],
