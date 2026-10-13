@@ -83,3 +83,27 @@ describe("ported player interactions", () => {
     await waitFor(() => expect(video.src).toBe(sources[1].url));
   });
 });
+
+it("starts with sound and preserves an explicit mute when switching sources", async () => {
+  const { video } = await mount();
+  expect(video.closest(".pf-player-stage")?.querySelector(".pf-player-controls")).toBeNull();
+  expect(video.muted).toBe(false);
+  expect(video.volume).toBeGreaterThan(0);
+  fireEvent.click(screen.getByRole("button", { name: "Mute" }));
+  expect(video.muted).toBe(true);
+  fireEvent.change(screen.getByLabelText("Video quality"), { target: { value: "source:1" } });
+  await waitFor(() => expect(video.src).toBe(sources[1].url));
+  expect(video.muted).toBe(true);
+});
+it("keeps sound enabled when autoplay is blocked until the user presses play", async () => {
+  vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValue(new DOMException("Gesture required", "NotAllowedError"));
+  const view = render(<WatchPlayer mediaId="example" title="Example" backHref="/movies" inline />);
+  const video = view.container.querySelector("video")!;
+  await waitFor(() => expect(screen.getByRole("button", { name: "Start playback" })).toBeTruthy());
+  expect(video.muted).toBe(false);
+  vi.mocked(HTMLMediaElement.prototype.play).mockImplementation(function (this: HTMLMediaElement) { Object.defineProperty(this, "paused", { configurable: true, value: false }); return Promise.resolve(); });
+  fireEvent.click(screen.getByRole("button", { name: "Start playback" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy());
+  expect(video.muted).toBe(false);
+  expect(video.volume).toBeGreaterThan(0);
+});
