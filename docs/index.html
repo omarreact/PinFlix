@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PinFlix direct playback test</title>
+<style>body{font:16px system-ui;background:#111;color:#eee;max-width:960px;margin:40px auto;padding:20px}video{width:100%;background:#000}input{box-sizing:border-box;width:100%;padding:12px}button{padding:12px;margin:12px 8px 12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>
+<h1>PinFlix direct playback test</h1><p>Video requests go directly from your browser to the source. No streaming proxy is used.</p>
+<label for="url">Video URL</label><input id="url"><button id="play">Play</button><button id="stop">Stop</button><video id="video" controls playsinline></video><pre id="status" role="status"></pre>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js"></script>
+<script>
+const input=document.getElementById('url'),video=document.getElementById('video'),status=document.getElementById('status');
+input.value='http://vod.cineplexbd.net:8081/movies/Hindi%20Dubbed/English%20Movies/2026/Sardar%202%20%282026%29%201080p/Sardar%202%20%5BHindi%5D-1080P.mp4/index.m3u8';
+let hls;function stop(){if(hls){hls.destroy();hls=null}video.pause();video.removeAttribute('src');video.load()}
+document.getElementById('stop').onclick=()=>{stop();status.textContent='Stopped.'};
+document.getElementById('play').onclick=()=>{stop();let url;try{url=new URL(input.value);if(!['http:','https:'].includes(url.protocol))throw Error()}catch{status.textContent='Enter a valid HTTP or HTTPS video URL.';return}
+if(location.protocol==='https:'&&url.protocol==='http:'){status.textContent='This page is HTTPS. Open the HTTP test address to test this HTTP video source.';return}
+status.textContent='Loading directly from source…';
+if(video.canPlayType('application/vnd.apple.mpegurl')){video.src=url.href;video.play().catch(()=>{status.textContent='Press the video play button.'})}
+else if(window.Hls&&Hls.isSupported()){hls=new Hls();hls.loadSource(url.href);hls.attachMedia(video);hls.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{status.textContent='Press the video play button.'}));hls.on(Hls.Events.ERROR,(_,data)=>{status.textContent='Player error: '+data.type+' / '+data.details+(data.fatal?' (fatal)':'')+'. Network reachability or source CORS may be involved; inspect browser Network details to distinguish them.';if(data.fatal){hls.destroy();hls=null}})}
+else{status.textContent='This browser does not support HLS playback.'}};
+video.onplaying=()=>status.textContent='Playing directly from source.';
+video.onerror=()=>status.textContent='Video error '+(video.error?.code||'')+'. Playback was not confirmed.';
+</script></html>
