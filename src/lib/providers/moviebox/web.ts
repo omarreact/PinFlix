@@ -82,6 +82,7 @@ function mapItem(item: any, kindFallback?: "movie" | "show"): Entertainment {
     kind,
     provider: "moviebox",
     providerId: String(subjectId),
+    category: subj.isPornographic === true ? "Adult" : undefined,
     title: subj.title ?? item.title ?? "Untitled",
     synopsis: subj.description ?? item.description ?? "",
     year: subj.releaseDate
@@ -419,16 +420,18 @@ export async function getDetails(id: string): Promise<Entertainment | null> {
   url.searchParams.set("detailPath", parsed.detailPath);
 
   try {
-    const res = await fetchJson<H5ApiResponse<any>>(url);
+    const res = await fetchJson<H5ApiResponse<any>>(url, {}, 6000);
     if (res.code !== 0 || !res.data?.subject) return null;
 
     const subj = res.data.subject;
     const kind = subj.subjectType === 2 ? "show" : "movie";
 
-    const cast = res.data.stars?.map((star: any) => ({
-      name: star.name,
-      role: star.character,
-    }));
+    const cast = res.data.stars
+      ?.filter((star: any) => Number(star.staffType) === 1)
+      .map((star: any) => ({
+        name: star.name,
+        role: star.character,
+      }));
 
     return {
       id,
@@ -436,6 +439,7 @@ export async function getDetails(id: string): Promise<Entertainment | null> {
       kind,
       provider: "moviebox",
       providerId: String(subj.subjectId),
+      category: subj.isPornographic === true ? "Adult" : undefined,
       title: subj.title,
       synopsis: subj.description || "",
       year: subj.releaseDate
@@ -455,6 +459,56 @@ export async function getDetails(id: string): Promise<Entertainment | null> {
         ? parseFloat(subj.imdbRatingValue)
         : undefined,
       cast,
+      country: subj.countryName || undefined,
+      audioVersions: (subj.dubs ?? [])
+        .filter(
+          (dub: any) =>
+            dub.type === 0 &&
+            typeof dub.detailPath === "string" &&
+            /^\d+$/.test(String(dub.subjectId)),
+        )
+        .map((dub: any) => ({
+          id: providerId(dub.subjectId, dub.detailPath),
+          language: String(dub.lanCode),
+          dubbed: !dub.original,
+        })),
+      audioLanguages: (subj.dubs ?? [])
+        .filter(
+          (dub: any) =>
+            dub.type === 0 && String(dub.subjectId) === String(subj.subjectId),
+        )
+        .map((dub: any) => String(dub.lanCode)),
+      languages: (subj.dubs ?? [])
+        .filter(
+          (dub: any) =>
+            dub.type === 0 && String(dub.subjectId) === String(subj.subjectId),
+        )
+        .map((dub: any) => {
+          try {
+            return (
+              new Intl.DisplayNames(["en"], { type: "language" }).of(
+                dub.lanCode,
+              ) || dub.lanCode
+            );
+          } catch {
+            return dub.lanCode;
+          }
+        }),
+      dubbed: (subj.dubs ?? []).some(
+        (dub: any) =>
+          dub.type === 0 &&
+          !dub.original &&
+          String(dub.subjectId) === String(subj.subjectId),
+      ),
+      resolutions: [
+        ...new Set<number>(
+          (res.data.resource?.seasons ?? []).flatMap((season: any) =>
+            (season.resolutions ?? [])
+              .map((value: any) => Number(value.resolution))
+              .filter((value: number) => Number.isFinite(value) && value > 0),
+          ),
+        ),
+      ],
       detailUrl: new URL(`/detail/${parsed.detailPath}`, SITE_BASE).toString(),
     };
   } catch (error) {

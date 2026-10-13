@@ -2479,3 +2479,223 @@ img {
     transition: none !important;
   }
 }
+
+.category-backdrop,
+.advanced-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #0009;
+  backdrop-filter: blur(5px);
+}
+.category-drawer {
+  width: min(86vw, 480px);
+  height: 100dvh;
+  overflow-y: auto;
+  background: #0d101c;
+  border-right: 1px solid #ffffff20;
+  padding: 20px 16px;
+  color: #e1e6ee;
+}
+.category-drawer header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 14px 22px;
+  color: #38c1e5;
+}
+.category-drawer summary {
+  cursor: pointer;
+  background: #242731;
+  border-radius: 18px;
+  padding: 20px;
+  margin: 12px 0;
+  font-weight: 600;
+}
+.category-drawer .nested summary {
+  background: transparent;
+  padding: 16px 26px;
+}
+.category-drawer a,
+.drawer-unavailable {
+  display: block;
+  padding: 16px 28px;
+  font-size: 15px;
+}
+.category-drawer a:hover {
+  background: #ffffff0a;
+  color: #38c1e5;
+}
+.category-drawer h3 {
+  color: #38c1e5;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  padding: 18px 26px 8px;
+}
+.category-drawer h3:nth-of-type(3) {
+  color: #cd91fc;
+}
+.category-drawer p,
+.drawer-unavailable small {
+  display: block;
+  font-size: 12px;
+  color: #a7b0c2;
+  line-height: 1.6;
+}
+.category-drawer p {
+  padding: 8px 24px 22px;
+}
+.drawer-unavailable {
+  color: #8e95a3;
+}
+.advanced-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #ffffff25;
+  border-radius: 10px;
+  padding: 12px 18px;
+  margin-bottom: 20px;
+}
+.advanced-overlay {
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow-y: auto;
+}
+.advanced-panel {
+  width: min(100%, 540px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  border: 1px solid #ffffff25;
+  border-radius: 30px;
+  background: #101829;
+  color: #e6eaf0;
+}
+.advanced-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #ffffff20;
+  padding: 24px 30px;
+}
+.advanced-panel h2 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #39c6eb;
+}
+.advanced-panel header button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #252f42;
+}
+.advanced-panel form {
+  padding: 28px 30px;
+}
+.advanced-panel form > label {
+  display: block;
+  margin-bottom: 22px;
+  color: #a7adbb;
+  font-size: 14px;
+  letter-spacing: 0.03em;
+}
+.advanced-panel :is(input:not([type="checkbox"]), select) {
+  display: block;
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid #ffffff25;
+  border-radius: 18px;
+  background: #1c2838;
+  color: #fff;
+  padding: 14px 20px;
+  margin-top: 8px;
+}
+.advanced-panel legend {
+  color: #a7adbb;
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+.advanced-years {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+.advanced-years label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 14px;
+}
+.advanced-years input {
+  width: 19px;
+  height: 19px;
+  accent-color: #10b8ea;
+}
+.advanced-scope {
+  font-size: 11px;
+  color: #a7adbb;
+  margin: 14px 0;
+}
+.advanced-panel footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  border-top: 1px solid #ffffff20;
+  padding-top: 22px;
+}
+.advanced-panel footer button {
+  padding: 16px 24px;
+  border-radius: 17px;
+  background: #1e293b;
+  font-weight: 600;
+  font-size: 14px;
+}
+.advanced-panel footer button[type="submit"] {
+  background: #08b5e7;
+  color: #071322;
+}
+.category-drawer summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  list-style: none;
+}
+.category-drawer summary::-webkit-details-marker {
+  display: none;
+}
+.category-drawer details[open] > summary > svg {
+  transform: rotate(180deg);
+}
+.category-drawer .drawer-external small {
+  display: block;
+  color: #a7b0c2;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.digital-search {
+  border: 1px solid var(--line);
+  padding: 14px 20px;
+  border-radius: 16px;
+  margin-bottom: 28px;
+}
+.digital-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 22px;
+}
+.digital-grid article {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 28px;
+}
+.digital-grid article > p:not(.eyebrow) {
+  margin: 16px 0 24px;
+  color: var(--muted);
+}

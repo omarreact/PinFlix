@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { franchiseCollection } from "@/src/lib/franchise-collections";
 import { api, type Catalogue } from "@/src/lib/source-ui";
+import { AdvancedFilter } from "./advanced-filter";
 import { Card } from "./cards";
 export function Browse({
   initial,
@@ -16,13 +17,24 @@ export function Browse({
   initialQuery = "",
   initialCategory = "",
   initialYear = "",
+  initialActor = "",
+  initialGenres = "",
+  initialYears = [],
 }: {
   initial: Catalogue;
   kind?: "movie" | "series";
   initialQuery?: string;
   initialCategory?: string;
   initialYear?: string;
+  initialActor?: string;
+  initialGenres?: string;
+  initialYears?: string[];
 }) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advancedActor, setAdvancedActor] = useState(initialActor);
+  const [genres, setGenres] = useState(initialGenres);
+  const [selectedYears, setSelectedYears] = useState<string[]>(initialYears);
+  const advancedOpener = useRef<HTMLButtonElement>(null);
   const [data, setData] = useState(initial);
   const [q, setQ] = useState(initialQuery);
   const [searchBy, setSearchBy] = useState("title");
@@ -44,6 +56,9 @@ export function Browse({
     quality,
     sort,
     type,
+    advancedActor,
+    genres,
+    selectedYears,
   ]);
   const [loadedFilterKey, setLoadedFilterKey] = useState(filterKey);
   const first = useRef(true);
@@ -64,7 +79,9 @@ export function Browse({
       const p = new URLSearchParams();
       Object.entries({
         q: searchBy === "title" ? q : "",
-        actor: searchBy === "actor" ? q : "",
+        actor: searchBy === "actor" ? q : advancedActor,
+        genres,
+        years: selectedYears.join(","),
         category,
         year,
         language,
@@ -112,6 +129,9 @@ export function Browse({
     refresh,
     searchBy,
     filterKey,
+    advancedActor,
+    genres,
+    selectedYears,
   ]);
   async function more() {
     if (loadedFilterKey !== filterKey || busy) return;
@@ -123,7 +143,9 @@ export function Browse({
     const p = new URLSearchParams({ page: String(data.page + 1) });
     Object.entries({
       q: searchBy === "title" ? q : "",
-      actor: searchBy === "actor" ? q : "",
+      actor: searchBy === "actor" ? q : advancedActor,
+      genres,
+      years: selectedYears.join(","),
       category,
       year,
       language,
@@ -199,12 +221,49 @@ export function Browse({
           from the PinFlix collection.
         </p>
       </div>
+      <button
+        ref={advancedOpener}
+        type="button"
+        className="advanced-trigger"
+        onClick={() => setAdvancedOpen(true)}
+      >
+        <SlidersHorizontal size={18} /> Advanced filter
+      </button>
+      {advancedOpen && (
+        <AdvancedFilter
+          initial={{
+            title: q,
+            actor: advancedActor,
+            genres,
+            category,
+            years: selectedYears,
+          }}
+          categories={categories.map((category) => category.name)}
+          onClose={() => {
+            setAdvancedOpen(false);
+            advancedOpener.current?.focus();
+          }}
+          onApply={(value) => {
+            setQ(value.title);
+            setSearchBy("title");
+            setAdvancedActor(value.actor);
+            setGenres(value.genres);
+            setCategory(value.category);
+            setSelectedYears(value.years);
+            setYear("");
+            setAdvancedOpen(false);
+            advancedOpener.current?.focus();
+          }}
+        />
+      )}
       <div className="filter-panel">
         <label className="browse-search">
           <Search size={20} />
           <input
             aria-label="Search catalogue"
-            placeholder="Title, year, language…"
+            placeholder={
+              searchBy === "actor" ? "Actor name…" : "Title, year, language…"
+            }
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -219,9 +278,7 @@ export function Browse({
               onChange={(e) => setSearchBy(e.target.value)}
             >
               <option value="title">Title / keywords</option>
-              <option value="actor" disabled>
-                Cast member (not available)
-              </option>
+              <option value="actor">Cast member</option>
             </select>
           </label>
           {!kind && (
@@ -261,7 +318,10 @@ export function Browse({
             <select
               aria-label="Year"
               value={year}
-              onChange={(e) => setYear(e.target.value)}
+              onChange={(e) => {
+                setYear(e.target.value);
+                setSelectedYears([]);
+              }}
             >
               <option value="">Any year</option>
               {data.years.map((y) => (
@@ -283,10 +343,9 @@ export function Browse({
             </select>
           </label>
           <label>
-            <span>Quality</span>
+            <span>Minimum quality</span>
             <select
               aria-label="Quality"
-              disabled={!data.items.some((item) => item.quality)}
               value={quality}
               onChange={(e) => setQuality(e.target.value)}
             >
@@ -324,6 +383,11 @@ export function Browse({
         </span>
         {busy && <span role="status">Finding stories…</span>}
       </div>
+      {data.notice && (
+        <p role="status" className="notice">
+          {data.notice}
+        </p>
+      )}
       {error && (
         <div role="alert" className="notice">
           {error}
@@ -348,6 +412,10 @@ export function Browse({
               setYear("");
               setLanguage("");
               setQuality("");
+              setAdvancedActor("");
+              setGenres("");
+              setSelectedYears([]);
+              setSearchBy("title");
             }}
           >
             Clear filters

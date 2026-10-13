@@ -55,6 +55,9 @@ export async function BrowsePage({
           params.category ??
           ""
         }
+        initialActor={params.actor ?? ""}
+        initialGenres={params.genres ?? ""}
+        initialYears={(params.years ?? "").split(",").filter(Boolean)}
         initialYear={params.year ?? ""}
       />
     </>
