@@ -2637,11 +2637,6 @@ img {
   height: 19px;
   accent-color: #10b8ea;
 }
-.advanced-scope {
-  font-size: 11px;
-  color: #a7adbb;
-  margin: 14px 0;
-}
 .advanced-panel footer {
   display: flex;
   justify-content: flex-end;

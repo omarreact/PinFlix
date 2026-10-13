@@ -9,7 +9,6 @@ import { Artwork } from "./artwork";
 import { read, write } from "@/src/lib/source-ui-storage";
 export function Shell({
   children,
-  categories,
 }: {
   children: React.ReactNode;
   categories: Category[];
@@ -96,7 +95,7 @@ export function Shell({
         <nav
           id="main-navigation"
           aria-label="Main navigation"
-          className={menu ? "nav-links mobile-open" : "nav-links"}
+          className="nav-links"
         >
           <Link
             href="/"
@@ -142,44 +141,7 @@ export function Shell({
               Categories{" "}
               <ChevronDown size={14} className={catOpen ? "rotate-180" : ""} />
             </button>
-            <div className="nav-dropdown-menu">
-              <div className="dropdown-col">
-                <span className="dropdown-title">MOVIES</span>
-                {categories
-                  .filter((c) => c.kind === "movie" && !c.mature)
-                  .slice(0, 6)
-                  .map((c) => (
-                    <Link
-                      key={c.name}
-                      href={"/movies?category=" + encodeURIComponent(c.name)}
-                      onClick={() => {
-                        setCatOpen(false);
-                        setMenu(false);
-                      }}
-                    >
-                      {c.name}
-                    </Link>
-                  ))}
-              </div>
-              <div className="dropdown-col">
-                <span className="dropdown-title">SERIES</span>
-                {categories
-                  .filter((c) => c.kind === "series" && !c.mature)
-                  .slice(0, 6)
-                  .map((c) => (
-                    <Link
-                      key={c.name}
-                      href={"/series?category=" + encodeURIComponent(c.name)}
-                      onClick={() => {
-                        setCatOpen(false);
-                        setMenu(false);
-                      }}
-                    >
-                      {c.name}
-                    </Link>
-                  ))}
-              </div>
-            </div>
+
           </div>
           <Link
             href="/library"
@@ -205,7 +167,6 @@ export function Shell({
           >
             <Search size={20} />
           </button>
-          <span className="edition">PINFLIX EDITION</span>
           <button
             className="menu-toggle icon-button"
             ref={navigationOpener}
@@ -219,9 +180,7 @@ export function Shell({
           >
             <Menu />
           </button>
-          <Link className="avatar" href="/library" aria-label="My space">
-            P
-          </Link>
+
         </div>
       </header>
       <main
@@ -240,7 +199,6 @@ export function Shell({
           <i />
         </Link>
         <p>A world of stories. A space of your own.</p>
-        <span>Catalogue by MovieBox · Availability varies by title.</span>
       </footer>
       {catOpen && (
         <CategoryDrawer

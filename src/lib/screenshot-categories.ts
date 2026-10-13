@@ -33,7 +33,7 @@ export const SCREENSHOT_CATEGORIES: ScreenshotCategory[] = [
     name: "3D Movies",
     kind: "movie",
     group: "Categories",
-    unavailable: "The connected catalogue does not expose verified 3D formats.",
+    unavailable: "No 3D movies are available yet.",
   },
   { name: "4K Movies", kind: "movie", group: "Categories", resolution: 2160 },
   { name: "Animation", kind: "movie", group: "Categories", genre: "Animation" },
@@ -82,14 +82,14 @@ export const SCREENSHOT_CATEGORIES: ScreenshotCategory[] = [
     kind: "movie",
     group: "Categories",
     unavailable:
-      "Separate dubbed versions are available; a dual-audio file is not verified.",
+      "No dual-audio movies are available yet.",
   },
   {
     name: "Exclusive Full HD",
     kind: "movie",
     group: "Categories",
     unavailable:
-      "The connected catalogue does not identify exclusive editions.",
+      "No exclusive Full HD movies are available yet.",
   },
   {
     name: "Foreign",
@@ -97,7 +97,7 @@ export const SCREENSHOT_CATEGORIES: ScreenshotCategory[] = [
     group: "Categories",
     excludeCountries: ["Bangladesh"],
     notice:
-      "Foreign movies are productions outside Bangladesh, filtered by verified country metadata.",
+      "Movies from outside Bangladesh.",
   },
   {
     name: "Kids Cartoon",

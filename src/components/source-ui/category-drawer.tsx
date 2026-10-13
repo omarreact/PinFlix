@@ -16,7 +16,7 @@ export function CategoryDrawer({ onClose }: { onClose: () => void }) {
   }, []);
   function links(group: string) {
     return SCREENSHOT_CATEGORIES.filter(
-      (category) => category.group === group,
+      (category) => category.group === group && !["Bangla", "Documentary"].includes(category.name),
     ).map((category) => (
       <Link
         key={category.name}
@@ -121,18 +121,13 @@ export function CategoryDrawer({ onClose }: { onClose: () => void }) {
               category.group === "TV Series" &&
               category.name !== "All TV Series",
           ).map((category) => (
-            <details key={category.name} className="nested">
-              <summary>
-                {category.name}
-                <ChevronDown size={18} />
-              </summary>
-              <Link
-                href={`/series?category=${encodeURIComponent(category.name)}`}
-                onClick={onClose}
-              >
-                All {category.name}
-              </Link>
-            </details>
+            <Link
+              key={category.name}
+              href={`/series?category=${encodeURIComponent(category.name)}`}
+              onClick={onClose}
+            >
+              {category.name}
+            </Link>
           ))}
         </details>
         {["GAMES", "SOFTWARE", "TUTORIAL"].map((name) => (
