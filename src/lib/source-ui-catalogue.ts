@@ -25,7 +25,14 @@ export async function sourceCatalogue(
   params: URLSearchParams,
 ): Promise<Catalogue> {
   const category = params.get("category") || params.get("genre");
-  const value = params.get("kind") || screenshotCategory(category)?.kind;
+  const genre = CATALOGUE_GENRES.find(
+    (item) =>
+      item.slug !== "adult" &&
+      (item.slug === category ||
+        item.label.toLowerCase() === category?.toLowerCase()),
+  );
+  const screenshot = genre ? undefined : screenshotCategory(category);
+  const value = params.get("kind") || screenshot?.kind;
   const kind =
     value === "movie"
       ? "movie"
@@ -38,13 +45,6 @@ export async function sourceCatalogue(
     : 1;
   const query = (params.get("q") ?? "").trim().slice(0, 100);
   const intent = parseYearSearch(query, params.get("year"));
-  const genre = CATALOGUE_GENRES.find(
-    (item) =>
-      item.slug !== "adult" &&
-      (item.slug === category ||
-        item.label.toLowerCase() === category?.toLowerCase()),
-  );
-  const screenshot = screenshotCategory(category);
   const actor = (params.get("actor") ?? "").trim().slice(0, 100);
   const requestedGenres = (params.get("genres") ?? "")
     .split(",")
@@ -133,6 +133,7 @@ export async function sourceCatalogue(
     actor ||
     screenshot?.country ||
     screenshot?.language ||
+    screenshot?.excludeLanguages ||
     screenshot?.resolution ||
     resolution ||
     params.get("language")

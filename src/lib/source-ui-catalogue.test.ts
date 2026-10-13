@@ -208,6 +208,25 @@ describe("source UI provider adapter", () => {
       (await sourceCatalogue(new URLSearchParams({ actor: "Actor" }))).items,
     ).toEqual([]);
   });
+  it("retains TV animation and documentary genre filtering alongside screenshot categories", async () => {
+    const show = {
+      ...movie,
+      kind: "show",
+      genres: ["Animation", "Documentary"],
+    };
+    getLatestPage.mockResolvedValue({
+      items: [show],
+      page: 1,
+      hasNextPage: false,
+    });
+    for (const category of ["Animation", "Documentary"]) {
+      const result = await sourceCatalogue(
+        new URLSearchParams({ kind: "series", category }),
+      );
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].kind).toBe("series");
+    }
+  });
   it("preserves upstream failures instead of turning them into empty search results", async () => {
     searchLibrary.mockResolvedValue({
       catalog: [],

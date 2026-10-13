@@ -5,6 +5,7 @@ export type ScreenshotCategory = {
   group: string;
   country?: string[];
   language?: string;
+  excludeLanguages?: string[];
   genre?: string;
   dubbed?: boolean;
   resolution?: number;
@@ -143,6 +144,7 @@ export const SCREENSHOT_CATEGORIES: ScreenshotCategory[] = [
     kind: "series",
     group: "Animation Series",
     genre: "Animation",
+    excludeLanguages: ["bn", "hi", "en"],
   },
   { name: "Award Shows", kind: "series", group: "TV Series", genre: "Awards" },
   { name: "Bangla Series", kind: "series", group: "TV Series", language: "bn" },
@@ -192,6 +194,14 @@ export function matchesScreenshotCategory(
   )
     return false;
   if (category.language && !item.audioLanguages?.includes(category.language))
+    return false;
+  if (
+    category.excludeLanguages &&
+    (!item.audioLanguages?.length ||
+      !item.audioLanguages.some(
+        (language) => !category.excludeLanguages!.includes(language),
+      ))
+  )
     return false;
   if (category.dubbed && !item.dubbed) return false;
   if (
