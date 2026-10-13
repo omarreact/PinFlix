@@ -105,20 +105,19 @@ describe("ported source UI flows", () => {
       "https://images.example/working.jpg",
     );
   });
-  it("opens the screenshot drawer from mobile navigation and restores focus", () => {
-    render(<Shell categories={[]}>Home</Shell>);
+  it("uses compact mobile navigation without the Collections sidebar", () => {
+    render(<Shell categories={[]}><div>Content</div></Shell>);
     const opener = screen.getByRole("button", { name: "Toggle navigation" });
     fireEvent.click(opener);
-    const drawer = screen.getByRole("dialog", { name: "Browse categories" });
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "Close categories" }),
-    );
-    fireEvent.keyDown(drawer, { key: "Escape" });
-    expect(
-      screen.queryByRole("dialog", { name: "Browse categories" }),
-    ).toBeNull();
+    expect(opener.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.queryByRole("dialog", { name: "Browse categories" })).toBeNull();
+    const navigation = screen.getByRole("navigation", { name: "Main navigation" });
+    expect(navigation.className).toContain("mobile-open");
+    fireEvent.keyDown(navigation, { key: "Escape" });
+    expect(opener.getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(opener);
   });
+
   it("opens search, navigates suggestions, and restores focus after Escape", async () => {
     vi.stubGlobal(
       "fetch",

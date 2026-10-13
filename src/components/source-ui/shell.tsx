@@ -2,9 +2,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Search, X, ArrowUpRight, Menu, Play, ChevronDown } from "lucide-react";
+import { Search, X, ArrowUpRight, Menu, Play } from "lucide-react";
 import { toTitle, type Title, type Category } from "@/src/lib/source-ui";
-import { CategoryDrawer } from "./category-drawer";
 import { Artwork } from "./artwork";
 import { read, write } from "@/src/lib/source-ui-storage";
 export function Shell({
@@ -17,14 +16,12 @@ export function Shell({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [catOpen, setCatOpen] = useState(false);
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Title[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  const categoryOpener = useRef<HTMLButtonElement>(null);
   const navigationOpener = useRef<HTMLButtonElement>(null);
   const searchOpener = useRef<HTMLButtonElement>(null);
   function closeSearch() {
@@ -95,13 +92,13 @@ export function Shell({
         <nav
           id="main-navigation"
           aria-label="Main navigation"
-          className="nav-links"
+          className={menu ? "nav-links mobile-open" : "nav-links"}
+          onKeyDown={(event) => { if (event.key === "Escape") { setMenu(false); navigationOpener.current?.focus(); } }}
         >
           <Link
             href="/"
             onClick={() => {
               setMenu(false);
-              setCatOpen(false);
             }}
             className={pathname === "/" ? "active" : ""}
           >
@@ -111,7 +108,6 @@ export function Shell({
             href="/movies"
             onClick={() => {
               setMenu(false);
-              setCatOpen(false);
             }}
             className={pathname === "/movies" ? "active" : ""}
           >
@@ -121,33 +117,15 @@ export function Shell({
             href="/series"
             onClick={() => {
               setMenu(false);
-              setCatOpen(false);
             }}
             className={pathname === "/series" ? "active" : ""}
           >
             Series
           </Link>
-          <div className="nav-item-dropdown">
-            <button
-              type="button"
-              className="nav-dropdown-trigger"
-              ref={categoryOpener}
-              onClick={() => setCatOpen(!catOpen)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setCatOpen(false);
-              }}
-              aria-expanded={catOpen}
-            >
-              Categories{" "}
-              <ChevronDown size={14} className={catOpen ? "rotate-180" : ""} />
-            </button>
-
-          </div>
           <Link
             href="/library"
             onClick={() => {
               setMenu(false);
-              setCatOpen(false);
             }}
             className={
               ["/library", "/saved", "/history"].includes(pathname)
@@ -171,14 +149,13 @@ export function Shell({
             className="menu-toggle icon-button"
             ref={navigationOpener}
             aria-label="Toggle navigation"
-            aria-expanded={catOpen}
-            aria-controls="category-navigation"
+            aria-expanded={menu}
+            aria-controls="main-navigation"
             onClick={() => {
-              setMenu(true);
-              setCatOpen(true);
+              setMenu(value => !value);
             }}
           >
-            <Menu />
+            {menu ? <X /> : <Menu />}
           </button>
 
         </div>
@@ -200,15 +177,6 @@ export function Shell({
         </Link>
         <p>A world of stories. A space of your own.</p>
       </footer>
-      {catOpen && (
-        <CategoryDrawer
-          onClose={() => {
-            setCatOpen(false);
-            setMenu(false);
-            (menu ? navigationOpener : categoryOpener).current?.focus();
-          }}
-        />
-      )}
       {open && (
         <div
           className="search-overlay"
