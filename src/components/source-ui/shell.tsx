@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Search, X, ArrowUpRight, Menu, Play, ChevronDown } from "lucide-react";
 import { toTitle, type Title, type Category } from "@/src/lib/source-ui";
+import { CategoryDrawer } from "./category-drawer";
 import { Artwork } from "./artwork";
 import { read, write } from "@/src/lib/source-ui-storage";
 export function Shell({
@@ -24,6 +25,8 @@ export function Shell({
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const categoryOpener = useRef<HTMLButtonElement>(null);
+  const navigationOpener = useRef<HTMLButtonElement>(null);
   const searchOpener = useRef<HTMLButtonElement>(null);
   function closeSearch() {
     setOpen(false);
@@ -129,6 +132,7 @@ export function Shell({
             <button
               type="button"
               className="nav-dropdown-trigger"
+              ref={categoryOpener}
               onClick={() => setCatOpen(!catOpen)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") setCatOpen(false);
@@ -138,7 +142,7 @@ export function Shell({
               Categories{" "}
               <ChevronDown size={14} className={catOpen ? "rotate-180" : ""} />
             </button>
-            <div className={`nav-dropdown-menu ${catOpen ? "open" : ""}`}>
+            <div className="nav-dropdown-menu">
               <div className="dropdown-col">
                 <span className="dropdown-title">MOVIES</span>
                 {categories
@@ -204,10 +208,14 @@ export function Shell({
           <span className="edition">PINFLIX EDITION</span>
           <button
             className="menu-toggle icon-button"
+            ref={navigationOpener}
             aria-label="Toggle navigation"
-            aria-expanded={menu}
-            aria-controls="main-navigation"
-            onClick={() => setMenu(!menu)}
+            aria-expanded={catOpen}
+            aria-controls="category-navigation"
+            onClick={() => {
+              setMenu(true);
+              setCatOpen(true);
+            }}
           >
             <Menu />
           </button>
@@ -234,6 +242,15 @@ export function Shell({
         <p>A world of stories. A space of your own.</p>
         <span>Catalogue by MovieBox · Availability varies by title.</span>
       </footer>
+      {catOpen && (
+        <CategoryDrawer
+          onClose={() => {
+            setCatOpen(false);
+            setMenu(false);
+            (menu ? navigationOpener : categoryOpener).current?.focus();
+          }}
+        />
+      )}
       {open && (
         <div
           className="search-overlay"

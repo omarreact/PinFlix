@@ -105,6 +105,20 @@ describe("ported source UI flows", () => {
       "https://images.example/working.jpg",
     );
   });
+  it("opens the screenshot drawer from mobile navigation and restores focus", () => {
+    render(<Shell categories={[]}>Home</Shell>);
+    const opener = screen.getByRole("button", { name: "Toggle navigation" });
+    fireEvent.click(opener);
+    const drawer = screen.getByRole("dialog", { name: "Browse categories" });
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Close categories" }),
+    );
+    fireEvent.keyDown(drawer, { key: "Escape" });
+    expect(
+      screen.queryByRole("dialog", { name: "Browse categories" }),
+    ).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
   it("opens search, navigates suggestions, and restores focus after Escape", async () => {
     vi.stubGlobal(
       "fetch",
@@ -198,7 +212,7 @@ describe("ported source UI flows", () => {
     expect(screen.getAllByRole("heading", { name: "Example" })).toHaveLength(1);
     expect(fetcher.mock.calls[0][0]).toContain("page=2");
     expect(screen.getByLabelText("Quality").hasAttribute("disabled")).toBe(
-      true,
+      false,
     );
   });
   it("keeps the selected title order across More stories pages", async () => {

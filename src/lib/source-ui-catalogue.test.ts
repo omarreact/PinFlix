@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const { getLatestPage, searchLibrary } = vi.hoisted(() => ({
-  getLatestPage: vi.fn(),
-  searchLibrary: vi.fn(),
-}));
+const { getLatestPage, getDetails, searchPage, searchLibrary } = vi.hoisted(
+  () => ({
+    getLatestPage: vi.fn(),
+    getDetails: vi.fn(),
+    searchPage: vi.fn(),
+    searchLibrary: vi.fn(),
+  }),
+);
 vi.mock("server-only", () => ({}));
 vi.mock("@/src/lib/providers/catalog", () => ({
-  catalogProvider: { getLatestPage },
+  catalogProvider: { getLatestPage, getDetails, searchPage },
 }));
 vi.mock("@/src/lib/search-service", () => ({ searchLibrary }));
 import { sourceCatalogue } from "./source-ui-catalogue";
@@ -25,6 +29,12 @@ const movie: Entertainment = {
 };
 beforeEach(() => {
   vi.resetAllMocks();
+  getDetails.mockImplementation(async (id) => ({
+    ...movie,
+    id,
+    languages: ["English"],
+    audioLanguages: ["en"],
+  }));
   getLatestPage.mockResolvedValue({
     items: [movie],
     page: 1,
@@ -63,7 +73,7 @@ describe("source UI provider adapter", () => {
     );
     expect(getLatestPage).toHaveBeenCalledWith("movie", 100);
     expect(result.items.map((item) => item.id)).toEqual([movie.id]);
-    expect(result.hasNext).toBe(true);
+    expect(result.hasNext).toBe(false);
     expect(result.years).toContain(1900);
     expect(result.years).toContain(2021);
   });
@@ -119,6 +129,84 @@ describe("source UI provider adapter", () => {
       new URLSearchParams({ category: "DC" }),
     );
     expect(dcResult.items.map((item) => item.id)).toEqual([dc.id]);
+  });
+  it("checks actors, genres and multiple years against provider metadata", async () => {
+    const inception = {
+      ...movie,
+      title: "Inception",
+      year: 2010,
+      cast: [{ name: "Leonardo DiCaprio" }],
+    };
+    searchPage.mockResolvedValue({
+      items: [
+        inception,
+        { ...movie, id: "mb-456~leonardo", title: "Leonardo da Vinci" },
+      ],
+      hasNextPage: true,
+    });
+    getDetails.mockImplementation(async (id) =>
+      id === movie.id
+        ? inception
+        : {
+            ...movie,
+            id,
+            title: "Leonardo da Vinci",
+            cast: [{ name: "Someone Else" }],
+          },
+    );
+    const result = await sourceCatalogue(
+      new URLSearchParams({
+        actor: "Leonardo DiCaprio",
+        genres: "Action",
+        years: "2010,2012",
+      }),
+    );
+    expect(result.items.map((item) => item.title)).toEqual(["Inception"]);
+    expect(searchPage).toHaveBeenCalledWith("Leonardo DiCaprio", 1, "all");
+  });
+  it("links a verified dubbed version and never interprets subtitles as audio", async () => {
+    const dub = {
+      ...movie,
+      id: "mb-456~dub",
+      audioLanguages: ["hi"],
+      dubbed: true,
+      country: "United States",
+    };
+    getDetails.mockImplementation(async (id) =>
+      id === movie.id
+        ? {
+            ...movie,
+            audioVersions: [{ id: dub.id, language: "hi", dubbed: true }],
+          }
+        : dub,
+    );
+    const result = await sourceCatalogue(
+      new URLSearchParams({ category: "Hindi Dubbed/English Movies" }),
+    );
+    expect(result.items.map((item) => item.id)).toEqual([dub.id]);
+    getDetails.mockResolvedValue({
+      ...movie,
+      audioLanguages: ["en"],
+      audioVersions: [],
+    });
+    expect(
+      (
+        await sourceCatalogue(
+          new URLSearchParams({ category: "Hindi Dubbed/English Movies" }),
+        )
+      ).items,
+    ).toEqual([]);
+  });
+  it("removes adult flags revealed only by detailed metadata", async () => {
+    searchPage.mockResolvedValue({ items: [movie], hasNextPage: false });
+    getDetails.mockResolvedValue({
+      ...movie,
+      category: "Adult",
+      cast: [{ name: "Actor" }],
+    });
+    expect(
+      (await sourceCatalogue(new URLSearchParams({ actor: "Actor" }))).items,
+    ).toEqual([]);
   });
   it("preserves upstream failures instead of turning them into empty search results", async () => {
     searchLibrary.mockResolvedValue({

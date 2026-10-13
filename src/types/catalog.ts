@@ -35,6 +35,10 @@ export type Entertainment = {
   durationMinutes?: number;
   country?: string;
   languages?: string[];
+  audioLanguages?: string[];
+  audioVersions?: { id: string; language: string; dubbed: boolean }[];
+  dubbed?: boolean;
+  resolutions?: number[];
   cast?: CastCredit[];
   collections?: string[];
   provider?: string;

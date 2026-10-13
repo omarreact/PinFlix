@@ -28,6 +28,7 @@ export type Catalogue = {
   page: number;
   stale: boolean;
   retrievedAt: string;
+  notice?: string;
 };
 export function toTitle(item: SavedTitle | Entertainment): Title {
   const details = item as Partial<Entertainment>;
@@ -43,7 +44,11 @@ export function toTitle(item: SavedTitle | Entertainment): Title {
       item.genres?.[0] ||
       (item.kind === "show" ? "Series" : "Movie"),
     language: details.languages?.join(" · ") || null,
-    quality: null,
+    quality: details.resolutions?.length
+      ? Math.max(...details.resolutions) >= 2160
+        ? "4K"
+        : `${Math.max(...details.resolutions)}P`
+      : null,
     synopsis: details.synopsis || "",
     genres: item.genres ?? [],
   };
