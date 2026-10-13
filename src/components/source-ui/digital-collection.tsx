@@ -23,8 +23,7 @@ export function DigitalCollection({
         <p className="eyebrow">EXPLORE AND LEARN</p>
         <h1>{title}</h1>
         <p>
-          Open the official project websites for downloads and learning
-          resources.
+          Downloads and learning resources.
         </p>
       </div>
       <label className="browse-search digital-search">

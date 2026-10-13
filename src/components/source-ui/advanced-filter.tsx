@@ -152,10 +152,6 @@ export function AdvancedFilter({
               ))}
             </div>
           </fieldset>
-          <p className="advanced-scope">
-            Filters check verified metadata in the provider results on each
-            page.
-          </p>
           <footer>
             <button type="button" onClick={onClose}>
               CANCEL

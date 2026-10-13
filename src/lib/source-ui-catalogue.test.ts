@@ -249,7 +249,7 @@ it.each(["3D Movies", "Dual Audio", "Exclusive Full HD"])(
     const result = await sourceCatalogue(new URLSearchParams({ category }));
     expect(result.items).toEqual([]);
     expect(result.hasNext).toBe(false);
-    expect(result.notice).toContain("verified");
+    expect(result.notice).toContain("available yet");
     expect(result.categories.some((entry) => entry.name === category)).toBe(
       true,
     );

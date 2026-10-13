@@ -708,7 +708,7 @@ export function WatchPlayer({
             <div>
               <LoaderCircle size={32} className="mx-auto animate-spin" />
               <p className="mt-4 text-xs font-bold uppercase tracking-[.18em] text-accent">
-                {displayStatus === "switching" ? "Trying another source" : "Loading stream"}
+                {displayStatus === "switching" ? "Preparing video" : "Loading video"}
               </p>
             </div>
           </div>
@@ -779,14 +779,14 @@ export function WatchPlayer({
           </>}
           {isEmbed && (
             <p className="px-3 text-xs text-zinc-400">
-              Playing via movibox.net player · switch quality above if available
+              Video player
             </p>
           )}
 
           <div className="pf-player-settings">
             {!isEmbed && <select aria-label="Playback speed" value={playbackRate} onChange={(event) => { const rate = Number(event.target.value); setPlaybackRate(rate); window.localStorage.setItem("pinflix-playback-rate", String(rate)); }}>{[0.5,0.75,1,1.25,1.5,1.75,2].map(rate => <option key={rate} value={rate}>{rate}x</option>)}</select>}
             {(sources.length > 1 || hlsLevels.length > 1) && <select aria-label="Video quality" value={hlsLevels.length ? `level:${selectedLevel}` : `source:${sourcePosition}`} onChange={(event) => { const [kind, value] = event.target.value.split(":"); if (kind === "level") chooseLevel(Number(value)); else chooseSource(Number(value)); }}>
-              {sources.map((item,index) => <option key={index} value={`source:${index}`}>{item.quality}</option>)}
+              {sources.map((item,index) => <option key={index} value={`source:${index}`}>{item.quality.match(/(?:2160|1080|720|480|360)p|4k/i)?.[0] ?? `Video ${index + 1}`}</option>)}
               {hlsLevels.length > 0 && <option value="level:-1">Auto</option>}
               {hlsLevels.map(level => <option key={level.index} value={`level:${level.index}`}>{level.label}</option>)}
             </select>}

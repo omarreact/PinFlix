@@ -91,7 +91,7 @@ export async function sourceCatalogue(
       hasNext: false,
       years,
       categories,
-      notice: `${screenshot.unavailable} This collection will appear here when verified titles are available.`,
+      notice: screenshot.unavailable,
       stale: false,
       retrievedAt: new Date().toISOString(),
     };
