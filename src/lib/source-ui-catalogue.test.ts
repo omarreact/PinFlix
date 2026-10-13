@@ -242,3 +242,42 @@ describe("source UI provider adapter", () => {
     );
   });
 });
+
+it.each(["3D Movies", "Dual Audio", "Exclusive Full HD"])(
+  "keeps %s internal with an honest availability notice",
+  async (category) => {
+    const result = await sourceCatalogue(new URLSearchParams({ category }));
+    expect(result.items).toEqual([]);
+    expect(result.hasNext).toBe(false);
+    expect(result.notice).toContain("verified");
+    expect(result.categories.some((entry) => entry.name === category)).toBe(
+      true,
+    );
+    expect(getLatestPage).not.toHaveBeenCalled();
+  },
+);
+it("filters Foreign by verified countries outside Bangladesh", async () => {
+  getLatestPage.mockResolvedValue({
+    items: [
+      movie,
+      { ...movie, id: "mb-456~bd" },
+      { ...movie, id: "mb-789~unknown" },
+    ],
+    hasNextPage: false,
+  });
+  getDetails.mockImplementation(async (id) => ({
+    ...movie,
+    id,
+    country:
+      id === movie.id
+        ? "United States"
+        : id.includes("456")
+          ? "Bangladesh"
+          : undefined,
+  }));
+  const result = await sourceCatalogue(
+    new URLSearchParams({ category: "Foreign" }),
+  );
+  expect(result.items.map((item) => item.id)).toEqual([movie.id]);
+  expect(result.notice).toContain("outside Bangladesh");
+});

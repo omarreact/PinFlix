@@ -4,6 +4,8 @@ export type ScreenshotCategory = {
   kind: "movie" | "series";
   group: string;
   country?: string[];
+  excludeCountries?: string[];
+  notice?: string;
   language?: string;
   excludeLanguages?: string[];
   genre?: string;
@@ -93,8 +95,9 @@ export const SCREENSHOT_CATEGORIES: ScreenshotCategory[] = [
     name: "Foreign",
     kind: "movie",
     group: "Categories",
-    unavailable:
-      "Select a country collection; 'Foreign' has no defined reference country.",
+    excludeCountries: ["Bangladesh"],
+    notice:
+      "Foreign movies are productions outside Bangladesh, filtered by verified country metadata.",
   },
   {
     name: "Kids Cartoon",
@@ -193,6 +196,21 @@ export function matchesScreenshotCategory(
     )
   )
     return false;
+  if (category.excludeCountries) {
+    const countries = item.country
+      ?.split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+    if (
+      !countries?.length ||
+      countries.some((country) =>
+        category.excludeCountries!.some(
+          (excluded) => excluded.toLowerCase() === country,
+        ),
+      )
+    )
+      return false;
+  }
   if (category.language && !item.audioLanguages?.includes(category.language))
     return false;
   if (

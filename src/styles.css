@@ -2672,12 +2672,6 @@ img {
 .category-drawer details[open] > summary > svg {
   transform: rotate(180deg);
 }
-.category-drawer .drawer-external small {
-  display: block;
-  color: #a7b0c2;
-  font-size: 11px;
-  margin-top: 4px;
-}
 .digital-search {
   border: 1px solid var(--line);
   padding: 14px 20px;

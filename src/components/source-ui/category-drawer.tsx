@@ -17,31 +17,17 @@ export function CategoryDrawer({ onClose }: { onClose: () => void }) {
   function links(group: string) {
     return SCREENSHOT_CATEGORIES.filter(
       (category) => category.group === group,
-    ).map((category) =>
-      category.unavailable ? (
-        <a
-          key={category.name}
-          className="drawer-external"
-          href={`http://cineplexbd.net/category.php?category=${encodeURIComponent(category.name)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={category.unavailable}
-        >
-          {category.name}
-          <small>Open CineplexBD collection ↗</small>
-        </a>
-      ) : (
-        <Link
-          key={category.name}
-          href={`/${category.kind === "series" ? "series" : "movies"}?category=${encodeURIComponent(category.name)}`}
-          onClick={onClose}
-        >
-          {category.group === "Hindi Dubbed"
-            ? category.name.split("/")[1]
-            : category.name}
-        </Link>
-      ),
-    );
+    ).map((category) => (
+      <Link
+        key={category.name}
+        href={`/${category.kind === "series" ? "series" : "movies"}?category=${encodeURIComponent(category.name)}`}
+        onClick={onClose}
+      >
+        {category.group === "Hindi Dubbed"
+          ? category.name.split("/")[1]
+          : category.name}
+      </Link>
+    ));
   }
   return (
     <div
