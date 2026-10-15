@@ -528,7 +528,7 @@ export async function getSeriesNavigation(
 
   const parsed = parseProviderId(id);
   if (!parsed) {
-    return { seasons: [fallbackSeason], season: fallbackSeason, episodes: 1 };
+    throw new Error("Invalid series ID");
   }
 
   const url = new URL("/wefeed-h5api-bff/detail", API_BASE);
@@ -536,6 +536,9 @@ export async function getSeriesNavigation(
 
   try {
     const res = await fetchJson<H5ApiResponse<any>>(url);
+    if (res.code !== 0 || !Array.isArray(res.data?.resource?.seasons)) {
+      throw new Error("Series episode information is unavailable");
+    }
     const rawSeasons = res.data?.resource?.seasons ?? [];
 
     const seasons = rawSeasons
@@ -557,16 +560,18 @@ export async function getSeriesNavigation(
       rawSeasons.find((item: any) => Number(item.se) === 0) ??
       rawSeasons[0];
 
-    let episodes = 1;
+    let episodes = 0;
+    let episodeNumbers: number[] = [];
     if (seasonMeta) {
       if (typeof seasonMeta.allEp === "string" && seasonMeta.allEp.trim()) {
         const epArr = seasonMeta.allEp
           .split(",")
           .map((v: string) => Number(v.trim()))
           .filter((v: number) => Number.isInteger(v) && v > 0);
-        if (epArr.length) episodes = Math.max(...epArr);
+        episodeNumbers = [...new Set<number>(epArr)].sort((a, b) => a - b);
+        if (episodeNumbers.length) episodes = episodeNumbers[episodeNumbers.length - 1];
       } else if (
-        Number.isInteger(seasonMeta.maxEp) &&
+        Number.isInteger(Number(seasonMeta.maxEp)) &&
         Number(seasonMeta.maxEp) > 0
       ) {
         episodes = Number(seasonMeta.maxEp);
@@ -577,10 +582,11 @@ export async function getSeriesNavigation(
       seasons: seasons.length ? seasons : [season],
       season,
       episodes,
+      ...(episodeNumbers.length ? { episodeNumbers } : {}),
     };
   } catch (error) {
     console.error("MovieBox getSeriesNavigation error:", formatError(error));
-    return { seasons: [fallbackSeason], season: fallbackSeason, episodes: 1 };
+    throw error;
   }
 }
 

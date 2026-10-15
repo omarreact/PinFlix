@@ -22,6 +22,7 @@ export type SeriesNavigation = {
   seasons: number[];
   season: number;
   episodes: number;
+  episodeNumbers?: number[];
 };
 
 export interface PinFlixProvider {

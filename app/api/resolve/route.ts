@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unsupported provider title ID" }, { status: 400 });
   }
 
-  const [mediaEdgeStreams, providerStreams] = await Promise.all([
+  const results = await Promise.allSettled([
     resolveMediaEdgeStreams(id, {
       season: season || undefined,
       episode: episode || undefined,
@@ -42,6 +42,10 @@ export async function GET(request: Request) {
     }),
   ]);
 
+  // An upstream outage must not discard playable sources from the other origin.
+  const [mediaEdgeStreams, providerStreams] = results.map((result) =>
+    result.status === "fulfilled" ? result.value : [],
+  );
   const streams = [...mediaEdgeStreams, ...providerStreams].sort((a, b) => b.priority - a.priority);
 
   if (!streams.length) {

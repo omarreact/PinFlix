@@ -7,6 +7,7 @@ type MediaEdgeResolveResponse = {
   sources?: Array<{
     label?: unknown;
     url?: unknown;
+    protocol?: unknown;
   }>;
   error?: unknown;
 };
@@ -54,7 +55,16 @@ export function isMediaEdgeUrl(rawUrl: string) {
   try {
     const base = mediaEdgeApiBase();
     const url = new URL(rawUrl);
-    return url.protocol === "https:" && url.hostname === base.hostname;
+    const origins = [base.origin];
+    for (const value of (process.env.PINFLIX_MEDIA_CDN_ORIGINS ?? "").split(",")) {
+      try {
+        const cdn = new URL(value.trim());
+        if (cdn.protocol === "https:") origins.push(cdn.origin);
+      } catch {
+        // Ignore empty or invalid entries; never broaden the allowlist.
+      }
+    }
+    return url.protocol === "https:" && !url.username && !url.password && origins.includes(url.origin);
   } catch {
     return false;
   }
@@ -106,7 +116,9 @@ export async function resolveMediaEdgeStreams(
         return {
           url: source.url,
           quality: `Cloudflare Edge · ${label}`,
-          protocol: protocolFromUrl(source.url),
+          protocol: source.protocol === "hls" || source.protocol === "native"
+            ? source.protocol
+            : protocolFromUrl(source.url),
           priority: 10_000 - index,
         } satisfies StreamSource;
       })

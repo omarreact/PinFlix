@@ -23,6 +23,12 @@ type HistoryItem = {
 type PlaybackContextValue = { play: () => void };
 const PlaybackContext = createContext<PlaybackContextValue | null>(null);
 
+function availableEpisodes(navigation?: SeriesNavigation | null): number[] {
+  if (!navigation) return [];
+  if (navigation.episodeNumbers) return navigation.episodeNumbers;
+  return Array.from({ length: Math.min(10_000, navigation.episodes) }, (_, index) => index + 1);
+}
+
 export function InlinePlayButton({
   children = "Play",
   className,
@@ -84,11 +90,14 @@ export function InlinePlaybackBanner({
   const [playing, setPlaying] = useState(initialPlay);
   const validSeasons = navigation?.seasons?.length ? navigation.seasons : [1];
   const [season, setSeason] = useState(() =>
-    validSeasons.includes(initialSeason) ? initialSeason : validSeasons[0],
+    navigation?.season ?? initialSeason,
   );
-  const [episode, setEpisode] = useState(() =>
-    Math.max(1, Math.min(initialEpisode, navigation?.episodes ?? 1)),
-  );
+  const [episode, setEpisode] = useState(() => {
+    const episodes = availableEpisodes(navigation);
+    return episodes.includes(initialEpisode) ? initialEpisode : (episodes[0] ?? initialEpisode);
+  });
+  const episodeNumbers = availableEpisodes(navigation);
+  const followingEpisode = episodeNumbers.find((value) => value > episode);
   const [attempt, setAttempt] = useState(0);
   const isShow = historyItem?.kind === "show";
 
@@ -127,12 +136,16 @@ export function InlinePlaybackBanner({
       if (
         next.season !== value ||
         !Number.isInteger(next.episodes) ||
-        next.episodes < 0
+        next.episodes < 0 || next.episodes > 10_000 ||
+        (next.episodeNumbers !== undefined && (
+          !Array.isArray(next.episodeNumbers) ||
+          next.episodeNumbers.some((value) => !Number.isInteger(value) || value < 1 || value > next.episodes)
+        ))
       )
         throw new Error("Invalid episode information.");
       setNavigation(next);
       setSeason(value);
-      setEpisode(1);
+      setEpisode(availableEpisodes(next)[0] ?? 1);
       setPlaying(false);
     } catch {
       if (!controller.signal.aborted)
@@ -142,8 +155,8 @@ export function InlinePlaybackBanner({
     }
   }
   function nextEpisode() {
-    if (!navigation || episode >= navigation.episodes) return;
-    selectEpisode(season, episode + 1);
+    if (followingEpisode === undefined) return;
+    selectEpisode(season, followingEpisode);
   }
 
   return (
@@ -164,7 +177,7 @@ export function InlinePlaybackBanner({
             backHref={backHref}
             onClose={() => setPlaying(false)}
             onNext={
-              isShow && navigation && episode < navigation.episodes
+              isShow && followingEpisode !== undefined
                 ? nextEpisode
                 : undefined
             }
@@ -215,10 +228,7 @@ export function InlinePlaybackBanner({
               </p>
             )}
             <div className="episodes">
-              {Array.from(
-                { length: Math.min(200, navigation.episodes) },
-                (_, index) => index + 1,
-              ).map((value) => (
+              {episodeNumbers.map((value) => (
                 <div
                   key={value}
                   className={`episode ${playing && episode === value ? "active" : ""}`}

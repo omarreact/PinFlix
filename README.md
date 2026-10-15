@@ -126,6 +126,28 @@ running tests does not overwrite Next.js's generated route types before a build.
 
 ## Media boundary
 
+Series playback uses `/api/ui/episodes?id=<provider-id>&season=<number>` to
+load seasons and episodes from the MovieBox `/wefeed-h5api-bff/detail` endpoint.
+Selecting an episode passes its season and episode numbers to `/api/resolve`,
+which requests MovieBox `/wefeed-h5api-bff/subject/play` with `subjectId`, `se`,
+`ep`, and `detailPath`, alongside the PinFlix CDN resolver. The player supports
+MP4 and HLS sources, source failover, and advancing to the next available episode.
+Episode-list failures return an error instead of a fabricated one-episode season.
+
+The media resolver uses `PINFLIX_MEDIA_API_URL` (the existing PinFlix media API
+by default) and its `/public-resolve?key=...` endpoint. TV keys include the
+selected episode: `tv:<MovieBox subject ID>:s<season>e<episode>`.
+The response contract is `{ "sources": [{ "url": "https://...", "label": "1080p", "protocol": "hls" }] }`;
+`protocol` may be `hls` or `native` and otherwise is inferred from the URL.
+
+If this API returns signed playback URLs on a separate CDN, set the server-only
+`PINFLIX_MEDIA_CDN_ORIGINS` to its exact HTTPS origins, separated by commas
+(for example `https://video.example.com,https://backup.example.com`). The API's
+own origin is also allowed. Signed URLs are preserved and played directly;
+the CDN must support browser CORS, including HLS manifests and segments, and
+byte-range requests for MP4 playback. One resolver failing does not discard
+sources returned by the other resolver.
+
 **movibox.net is the only configured playback provider.** TMDB credentials are optional; when unavailable, discovery and search fall back to the MovieBox catalog so titles remain browseable and playable.
 Do not reintroduce CineplexBD or third-party embed aggregators unless the project owner explicitly changes this decision.
 
