@@ -1,3 +1,4 @@
+import { CineplexEpisodes } from "@/src/components/cineplex-episodes";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Play, Search } from "lucide-react";
@@ -105,7 +106,7 @@ export default async function EntertainmentDetailPage({
                   className="tv-focus accent-gradient inline-flex min-h-12 items-center gap-2 rounded-full px-7 py-3 font-bold text-white shadow-[0_0_30px_rgba(168,85,247,.22)]"
                 >
                   <Play size={18} fill="currentColor" />
-                  Play
+                  {item.provider === "cineplexbd" ? "Open player · unverified" : "Play"}
                 </Link>
 
                 <SavedToggle
@@ -132,6 +133,8 @@ export default async function EntertainmentDetailPage({
           </div>
         </div>
       </section>
+
+      {item.provider === "cineplexbd" && item.kind === "show" && item.providerId && <CineplexEpisodes id={item.providerId} />}
 
       {cast.length > 0 && (
         <section className="glass-panel rounded-3xl p-6 sm:p-8">

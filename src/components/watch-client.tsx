@@ -76,18 +76,19 @@ export function WatchClient({
 
   const isSeries = item.kind === "show";
   const season = navigation?.season ?? requestedSeason;
-  const episode = navigation
-    ? Math.min(requestedEpisode, Math.max(1, navigation.episodes))
-    : requestedEpisode;
+  const episodeItems = navigation?.episodeItems;
+  const episode = episodeItems ? requestedEpisode : navigation ? Math.min(requestedEpisode, Math.max(1,navigation.episodes)) : requestedEpisode;
+  const selectedEpisode = episodeItems?.find(item => item.number === episode);
+  const nextEpisode = episodeItems?.find(item => item.number > episode);
   const nextHref =
-    navigation && episode < navigation.episodes
-      ? seriesHref(item.id, season, episode + 1)
+    navigation && (episodeItems ? Boolean(nextEpisode) : episode < navigation.episodes)
+      ? seriesHref(item.id, season, nextEpisode?.number ?? episode + 1)
       : undefined;
   const subtitle = isSeries ? `Season ${season} · Episode ${episode}` : item.year ? String(item.year) : undefined;
 
   return (
-    <div className="min-h-screen bg-bg text-white">
-      <WatchPlayer
+    <div className="min-h-screen min-w-0 max-w-full overflow-x-clip bg-bg text-white">
+      {episodeItems && !selectedEpisode ? <div role="status" className="glass-panel p-8">This episode is unavailable in the source catalog.</div> : <WatchPlayer
         key={`${item.id}-${season}-${episode}`}
         historyItem={item}
         mediaId={item.id}
@@ -97,7 +98,7 @@ export function WatchClient({
         nextHref={nextHref}
         season={isSeries ? season : undefined}
         episode={isSeries ? episode : undefined}
-      />
+      />}
 
       <div className="mx-auto max-w-[1400px] space-y-8 px-5 py-8 sm:px-8 md:px-12 md:py-12">
         {navigation && (navigation.seasons.length > 1 || navigation.episodes > 1) && (
@@ -106,7 +107,7 @@ export function WatchClient({
               <ListVideo size={18} className="text-accent" />
               <h2 className="font-bold">Episodes</h2>
             </div>
-            
+
             {navigation.seasons.length > 1 && (
               <div className="mb-6 flex flex-wrap gap-2">
                 {navigation.seasons.map((s) => (
@@ -126,11 +127,12 @@ export function WatchClient({
             )}
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
-              {Array.from({ length: navigation.episodes }).map((_, i) => {
-                const ep = i + 1;
+              {(episodeItems ?? Array.from({length:navigation.episodes},(_,i) => ({number:i+1,title:'Episode '+(i+1),sourceUrl:''}))).map((entry) => {
+                const ep = entry.number;
                 const active = ep === episode;
                 return (
                   <Link
+                    title={entry.title}
                     key={ep}
                     href={seriesHref(item.id, season, ep)}
                     className={`flex items-center justify-center rounded-xl border p-3 text-sm font-medium transition-all ${
@@ -139,7 +141,7 @@ export function WatchClient({
                         : "border-white/5 bg-white/5 text-zinc-400 hover:border-white/20 hover:bg-white/10 hover:text-white"
                     }`}
                   >
-                    {active ? "Playing" : `Episode ${ep}`}
+                    {active ? `Selected · ${ep}` : `Episode ${ep}`}
                   </Link>
                 );
               })}

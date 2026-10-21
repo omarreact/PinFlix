@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Clapperboard } from "lucide-react";
 import { EntertainmentGrid } from "@/src/components/catalog-sections";
-import { getTmdbDiscover } from "@/src/lib/tmdb";
+import { search } from "@/src/lib/cineplex/search";
 
 export const revalidate = 300;
 
@@ -10,7 +10,7 @@ type SearchParams = Promise<{ page?: string }>;
 export default async function SeriesPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
-  const catalog = await getTmdbDiscover("tv", page).catch(() => ({ items: [], page, hasNextPage: false }));
+  const catalog = await search({type:'series', page}).catch(() => ({ items: [], page, hasNextPage: false }));
 
   return (
     <div className="space-y-9">

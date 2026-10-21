@@ -18,6 +18,10 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unsupported provider title ID" }, { status: 400 });
   }
 
+  if (id.startsWith('cb-') && process.env.CINEPLEX_PLAYBACK_AUTHORIZED !== 'true') {
+    return Response.json({error:'CineplexBD playback is restricted until the operator configures authorized playback. Source episode links remain available.',playback:'restricted'}, {status:403,headers:{'Cache-Control':'no-store'}});
+  }
+
   const streams = await catalogProvider.resolveStreams(id, {
     season: optionalPositiveInteger(url.searchParams.get("season")),
     episode: optionalPositiveInteger(url.searchParams.get("episode")),

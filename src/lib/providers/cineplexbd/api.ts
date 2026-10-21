@@ -1,87 +1,9 @@
-import { fetchCineplexOrigin } from "@/src/lib/cineplex-origin";
-
-export const CINEPLEX_BASE_URL = "http://cineplexbd.net";
-const METADATA_TIMEOUT_MS = 6_000;
-
-const headers = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "Accept-Language": "en-US,en;q=0.9",
-};
-
-function toCineplexUrl(path: string) {
-  return path.startsWith("http")
-    ? path
-    : `${CINEPLEX_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
-}
-
-export async function fetchHtml(path: string, revalidate = 0): Promise<string> {
-  const url = toCineplexUrl(path);
-  const response = await fetchCineplexOrigin(url, revalidate > 0
-    ? {
-        headers,
-        next: { revalidate },
-        signal: AbortSignal.timeout(METADATA_TIMEOUT_MS),
-      }
-    : {
-        headers,
-        cache: "no-store",
-        signal: AbortSignal.timeout(METADATA_TIMEOUT_MS),
-      });
-  if (!response.ok) throw new Error(`Failed to fetch ${url}: HTTP ${response.status}`);
-  return response.text();
-}
-
-export async function fetchJson(path: string, revalidate = 0): Promise<unknown> {
-  const url = toCineplexUrl(path);
-  const response = await fetchCineplexOrigin(url, revalidate > 0
-    ? {
-        headers,
-        next: { revalidate },
-        signal: AbortSignal.timeout(METADATA_TIMEOUT_MS),
-      }
-    : {
-        headers,
-        cache: "no-store",
-        signal: AbortSignal.timeout(METADATA_TIMEOUT_MS),
-      });
-  if (!response.ok) throw new Error(`Failed to fetch JSON ${url}: HTTP ${response.status}`);
-  return response.json();
-}
-
-
+import { requestSource, parseJson } from '@/src/lib/cineplex/client';
+export const CINEPLEX_BASE_URL = 'http://cineplexbd.net';
+export const fetchHtml = requestSource;
+export async function fetchJson(path: string, revalidate = 0): Promise<unknown> { return parseJson(await requestSource(path, revalidate)); }
 export async function probeCineplexConnectivity() {
-  const startedAt = Date.now();
-  try {
-    const response = await fetchCineplexOrigin(CINEPLEX_BASE_URL, {
-      headers,
-      cache: "no-store",
-      redirect: "manual",
-      signal: AbortSignal.timeout(8_000),
-    });
-
-    return {
-      reachable: true,
-      status: response.status,
-      latencyMs: Date.now() - startedAt,
-      outcome:
-        response.status >= 200 && response.status < 400
-          ? "reachable"
-          : "http_error",
-    } as const;
-  } catch (error) {
-    const message = error instanceof Error ? error.message.toLowerCase() : "";
-    const outcome =
-      message.includes("timeout") || message.includes("aborted")
-        ? "timeout"
-        : message.includes("dns") || message.includes("resolve") || message.includes("getaddrinfo")
-          ? "dns_error"
-          : "network_error";
-
-    return {
-      reachable: false,
-      status: null,
-      latencyMs: Date.now() - startedAt,
-      outcome,
-    } as const;
-  }
+ const started = Date.now();
+ try { await requestSource('/search_ajax.php?q=Avatar&limit=8', 30); return {reachable:true,status:200,latencyMs:Date.now()-started,outcome:'reachable'}; }
+ catch { return {reachable:false,status:null,latencyMs:Date.now()-started,outcome:'network_error'}; }
 }

@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import type { Entertainment } from "@/src/types/catalog";
 import { CINEPLEX_BASE_URL } from "./api";
+import { posterUrl } from "@/src/lib/cineplex/normalize";
 
 type CatalogContext = {
   forcedKind?: "movie" | "show";
@@ -12,18 +13,7 @@ function toUpstreamUrl(url: string) {
   return `${CINEPLEX_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
 }
 
-function toBrowserAssetUrl(url: string) {
-  const absolute = toUpstreamUrl(url);
-  try {
-    const parsed = new URL(absolute);
-    if (parsed.hostname.toLowerCase() === "cineplexbd.net" && (!parsed.port || parsed.port === "80")) {
-      return `/api/proxy-image?url=${encodeURIComponent(absolute)}`;
-    }
-  } catch {
-    // Leave malformed/non-Cineplex URLs untouched.
-  }
-  return absolute;
-}
+function toBrowserAssetUrl(url: string) { return posterUrl(url); }
 
 function asObject(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -42,7 +32,7 @@ function extractNumericId(href: string) {
 
 function inferKind(href: string, forcedKind?: "movie" | "show"): "movie" | "show" {
   if (forcedKind) return forcedKind;
-  if (href.includes("series_id=") || href.includes("tview.php")) return "show";
+  if (href.includes("series_id=") || href.includes("tview.php") || href.includes("watch.php")) return "show";
   return "movie";
 }
 
@@ -111,7 +101,7 @@ export function parseCatalog(html: string, context: CatalogContext = {}): Entert
     }
 
     const poster = rawImage ? toBrowserAssetUrl(rawImage) : "";
-    const year = findYear(text);
+    const year = findYear(genreText);
     const rating = findRating(text);
 
     seen.add(id);
@@ -149,7 +139,7 @@ export function parseDetails(
   const $ = cheerio.load(html);
   const meta = asObject(metaJson);
 
-  const title = $("h1, .movie-title, title")
+  const title = $("h1, .movie-title").length ? $("h1, .movie-title").first().text().trim() : $("title")
     .first()
     .text()
     .replace(" — Watch", "")
@@ -246,7 +236,7 @@ export function parseEpisodeCount(metaJson?: unknown, html = "") {
     if (count > 0) return count;
   }
 
-  return 1;
+  return 0;
 }
 
 export function parsePlayerUrl(html: string): string | null {
