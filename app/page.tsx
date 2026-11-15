@@ -155,7 +155,7 @@ export default async function Home() {
     .filter(
       (section) =>
         section.items.length >= 4 &&
-        !/banner|featured/i.test(section.label),
+        !/banner|featured|adult|18\+|hentai|porn|erotic/i.test(section.label),
     )
     .slice(0, 12);
 
@@ -245,14 +245,14 @@ export default async function Home() {
 
         <Row
           kicker="BOLLYWOOD & HINDI"
-          title="Latest Hindi Movies"
+          title="Latest Hindi & Indian Movies"
           items={titleRows(hindiMovies)}
           href="/movies?category=Hindi"
         />
 
         <Row
           kicker="BOLLYWOOD & HINDI"
-          title="Latest Hindi TV Shows"
+          title="Latest Hindi & Indian TV Shows"
           items={titleRows(hindiSeries)}
           href="/series"
         />
