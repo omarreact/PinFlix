@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
-import type { ProviderCatalogPage, SeriesNavigation } from "../contracts";
+import type { ProviderCatalogPage, ProviderCategory, SeriesNavigation } from "../contracts";
 import { cache } from "react";
 import { extractSearchItems, validSearchSubject } from "./search-response";
 import { getSearchSession, invalidateSearchSession } from "./search-session";
@@ -401,7 +401,9 @@ export async function getLatestPage(
   return homepagePageFallback(kind, page);
 }
 
-export async function getCategories(_kind: "movie" | "show") {
+export async function getCategories(
+  _kind: "movie" | "show",
+): Promise<ProviderCategory[]> {
   return [];
 }
 
