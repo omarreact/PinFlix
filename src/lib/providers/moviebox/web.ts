@@ -104,6 +104,19 @@ function mapItem(item: any, kindFallback?: "movie" | "show"): Entertainment {
             .map((g: string) => g.trim())
             .filter(Boolean)
         : [],
+    country: subj.countryName ?? item.countryName ?? undefined,
+    languages:
+      typeof (subj.language ?? item.language) === "string"
+        ? String(subj.language ?? item.language)
+            .split(",")
+            .map((value: string) => value.trim())
+            .filter(Boolean)
+        : undefined,
+    audioLanguages: Array.isArray(subj.dubs ?? item.dubs)
+      ? (subj.dubs ?? item.dubs)
+          .map((dub: any) => String(dub?.lanCode ?? dub?.language ?? "").trim())
+          .filter(Boolean)
+      : undefined,
     rating: subj.imdbRatingValue
       ? parseFloat(subj.imdbRatingValue)
       : item.imdbRatingValue
@@ -331,11 +344,104 @@ async function homepagePageFallback(kind: "movie" | "show", page: number) {
   return { items, page, hasNextPage: false };
 }
 
+export type MovieBoxBrowseFilters = {
+  sort?: string;
+  genre?: string;
+  country?: string;
+  year?: string;
+  language?: string;
+};
+
+export async function getFilteredPage(
+  kind: "movie" | "show",
+  page = 1,
+  filters: MovieBoxBrowseFilters = {},
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<ProviderCatalogPage> {
+  const safePage = Number.isInteger(page)
+    ? Math.max(1, Math.min(page, 100))
+    : 1;
+  const url = new URL("/wefeed-h5api-bff/subject/filter", API_BASE);
+  const payload = {
+    tabId: kind === "movie" ? 2 : 5,
+    channelId: kind === "movie" ? 1 : 2,
+    filter: {
+      sort: filters.sort || "Latest",
+      genre: filters.genre || "ALL",
+      country: filters.country || "ALL",
+      year: filters.year || "ALL",
+      language: filters.language || "ALL",
+    },
+    page: safePage,
+    perPage: 28,
+  };
+
+  try {
+    const res = await fetchJson<H5ApiResponse<unknown>>(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      Math.min(timeoutMs, 3500),
+    );
+
+    if (res.code !== 0) {
+      return { items: [], page: safePage, hasNextPage: false };
+    }
+
+    const raw = extractSearchItems(res.data);
+    if (raw === null) {
+      return { items: [], page: safePage, hasNextPage: false };
+    }
+
+    const items = distinctById(
+      raw.filter(validSearchSubject).map((item) => mapItem(item, kind)),
+    );
+    const pager =
+      res.data && typeof res.data === "object"
+        ? (
+            res.data as {
+              pager?: {
+                page?: string | number;
+                hasMore?: boolean;
+              };
+            }
+          ).pager
+        : undefined;
+
+    return {
+      items,
+      page: Number(pager?.page) || safePage,
+      hasNextPage: Boolean(pager?.hasMore),
+    };
+  } catch (error) {
+    console.warn(
+      "MovieBox filtered catalogue unavailable:",
+      kind,
+      filters,
+      formatError(error),
+    );
+    return { items: [], page: safePage, hasNextPage: false };
+  }
+}
+
 export async function getLatestPage(
   kind: "movie" | "show",
   page = 1,
   timeoutMs = REQUEST_TIMEOUT_MS,
 ) {
+  const filtered = await getFilteredPage(
+    kind,
+    page,
+    { sort: "Latest" },
+    timeoutMs,
+  );
+  if (filtered.items.length || page > 1) return filtered;
+
+  // Compatibility fallback for provider deployments that still expect the
+  // older channel-only payload.
   const channelId = kind === "movie" ? 1 : 2;
   const url = new URL("/wefeed-h5api-bff/subject/filter", API_BASE);
   try {
@@ -372,14 +478,9 @@ export async function getLatestPage(
         }
       }
     }
-    console.warn(
-      "MovieBox category filter returned no usable items:",
-      kind,
-      res.code,
-    );
   } catch (error) {
     console.warn(
-      "MovieBox category filter unavailable:",
+      "MovieBox legacy category filter unavailable:",
       kind,
       formatError(error),
     );
