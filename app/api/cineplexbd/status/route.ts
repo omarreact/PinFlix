@@ -35,6 +35,18 @@ const KNOWN_GATEWAY_PROBES = [
     url: "http://115.187.18.87/ebn-host-live/api/catalogue/?kind=movie&q=Inception&page=1",
     host: "test.pincodeit.com",
   },
+  { url: "http://pinflix.akogs-fashion.com/" },
+  { url: "http://pinflix.akogs-fashion.com/api.php?action=health" },
+  { url: "http://pinflix.akogs-fashion.com/site/api.php?action=health" },
+  { url: "http://pinflix.akogs-fashion.com/pinflix-api/status.php" },
+  { url: "http://pinflix.akogs-fashion.com/pinflix-http-cpanel/" },
+  {
+    url: "http://pinflix.akogs-fashion.com/pinflix-http-cpanel/api.php?action=health",
+  },
+  { url: "http://pinflix.akogs-fashion.com/ebn-host-live/_ebn/health" },
+  {
+    url: "http://pinflix.akogs-fashion.com/api/catalogue/?kind=movie&q=Inception&page=1",
+  },
 ] as const;
 
 async function responseFingerprint(response: Response) {
