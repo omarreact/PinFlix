@@ -32,9 +32,9 @@ PinFlix is a production-oriented Next.js OTT (over-the-top) streaming applicatio
 └──────────────────┬──────────────────┘
                    │
 ┌──────────────────┴──────────────────┐
-│  Provider adapter (movibox.net only)│
-│  H5 API: home · filter · detail ·   │
-│  play · captions                    │
+│  Provider adapters                 │
+│  MovieBox H5 + CineplexBD fallback │
+│  search · detail · play · captions │
 └──────────────────┬──────────────────┘
                    │
 ┌──────────────────┴──────────────────┐
@@ -49,8 +49,8 @@ PinFlix is a production-oriented Next.js OTT (over-the-top) streaming applicatio
 |-------|--------|
 | Frontend | Next.js App Router, React Server Components |
 | Styling | Tailwind CSS v4 — theater-dark abyss + crimson accent |
-| Discovery metadata | TMDB when configured; MovieBox H5 API is the catalog fallback |
-| Playback | **Only** `https://movibox.net` via H5 API (`h5-api.aoneroom.com`) |
+| Discovery metadata | TMDB when configured; playable search merges MovieBox H5 + CineplexBD |
+| Playback | MovieBox primary; CineplexBD fallback through the PinFlix HTTPS proxy |
 | Player | Native `<video>` + hls.js, quality switching, captions, resume |
 | Deploy | Cloudflare Workers + static assets (`pinflix.pincodeit.com`) |
 | Auth / DB | Prisma + optional local/SQLite user state |
@@ -71,8 +71,9 @@ app/                         routes (home, movies, series, watch, search, auth)
 src/components/              UI, hero, rails, player, shell
 src/lib/providers/
   contracts.ts               provider-neutral catalog/playback contract
-  catalog.ts                 binds exclusively to moviebox/web
+  catalog.ts                 multi-provider routing and fallback
   moviebox/web.ts            movibox.net H5 adapter
+  cineplexbd/                CineplexBD catalogue/playback adapter
 src/styles.css               design tokens + cinematic utilities
 src/types/                   Entertainment / StreamSource types
 ```
@@ -148,13 +149,13 @@ the CDN must support browser CORS, including HLS manifests and segments, and
 byte-range requests for MP4 playback. One resolver failing does not discard
 sources returned by the other resolver.
 
-**movibox.net is the only configured playback provider.** TMDB credentials are optional; when unavailable, discovery and search fall back to the MovieBox catalog so titles remain browseable and playable.
-Do not reintroduce CineplexBD or third-party embed aggregators unless the project owner explicitly changes this decision.
+**MovieBox remains the primary playback provider.** CineplexBD is enabled as a secondary provider: playable search results are supplemented with CineplexBD titles, direct `cb-*` titles resolve through the CineplexBD adapter, and an `mb-*` title may fall back to an exact title/type/year match on CineplexBD when MovieBox returns no stream. TMDB credentials remain optional and TMDB never supplies playable streams.
 
 Use media only where the operator is authorized to access and relay it. Upstream availability, content rights, and regional routing remain the responsibility of the source provider.
 
 ## Security notes (from platform blueprint)
 
 - Player uses direct resolved streams; no untrusted top-level-navigation embeds for primary playback
+- CineplexBD media is relayed only through exact-host allowlisted proxy paths; arbitrary upstream proxying is not permitted
 - Image domains for CDN hosts (e.g. aoneroom / hakunaymatata) should remain allowlisted in Next config / proxy
 - Video elements stay in client components to avoid hydration mismatches
