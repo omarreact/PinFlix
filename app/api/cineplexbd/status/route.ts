@@ -96,6 +96,120 @@ async function responseFingerprint(response: Response) {
   };
 }
 
+async function readPublicText(url: URL, limit = 196_608) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6_000);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: "text/html,application/javascript,text/javascript,*/*;q=0.8",
+        "User-Agent": "PinFlix/1.0 public-source diagnostic",
+      },
+      cache: "no-store",
+      redirect: "manual",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      await response.body?.cancel();
+      return null;
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) return "";
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      while (size < limit) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          chunks.push(value);
+          size += value.byteLength;
+        }
+      }
+    } finally {
+      await reader.cancel().catch(() => {});
+    }
+
+    const output = new Uint8Array(Math.min(size, limit));
+    let offset = 0;
+    for (const chunk of chunks) {
+      const remaining = output.length - offset;
+      if (remaining <= 0) break;
+      const slice = chunk.subarray(0, remaining);
+      output.set(slice, offset);
+      offset += slice.length;
+    }
+    return new TextDecoder().decode(output);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function sourceHints(text: string) {
+  const values = new Set<string>();
+  const patterns = [
+    /https?:\/\/[^\s"'<>\\)]+/gi,
+    /["'](\/[^"'\s]{1,240}(?:api|stream|play|movie|series|search|catalog|hls)[^"'\s]{0,240})["']/gi,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const value = (match[1] || match[0]).replace(/&amp;/g, "&");
+      if (
+        /(?:cineplex|aoneroom|movie|series|stream|playback|catalog|search|api|m3u8|mp4)/i.test(
+          value,
+        )
+      ) {
+        values.add(value.slice(0, 500));
+      }
+      if (values.size >= 40) break;
+    }
+    if (values.size >= 40) break;
+  }
+
+  return [...values];
+}
+
+async function inspectAlternatePinflixHost() {
+  const origin = new URL("http://pinflix.akogs-fashion.com/");
+  const html = await readPublicText(origin);
+  if (!html) return { reachable: false, scripts: [], hints: [] };
+
+  const scripts = [
+    ...new Set(
+      [...html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)]
+        .map((match) => match[1])
+        .flatMap((value) => {
+          try {
+            const url = new URL(value, origin);
+            return url.origin === origin.origin ? [url.toString()] : [];
+          } catch {
+            return [];
+          }
+        }),
+    ),
+  ].slice(0, 10);
+
+  const scriptResults = await Promise.all(
+    scripts.map(async (script) => {
+      const text = await readPublicText(new URL(script), 262_144);
+      return {
+        script: new URL(script).pathname,
+        hints: text ? sourceHints(text) : [],
+      };
+    }),
+  );
+
+  return {
+    reachable: true,
+    scripts: scriptResults,
+    hints: sourceHints(html),
+  };
+}
+
 async function probeKnownGatewayPaths() {
   return Promise.all(
     KNOWN_GATEWAY_PROBES.map(async (probe) => {
@@ -155,7 +269,7 @@ export async function GET(request: Request) {
   const gatewayConfigured = hasCineplexGateway();
   const deep = new URL(request.url).searchParams.get("deep") === "1";
 
-  const [gateway, summary, direct, candidates] = await Promise.all([
+  const [gateway, summary, direct, candidates, alternateHost] = await Promise.all([
     probeCineplexGateway(),
     getCineplexStatusSummary(),
     gatewayConfigured
@@ -167,6 +281,7 @@ export async function GET(request: Request) {
         })
       : probeCineplexConnectivity(),
     deep ? probeKnownGatewayPaths() : Promise.resolve(undefined),
+    deep ? inspectAlternatePinflixHost() : Promise.resolve(undefined),
   ]);
 
   const liveThroughGateway =
@@ -188,6 +303,7 @@ export async function GET(request: Request) {
         navigation: summary.navigation,
       },
       ...(candidates ? { candidatePaths: candidates } : {}),
+      ...(alternateHost ? { alternateHost } : {}),
     },
     { headers: { "Cache-Control": "no-store" } },
   );
