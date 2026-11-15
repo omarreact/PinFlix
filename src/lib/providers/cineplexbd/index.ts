@@ -31,6 +31,81 @@ type SeriesPlaybackOptions = {
   episode?: number;
 };
 
+
+function mapSearchAjaxResults(payload: unknown): Entertainment[] {
+  const root =
+    payload !== null && typeof payload === "object" && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : null;
+  const rawItems = Array.isArray(payload)
+    ? payload
+    : Array.isArray(root?.results)
+      ? root.results
+      : [];
+
+  const items: Entertainment[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of rawItems) {
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const record = raw as Record<string, unknown>;
+    const rawId = String(record.id ?? "").trim();
+    const title = String(record.title ?? record.name ?? "").trim();
+    if (!/^\d{1,10}$/.test(rawId) || !title) continue;
+
+    const rawType = String(record.type ?? record.kind ?? "movie").toLowerCase();
+    const kind: ProviderKind =
+      rawType === "series" || rawType === "tv" || rawType === "show"
+        ? "show"
+        : "movie";
+    const id = `cb-${kind === "show" ? "series" : "movie"}-${rawId}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+
+    const yearValue = Number(record.year);
+    const year =
+      Number.isInteger(yearValue) && yearValue >= 1800 && yearValue <= 3000
+        ? yearValue
+        : undefined;
+    const category =
+      typeof record.category === "string" && record.category.trim()
+        ? record.category.trim()
+        : undefined;
+
+    let poster = "";
+    if (typeof record.poster === "string" && record.poster.trim()) {
+      try {
+        const absolute = new URL(record.poster, CINEPLEX_BASE_URL);
+        if (
+          absolute.hostname.toLowerCase() === "cineplexbd.net" &&
+          (!absolute.port || absolute.port === "80")
+        ) {
+          poster = `/api/proxy-image?url=${encodeURIComponent(absolute.toString())}`;
+        }
+      } catch {
+        // Ignore malformed/non-provider artwork from the suggestion endpoint.
+      }
+    }
+
+    items.push({
+      id,
+      slug: id,
+      provider: "cineplexbd",
+      providerId: rawId,
+      title,
+      kind,
+      ...(year !== undefined ? { year } : {}),
+      ...(category ? { category } : {}),
+      genres: category ? [category] : [],
+      backdrop: poster,
+      poster,
+      synopsis: "",
+    });
+  }
+
+  return items;
+}
+
 function parseProviderId(id: string): ParsedProviderId {
   if (id.startsWith("cb-series-")) {
     return { rawId: id.slice("cb-series-".length), kind: "show" };
@@ -346,23 +421,49 @@ async function searchPage(
     return { items: [], page: safePage, hasNextPage: false };
   }
 
-  try {
-    const html = await fetchHtml(
+  const [ajaxResult, htmlResult] = await Promise.allSettled([
+    safePage === 1
+      ? fetchJson(
+          `/search_ajax.php?q=${encodeURIComponent(normalized)}&limit=80`,
+          60,
+        )
+      : Promise.resolve(undefined),
+    fetchHtml(
       `/search.php?q=${encodeURIComponent(normalized)}&page=${safePage}`,
       60,
-    );
-    const items = parseCatalog(html).filter(
-      (item) => kind === "all" || item.kind === kind,
-    );
-    return {
-      items,
-      page: safePage,
-      hasNextPage: parseHasNextPage(html),
-    };
-  } catch (error) {
-    console.error("CineplexBD search error:", error);
-    return { items: [], page: safePage, hasNextPage: false };
+    ),
+  ]);
+
+  const ajaxItems =
+    ajaxResult.status === "fulfilled"
+      ? mapSearchAjaxResults(ajaxResult.value)
+      : [];
+  const htmlItems =
+    htmlResult.status === "fulfilled" ? parseCatalog(htmlResult.value) : [];
+
+  const merged = new Map<string, Entertainment>();
+  for (const item of [...ajaxItems, ...htmlItems]) {
+    if (kind !== "all" && item.kind !== kind) continue;
+    if (!merged.has(item.id)) merged.set(item.id, item);
   }
+
+  if (
+    ajaxResult.status === "rejected" &&
+    htmlResult.status === "rejected"
+  ) {
+    console.error(
+      "CineplexBD search unavailable:",
+      ajaxResult.reason,
+      htmlResult.reason,
+    );
+  }
+
+  return {
+    items: [...merged.values()],
+    page: safePage,
+    hasNextPage:
+      htmlResult.status === "fulfilled" && parseHasNextPage(htmlResult.value),
+  };
 }
 
 export const cineplexbdProvider: PinFlixProvider = {
