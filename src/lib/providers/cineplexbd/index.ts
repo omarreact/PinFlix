@@ -20,6 +20,17 @@ import {
   parsePlayerUrl,
   parseSeasonNumbers,
 } from "./parser";
+import {
+  gatewayCategories,
+  gatewayCategoryPage,
+  gatewayDetails,
+  gatewayLatestPage,
+  gatewaySearchPage,
+  gatewaySeriesNavigation,
+  gatewayStreams,
+  hasCineplexGateway,
+  probeCineplexGateway,
+} from "./gateway";
 
 type ParsedProviderId = {
   rawId: string;
@@ -164,6 +175,15 @@ async function getLatestPage(
 ): Promise<ProviderCatalogPage> {
   const safePage = Math.max(1, Math.floor(page));
 
+  if (hasCineplexGateway()) {
+    try {
+      return await gatewayLatestPage(kind, safePage);
+    } catch (error) {
+      console.error("Cineplex gateway catalogue error:", error);
+      return { items: [], page: safePage, hasNextPage: false };
+    }
+  }
+
   if (kind === "movie") {
     try {
       const html = await fetchHtml(`/search.php?q=&page=${safePage}`, 300);
@@ -212,6 +232,15 @@ async function getLatestPage(
 }
 
 async function getDetails(id: string): Promise<Entertainment | null> {
+  if (hasCineplexGateway()) {
+    try {
+      return await gatewayDetails(id);
+    } catch (error) {
+      console.error("Cineplex gateway details error:", error);
+      return null;
+    }
+  }
+
   const { rawId, kind } = parseProviderId(id);
   if (!rawId) return null;
 
@@ -263,6 +292,16 @@ async function getSeriesNavigation(
   id: string,
   requestedSeason = 1,
 ): Promise<SeriesNavigation> {
+  if (hasCineplexGateway()) {
+    try {
+      return await gatewaySeriesNavigation(id, requestedSeason);
+    } catch (error) {
+      console.error("Cineplex gateway series navigation error:", error);
+      const fallbackSeason = safePositiveInteger(requestedSeason, 1);
+      return { seasons: [fallbackSeason], season: fallbackSeason, episodes: 1 };
+    }
+  }
+
   const { rawId, kind } = parseProviderId(id);
   const fallbackSeason = safePositiveInteger(requestedSeason, 1);
 
@@ -342,6 +381,15 @@ async function resolveStreams(
   id: string,
   options: SeriesPlaybackOptions = {},
 ): Promise<StreamSource[]> {
+  if (hasCineplexGateway()) {
+    try {
+      return await gatewayStreams(id, options);
+    } catch (error) {
+      console.error("Cineplex gateway stream resolution error:", error);
+      return [];
+    }
+  }
+
   try {
     let videoUrl = await resolveVideoUrl(id, options);
     if (!videoUrl) return [];
@@ -368,6 +416,15 @@ async function resolveStreams(
 }
 
 async function getCategories(kind: ProviderKind): Promise<ProviderCategory[]> {
+  if (hasCineplexGateway()) {
+    try {
+      return await gatewayCategories(kind);
+    } catch (error) {
+      console.error("Cineplex gateway categories error:", error);
+      return [];
+    }
+  }
+
   const categories = await getCineplexCategories(kind === "movie" ? "movie" : "tv");
   return categories.map((category) => ({
     id: category.id,
@@ -384,6 +441,15 @@ async function getCategoryPage(
   categoryId: string,
   page = 1,
 ): Promise<ProviderCatalogPage | null> {
+  if (hasCineplexGateway()) {
+    try {
+      return await gatewayCategoryPage(categoryId, page);
+    } catch (error) {
+      console.error("Cineplex gateway category error:", error);
+      return { items: [], page: Math.max(1, Math.floor(page)), hasNextPage: false };
+    }
+  }
+
   const category = await getCineplexCategory(categoryId);
   if (!category?.categoryValue) return null;
 
@@ -419,6 +485,15 @@ async function searchPage(
   const safePage = Math.max(1, Math.floor(page));
   if (!normalized) {
     return { items: [], page: safePage, hasNextPage: false };
+  }
+
+  if (hasCineplexGateway()) {
+    try {
+      return await gatewaySearchPage(normalized, safePage, kind);
+    } catch (error) {
+      console.error("Cineplex gateway search unavailable:", error);
+      return { items: [], page: safePage, hasNextPage: false };
+    }
   }
 
   const [ajaxResult, htmlResult] = await Promise.allSettled([
@@ -488,6 +563,20 @@ export const cineplexbdProvider: PinFlixProvider = {
 };
 
 export async function getCineplexStatusSummary() {
+  if (hasCineplexGateway()) {
+    const [movieCategories, showCategories, gateway] = await Promise.all([
+      gatewayCategories("movie").catch(() => []),
+      gatewayCategories("show").catch(() => []),
+      probeCineplexGateway(),
+    ]);
+    return {
+      provider: "cineplexbd",
+      taxonomySource: gateway.providerLive ? "gateway-live" : "gateway-unavailable",
+      categories: movieCategories.length + showCategories.length,
+      navigation: 0,
+    };
+  }
+
   const taxonomy = await getCineplexTaxonomy();
   return {
     provider: "cineplexbd",
