@@ -63,6 +63,7 @@ export async function GET(request: Request) {
       sources: streams.map((source, sourceIndex) => {
         const shouldProxy =
           id.startsWith("mb-") &&
+          /^https?:\/\//i.test(source.url) &&
           !isMediaEdgeUrl(source.url) &&
           (source.protocol === "native" || source.protocol === "hls");
         const streamUrl = shouldProxy ? proxiedStreamUrl(id, source.url, season, episode) : source.url;
