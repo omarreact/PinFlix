@@ -293,13 +293,10 @@ export async function searchPage(
   } catch (error) {
     console.warn("Primary provider search failed:", formatError(error));
   }
-  if (initial.items.length > 0) {
-    return { ...initial, items: distinctById(initial.items) };
-  }
-
-  // A zero-result generic query is not proof that an indexed series is absent.
-  // Retry the same provider using its movie/TV-specific indexes. Unlike the old
-  // first-page fallback, this searches by title across the provider index.
+  // The provider's generic index can return a partial result set. Always
+  // merge it with the movie/TV-specific indexes instead of returning early,
+  // otherwise valid titles disappear whenever subjectType=0 finds only some
+  // of the matching works.
   const secondary = kind === "all" ? [1, 2] : [0];
   const variants = await Promise.allSettled(secondary.map(queryType));
   const results = [...initial.items];
