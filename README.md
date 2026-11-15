@@ -1,6 +1,6 @@
 # PinFlix — Complete OTT Streaming Platform
 
-PinFlix is a production-oriented Next.js OTT (over-the-top) streaming application with a cinematic dark UI, decoupled catalog/playback architecture, and **movibox.net as the sole catalog and stream provider**.
+PinFlix is a production-oriented Next.js OTT (over-the-top) streaming application with a cinematic dark UI, decoupled catalog/playback architecture, with **MovieBox as the primary provider and CineplexBD as a secondary search/playback fallback**.
 
 ## Product scope
 
