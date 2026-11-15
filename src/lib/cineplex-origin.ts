@@ -8,6 +8,7 @@ const CINEPLEX_HOSTS = new Set([
   "cineplexbd.net",
   "www.cineplexbd.net",
   "vod.cineplexbd.net",
+  "cds3.cineplexbd.net",
 ]);
 
 function normalizeUrl(input: string | URL) {
@@ -19,6 +20,22 @@ function normalizeUrl(input: string | URL) {
     throw new Error("Unsupported CineplexBD upstream host.");
   }
   return url;
+}
+
+function getHttpEdgeBase(): URL | null {
+  const raw = process.env.CINEPLEX_EDGE_URL?.trim();
+  if (!raw) return null;
+
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.username || url.password || url.hash) {
+      return null;
+    }
+    url.search = "";
+    return url;
+  } catch {
+    return null;
+  }
 }
 
 async function getEdgeBinding(): Promise<FetcherBinding | null> {
@@ -51,6 +68,13 @@ export async function fetchCineplexOrigin(
     const internal = new URL("https://pinflix-media-edge.internal/");
     internal.searchParams.set("url", url.toString());
     return binding.fetch(new Request(internal, init));
+  }
+
+  const edgeBase = getHttpEdgeBase();
+  if (edgeBase) {
+    const edgeUrl = new URL(edgeBase.toString());
+    edgeUrl.searchParams.set("url", url.toString());
+    return fetch(edgeUrl, init);
   }
 
   return fetch(url, init);
