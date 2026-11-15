@@ -24,6 +24,27 @@ describe("TV playback resolution", () => {
     expect((await response.json()).sources[0].url).toBe("https://cdn.example.com/s2e4.m3u8?sig=abc");
   });
 
+  it("does not double-proxy an already same-origin Cineplex fallback stream", async () => {
+    vi.mocked(resolveMediaEdgeStreams).mockResolvedValue([]);
+    vi.mocked(catalogProvider.resolveStreams).mockResolvedValue([
+      {
+        url: "/api/proxy-video?url=http%3A%2F%2Fcineplexbd.net%2Fmovie.mp4",
+        protocol: "native",
+        quality: "Cineplex source",
+        priority: 1,
+      },
+    ]);
+    const response = await GET(
+      new Request(
+        "https://pinflix.test/api/resolve?id=mb-123~movie&season=1&episode=1",
+      ),
+    );
+    const source = (await response.json()).sources[0];
+    expect(source.url).toBe(
+      "/api/proxy-video?url=http%3A%2F%2Fcineplexbd.net%2Fmovie.mp4",
+    );
+  });
+
   it("keeps the provider proxy fallback when the CDN resolver fails", async () => {
     vi.mocked(resolveMediaEdgeStreams).mockRejectedValue(new Error("CDN unavailable"));
     vi.mocked(catalogProvider.resolveStreams).mockResolvedValue([
