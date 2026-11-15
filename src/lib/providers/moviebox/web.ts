@@ -280,39 +280,26 @@ export async function searchPage(
     };
   }
 
-  const mainType = kind === "movie" ? 1 : kind === "show" ? 2 : 0;
-  let initial: ProviderCatalogPage = {
-    items: [],
-    page: safePage,
-    hasNextPage: false,
-  };
+  // MovieBox maintains separate generic, movie and TV indexes. Query the
+  // relevant indexes concurrently so broader coverage does not add one full
+  // provider round-trip to every search.
+  const subjectTypes =
+    kind === "all" ? [0, 1, 2] : kind === "movie" ? [1, 0] : [2, 0];
+  const variants = await Promise.allSettled(subjectTypes.map(queryType));
+  const results: Entertainment[] = [];
+  let hasNextPage = false;
   let succeeded = false;
-  try {
-    initial = await queryType(mainType);
-    succeeded = true;
-  } catch (error) {
-    console.warn("Primary provider search failed:", formatError(error));
-  }
-  // The provider's generic index can return a partial result set. Always
-  // merge it with the movie/TV-specific indexes instead of returning early,
-  // otherwise valid titles disappear whenever subjectType=0 finds only some
-  // of the matching works.
-  const secondary = kind === "all" ? [1, 2] : [0];
-  const variants = await Promise.allSettled(secondary.map(queryType));
-  const results = [...initial.items];
-  let hasNextPage = initial.hasNextPage;
+
   for (const variant of variants) {
     if (variant.status === "fulfilled") {
       succeeded = true;
       results.push(...variant.value.items);
       hasNextPage ||= variant.value.hasNextPage;
     } else {
-      console.warn(
-        "Alternate provider search failed:",
-        formatError(variant.reason),
-      );
+      console.warn("Provider search index failed:", formatError(variant.reason));
     }
   }
+
   if (!succeeded) throw new ProviderSearchUnavailable();
   return { items: distinctById(results), page: safePage, hasNextPage };
 }
