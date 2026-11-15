@@ -1,6 +1,6 @@
 # PinFlix — Complete OTT Streaming Platform
 
-PinFlix is a production-oriented Next.js OTT (over-the-top) streaming application with a cinematic dark UI, decoupled catalog/playback architecture, with **MovieBox as the primary provider and CineplexBD as a secondary search/playback fallback**.
+PinFlix is a production-oriented Next.js OTT (over-the-top) streaming application with a cinematic dark UI, decoupled catalog/playback architecture, with **MovieBox as the only active catalogue, search, detail, and playback provider**.
 
 ## Product scope
 
@@ -32,8 +32,8 @@ PinFlix is a production-oriented Next.js OTT (over-the-top) streaming applicatio
 └──────────────────┬──────────────────┘
                    │
 ┌──────────────────┴──────────────────┐
-│  Provider adapters                 │
-│  MovieBox H5 + CineplexBD fallback │
+│  Active provider                   │
+│  MovieBox H5                       │
 │  search · detail · play · captions │
 └──────────────────┬──────────────────┘
                    │
@@ -49,8 +49,8 @@ PinFlix is a production-oriented Next.js OTT (over-the-top) streaming applicatio
 |-------|--------|
 | Frontend | Next.js App Router, React Server Components |
 | Styling | Tailwind CSS v4 — theater-dark abyss + crimson accent |
-| Discovery metadata | TMDB when configured; playable search merges MovieBox H5 + CineplexBD |
-| Playback | MovieBox primary; CineplexBD fallback through the PinFlix HTTPS proxy |
+| Discovery metadata | MovieBox H5; optional TMDB metadata never creates playable titles |
+| Playback | MovieBox MP4/HLS plus the existing PinFlix media-edge delivery path |
 | Player | Native `<video>` + hls.js, quality switching, captions, resume |
 | Deploy | Cloudflare Workers + static assets (`pinflix.pincodeit.com`) |
 | Auth / DB | Prisma + optional local/SQLite user state |
@@ -71,9 +71,9 @@ app/                         routes (home, movies, series, watch, search, auth)
 src/components/              UI, hero, rails, player, shell
 src/lib/providers/
   contracts.ts               provider-neutral catalog/playback contract
-  catalog.ts                 multi-provider routing and fallback
+  catalog.ts                 active MovieBox-only provider routing
   moviebox/web.ts            movibox.net H5 adapter
-  cineplexbd/                CineplexBD catalogue/playback adapter
+  cineplexbd/                preserved inactive adapter for future re-enablement
 src/styles.css               design tokens + cinematic utilities
 src/types/                   Entertainment / StreamSource types
 ```
@@ -149,13 +149,12 @@ the CDN must support browser CORS, including HLS manifests and segments, and
 byte-range requests for MP4 playback. One resolver failing does not discard
 sources returned by the other resolver.
 
-**MovieBox remains the primary playback provider.** CineplexBD is enabled as a secondary provider: playable search results are supplemented with CineplexBD titles, direct `cb-*` titles resolve through the CineplexBD adapter, and an `mb-*` title may fall back to an exact title/type/year match on CineplexBD when MovieBox returns no stream. TMDB credentials remain optional and TMDB never supplies playable streams.
+**MovieBox is currently the only active playable provider.** Search, catalogue, details, series navigation, and provider playback all use MovieBox-issued `mb-*` IDs. The CineplexBD adapter remains preserved but is disconnected from the active provider graph. TMDB credentials remain optional and TMDB never supplies playable streams.
 
 Use media only where the operator is authorized to access and relay it. Upstream availability, content rights, and regional routing remain the responsibility of the source provider.
 
 ## Security notes (from platform blueprint)
 
 - Player uses direct resolved streams; no untrusted top-level-navigation embeds for primary playback
-- CineplexBD media is relayed only through exact-host allowlisted proxy paths; arbitrary upstream proxying is not permitted
 - Image domains for CDN hosts (e.g. aoneroom / hakunaymatata) should remain allowlisted in Next config / proxy
 - Video elements stay in client components to avoid hydration mismatches
