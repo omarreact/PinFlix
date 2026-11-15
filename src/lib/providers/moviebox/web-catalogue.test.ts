@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getLatestPage } from "./web";
+import { getFilteredPage, getLatestPage } from "./web";
 
 const movie = { subjectId:"1654274595068805784", title:"Catalog Movie", subjectType:1, detailPath:"catalog-movie-1", cover:{url:"https://pbcdn.aoneroom.com/poster.jpg"} };
 const show = { subjectId:"1654274595068805785", title:"Catalog TV", subjectType:2, detailPath:"catalog-tv-2" };
@@ -29,6 +29,32 @@ describe("catalogue continuity during upstream failure",()=>{
     expect(movies.items[0].id).toBe("mb-1654274595068805784~catalog-movie-1");
     expect(movies.hasNextPage).toBe(false);
     expect(calls).toContain("/wefeed-h5api-bff/home");
+  });
+  it("sends MovieBox regional filters for Hollywood and Hindi rails",async()=>{
+    const payloads: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch",vi.fn(async(_input:URL|string,init?:RequestInit)=>{
+      if (init?.body) payloads.push(JSON.parse(String(init.body)));
+      return Response.json({code:0,message:"ok",data:{
+        items:[movie],pager:{page:"1",hasMore:false},
+      }});
+    }));
+    const result=await getFilteredPage("movie",1,{
+      sort:"Latest",
+      country:"India",
+      language:"Hindi",
+    });
+    expect(result.items).toHaveLength(1);
+    expect(payloads[0]).toMatchObject({
+      tabId:2,
+      channelId:1,
+      filter:{
+        sort:"Latest",
+        country:"India",
+        language:"Hindi",
+      },
+      page:1,
+      perPage:28,
+    });
   });
   it("does not fabricate a second page when only the home feed is available",async()=>{
     vi.stubGlobal("fetch",vi.fn(async()=>new Response("Down",{status:502})));
