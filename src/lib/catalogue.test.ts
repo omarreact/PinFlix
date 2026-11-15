@@ -6,10 +6,11 @@ const title = (id:string,kind:"movie"|"show",genres:string[],provider="moviebox"
 });
 describe("Provider catalogue categorization",()=>{
   const items=[title("mb-1","movie",["Action","Thriller"]),title("mb-2","movie",["Sci-Fi","Action"]),
-    title("mb-3","show",["Action","Drama"]),title("tmdb-movie-4","movie",["Drama"],"tmdb")];
+    title("mb-3","show",["Action","Drama"]),title("cb-movie-4","movie",["Drama"],"cineplexbd"),
+    title("tmdb-movie-5","movie",["Drama"],"tmdb")];
   it("shows only real provider items in each genre",()=>{
     expect(filterCatalogue(items,"movie","action").map(x=>x.id)).toEqual(["mb-1","mb-2"]);
-    expect(filterCatalogue(items,"all",null)).toHaveLength(3);
+    expect(filterCatalogue(items,"all",null).map(x=>x.id)).toEqual(["mb-1","mb-2","mb-3","cb-movie-4"]);
     expect(matchesGenre(items[1],"science-fiction")).toBe(true);
   });
   it("derives displayed genre choices from actual catalogue data",()=>{
