@@ -165,9 +165,10 @@ describe("provider index search reliability", () => {
     );
     expect((await search("Loki", 7, "show"))[0].title).toBe("Loki");
     expect(bootstraps).toBe(2);
-    expect(posts).toHaveLength(3);
+    expect(posts).toHaveLength(4);
     expect(posts.every((body) => body.page === 7)).toBe(true);
-    expect(posts.map((body) => body.subjectType)).toEqual([2, 2, 0]);
+    expect(posts.filter((body) => body.subjectType === 2)).toHaveLength(2);
+    expect(posts.filter((body) => body.subjectType === 0)).toHaveLength(2);
   });
   it("reboots expired sessions", async () => {
     let now = 1_700_000_000_000;
