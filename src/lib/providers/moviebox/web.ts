@@ -352,6 +352,42 @@ export type MovieBoxBrowseFilters = {
   language?: string;
 };
 
+function normalizedList(value: string | undefined) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function matchesCountryFilter(item: Entertainment, country: string | undefined) {
+  if (!country || country === "ALL") return true;
+  const target = country.trim().toLowerCase();
+  return normalizedList(item.country).includes(target);
+}
+
+function matchesLanguageFilter(item: Entertainment, language: string | undefined) {
+  if (!language || language === "ALL") return true;
+  const target = language.trim().toLowerCase();
+  const aliases =
+    target === "hindi"
+      ? new Set(["hindi", "hi"])
+      : target === "english"
+        ? new Set(["english", "en"])
+        : new Set([target]);
+  const values = [
+    ...(item.languages ?? []),
+    ...(item.audioLanguages ?? []),
+  ].map((value) => String(value).trim().toLowerCase());
+
+  if (values.some((value) => aliases.has(value))) return true;
+
+  // MovieBox often publishes dub/language markers directly in the title even
+  // when compact catalogue rows omit the dub metadata.
+  return [...aliases].some((alias) =>
+    new RegExp(`\\[${alias}\\]`, "i").test(item.title),
+  );
+}
+
 export async function getFilteredPage(
   kind: "movie" | "show",
   page = 1,
@@ -397,7 +433,11 @@ export async function getFilteredPage(
     }
 
     const items = distinctById(
-      raw.filter(validSearchSubject).map((item) => mapItem(item, kind)),
+      raw
+        .filter(validSearchSubject)
+        .map((item) => mapItem(item, kind))
+        .filter((item) => matchesCountryFilter(item, filters.country))
+        .filter((item) => matchesLanguageFilter(item, filters.language)),
     );
     const pager =
       res.data && typeof res.data === "object"
