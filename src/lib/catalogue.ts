@@ -56,8 +56,12 @@ export function matchesGenre(item: Entertainment, genre: CatalogueGenre): boolea
   });
 }
 export function filterCatalogue(items: Entertainment[], kind: CatalogueKind, genre: CatalogueGenre | null): Entertainment[] {
-  const unique = [...new Map(items.filter(item => item.provider === "moviebox" || item.id.startsWith("mb-"))
-    .map(item => [item.id, item])).values()];
+  const unique = [...new Map(items.filter(item =>
+    item.provider === "moviebox" ||
+    item.provider === "cineplexbd" ||
+    item.id.startsWith("mb-") ||
+    item.id.startsWith("cb-")
+  ).map(item => [item.id, item])).values()];
   return unique.filter(item =>
     (kind === "all" || item.kind === kind) &&
     (genre === "adult" ? isAdultTitle(item) : !isAdultTitle(item) && (!genre || matchesGenre(item, genre)))
