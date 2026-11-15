@@ -90,6 +90,31 @@ describe("provider index search reliability", () => {
     });
     expect(JSON.stringify(results)).not.toContain("fixture-session");
   });
+  it("merges generic, movie and TV indexes even when the generic index already has results", async () => {
+    const movie = {
+      subjectId: "987654321",
+      detailPath: "loki-movie-987",
+      title: "Loki: The Movie",
+      subjectType: "1",
+      releaseDate: "2024-01-01",
+      cover: { url: "https://example.test/loki-movie.jpg" },
+    };
+    const fetchMock = providerFetch((init) => {
+      const body = JSON.parse(init.body as string) as { subjectType: number };
+      const items =
+        body.subjectType === 0 ? [movie] :
+        body.subjectType === 1 ? [movie] :
+        body.subjectType === 2 ? [loki] : [];
+      return Response.json({ code: 0, data: { items } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await searchPage("Loki", 1, "all");
+
+    expect(result.items.map((item) => item.kind).sort()).toEqual(["movie", "show"]);
+    expect(fetchMock).toHaveBeenCalledTimes(4); // one session + all three indexes
+  });
+
   it("recovers a TV series when the combined index is empty", async () => {
     const fetchMock = providerFetch((init) => {
       const body = JSON.parse(init.body as string) as { subjectType: number };
