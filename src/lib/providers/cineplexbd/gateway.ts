@@ -76,6 +76,21 @@ const GatewayPlaybackSchema = z.object({
 });
 
 const GATEWAY_TIMEOUT_MS = 8_000;
+const GATEWAY_BACKOFF_MS = 60_000;
+
+let gatewayUnavailableUntil = 0;
+
+function gatewayBackoffActive(): boolean {
+  return gatewayUnavailableUntil > Date.now();
+}
+
+function markGatewayUnavailable() {
+  gatewayUnavailableUntil = Date.now() + GATEWAY_BACKOFF_MS;
+}
+
+function markGatewayHealthy() {
+  gatewayUnavailableUntil = 0;
+}
 
 export function getCineplexGatewayBase(): URL | null {
   const raw = process.env.CINEPLEX_GATEWAY_URL?.trim();
@@ -118,23 +133,38 @@ async function gatewayJson(
   resource: string,
   params?: URLSearchParams,
   timeoutMs = GATEWAY_TIMEOUT_MS,
+  options: { bypassBackoff?: boolean } = {},
 ): Promise<unknown> {
-  const response = await fetch(resourceUrl(resource, params), {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": "PinFlix/1.0 Cineplex gateway client",
-    },
-    cache: "no-store",
-    redirect: "manual",
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error(`Cineplex gateway ${resource} returned HTTP ${response.status}`);
+  if (!options.bypassBackoff && gatewayBackoffActive()) {
+    throw new Error("Cineplex gateway is temporarily unavailable");
   }
 
-  return response.json();
+  try {
+    const response = await fetch(resourceUrl(resource, params), {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "PinFlix/1.0 Cineplex gateway client",
+      },
+      cache: "no-store",
+      redirect: "manual",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!response.ok) {
+      await response.body?.cancel();
+      markGatewayUnavailable();
+      throw new Error(
+        `Cineplex gateway ${resource} returned HTTP ${response.status}`,
+      );
+    }
+
+    const payload = await response.json();
+    markGatewayHealthy();
+    return payload;
+  } catch (error) {
+    markGatewayUnavailable();
+    throw error;
+  }
 }
 
 function safeArtwork(value: string | null | undefined): string {
@@ -498,7 +528,12 @@ export async function probeCineplexGateway() {
 
   const startedAt = Date.now();
   try {
-    const result = await catalogue("movie", 1);
+    const params = new URLSearchParams({ kind: "movie", page: "1" });
+    const result = GatewayCatalogueSchema.parse(
+      await gatewayJson("catalogue", params, GATEWAY_TIMEOUT_MS, {
+        bypassBackoff: true,
+      }),
+    );
     return {
       configured: true,
       reachable: true,
