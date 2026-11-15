@@ -179,7 +179,7 @@ async function getLatestPage(
     try {
       return await gatewayLatestPage(kind, safePage);
     } catch (error) {
-      console.error("Cineplex gateway catalogue error:", error);
+      console.warn("Cineplex gateway catalogue unavailable:", error);
       return { items: [], page: safePage, hasNextPage: false };
     }
   }
@@ -236,7 +236,7 @@ async function getDetails(id: string): Promise<Entertainment | null> {
     try {
       return await gatewayDetails(id);
     } catch (error) {
-      console.error("Cineplex gateway details error:", error);
+      console.warn("Cineplex gateway details unavailable:", error);
       return null;
     }
   }
@@ -296,7 +296,7 @@ async function getSeriesNavigation(
     try {
       return await gatewaySeriesNavigation(id, requestedSeason);
     } catch (error) {
-      console.error("Cineplex gateway series navigation error:", error);
+      console.warn("Cineplex gateway series navigation unavailable:", error);
       const fallbackSeason = safePositiveInteger(requestedSeason, 1);
       return { seasons: [fallbackSeason], season: fallbackSeason, episodes: 1 };
     }
@@ -385,7 +385,7 @@ async function resolveStreams(
     try {
       return await gatewayStreams(id, options);
     } catch (error) {
-      console.error("Cineplex gateway stream resolution error:", error);
+      console.warn("Cineplex gateway stream unavailable:", error);
       return [];
     }
   }
@@ -420,7 +420,7 @@ async function getCategories(kind: ProviderKind): Promise<ProviderCategory[]> {
     try {
       return await gatewayCategories(kind);
     } catch (error) {
-      console.error("Cineplex gateway categories error:", error);
+      console.warn("Cineplex gateway categories unavailable:", error);
       return [];
     }
   }
@@ -445,7 +445,7 @@ async function getCategoryPage(
     try {
       return await gatewayCategoryPage(categoryId, page);
     } catch (error) {
-      console.error("Cineplex gateway category error:", error);
+      console.warn("Cineplex gateway category unavailable:", error);
       return { items: [], page: Math.max(1, Math.floor(page)), hasNextPage: false };
     }
   }
@@ -491,7 +491,7 @@ async function searchPage(
     try {
       return await gatewaySearchPage(normalized, safePage, kind);
     } catch (error) {
-      console.error("Cineplex gateway search unavailable:", error);
+      console.warn("Cineplex gateway search unavailable:", error);
       return { items: [], page: safePage, hasNextPage: false };
     }
   }
