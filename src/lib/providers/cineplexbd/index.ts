@@ -335,6 +335,36 @@ async function getCategoryPage(
   }
 }
 
+async function searchPage(
+  query: string,
+  page = 1,
+  kind: "all" | ProviderKind = "all",
+): Promise<ProviderCatalogPage> {
+  const normalized = query.trim();
+  const safePage = Math.max(1, Math.floor(page));
+  if (!normalized) {
+    return { items: [], page: safePage, hasNextPage: false };
+  }
+
+  try {
+    const html = await fetchHtml(
+      `/search.php?q=${encodeURIComponent(normalized)}&page=${safePage}`,
+      60,
+    );
+    const items = parseCatalog(html).filter(
+      (item) => kind === "all" || item.kind === kind,
+    );
+    return {
+      items,
+      page: safePage,
+      hasNextPage: parseHasNextPage(html),
+    };
+  } catch (error) {
+    console.error("CineplexBD search error:", error);
+    return { items: [], page: safePage, hasNextPage: false };
+  }
+}
+
 export const cineplexbdProvider: PinFlixProvider = {
   name: "cineplexbd",
 
@@ -342,21 +372,11 @@ export const cineplexbdProvider: PinFlixProvider = {
     return /^cb-(?:movie-|series-)?\d+$/.test(id);
   },
 
-  async search(query: string, page = 1) {
-    const normalized = query.trim();
-    if (!normalized) return [];
-
-    try {
-      const html = await fetchHtml(
-        `/search.php?q=${encodeURIComponent(normalized)}&page=${Math.max(1, page)}`,
-        60,
-      );
-      return parseCatalog(html);
-    } catch (error) {
-      console.error("CineplexBD search error:", error);
-      return [];
-    }
+  async search(query: string, page = 1, kind = "all") {
+    return (await searchPage(query, page, kind)).items;
   },
+
+  searchPage,
 
   getLatestPage,
   getCategories,
