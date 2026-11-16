@@ -948,14 +948,17 @@ export async function resolveStreams(
   return validSources.sort((a, b) => b.priority - a.priority);
 }
 
-export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
+export async function getHomeSections(
+  providerHost = "movibox.net",
+): Promise<MovieBoxHomeSection[]> {
   // Read-only provider discovery fallback. No change to playback origin/CDN.
-  // The second host is an H5 domain published for the same provider; do not
-  // manufacture movie records or use TMDB listings as playable titles.
+  // MovieBox publishes regional manifests under its own known web hosts.
+  const safeHost =
+    providerHost === "moviebox.ph" ? "moviebox.ph" : "movibox.net";
   const origins = [API_BASE, "https://h5.aoneroom.com"];
   async function readHome(origin: string): Promise<any[]> {
     const url = new URL("/wefeed-h5api-bff/home", origin);
-    url.searchParams.set("host", "movibox.net");
+    url.searchParams.set("host", safeHost);
     url.searchParams.set("channel", "1");
     const res = await fetchJson<H5ApiResponse<any>>(url, {}, 3500);
     const operations = res.data?.operatingList;
@@ -972,6 +975,7 @@ export async function getHomeSections(): Promise<MovieBoxHomeSection[]> {
   } catch (error) {
     console.warn(
       "All MovieBox home-feed endpoints unavailable:",
+      safeHost,
       formatError(error),
     );
     return [];
