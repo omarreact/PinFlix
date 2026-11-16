@@ -492,15 +492,20 @@ const resolveWebsiteDetailPathCached = cache(resolveWebsiteDetailPath);
 // not expose enough cards; metadata and playback are always resolved live from
 // MovieBox.
 const CURRENT_MOVIEBOX_HINDI_MOVIE_PATHS = [
-  "ikka-hindi-s0XqCEYJgs8",
-  "pati-patni-aur-woh-do-hindi-KDgBHBKEfs1",
-  "parimala-and-co-hindi-s6YtZid8dM5",
-  "dose-hindi-QMvlygmUVc2",
-  "cats-and-dogs-3-paws-unite-hindi-Ya47zJ01cy",
-  "boulevard-hindi-2rfAmsjiIx6",
-  "nothing-to-lose-hindi-oSBHPSwRHg",
-  "mario-hindi-0OdLFyCumw",
-  "sing-geetham-hindi-KzYSTGpwVX6",
+  "the-vvaan-force-of-the-forrest-hindi-yvxjyvRyyJ5",
+  "meesaya-murukku-2-hindi-0wA8PfjdEE5",
+  "apocalypse-z-new-world-hindi-6D2ttOtax5",
+  "immortal-hindi-6T0YySWAgXa",
+  "mirzapur-the-movie-hindi-WVGuExiYfc5",
+  "dont-trouble-the-trouble-hindi-Wto73wCmf65",
+  "runner-hindi-Qmo94ivMnY5",
+  "hope-hindi-4sf1PfR4wo",
+  "baththa-hindi-aDh9G7badD7",
+  "the-paradise-hindi-sUHGZANXbq9",
+  "drive-the-pretenders-hindi-eVtRqwLbcp",
+  "colony-hindi-WrHlMwhDfc7",
+  "gajab-raat-hindi-MyJXyMP5Av6",
+  "sigma-hindi-Am8iYNDgWHa",
 ] as const;
 
 const CURRENT_MOVIEBOX_HINDI_SHOW_PATHS = [
@@ -515,6 +520,47 @@ const CURRENT_MOVIEBOX_HINDI_SHOW_PATHS = [
   "sterling-point-hindi-gcy9EMdw7U",
   "stranger-things-hindi-Aw3jeTNwZX3",
 ] as const;
+
+export async function getCurrentHindiTitles(
+  kind: "movie" | "show",
+  limit = 14,
+): Promise<Entertainment[]> {
+  const seeds =
+    kind === "movie"
+      ? CURRENT_MOVIEBOX_HINDI_MOVIE_PATHS
+      : CURRENT_MOVIEBOX_HINDI_SHOW_PATHS;
+
+  const resolved = await Promise.allSettled(
+    seeds.map((detailPath) => resolveWebsiteDetailPathCached(detailPath)),
+  );
+
+  return distinctById(
+    resolved
+      .flatMap((result) =>
+        result.status === "fulfilled" && result.value ? [result.value] : [],
+      )
+      .filter((item) => item.kind === kind)
+      .filter(
+        (item) =>
+          /\[hindi(?:\]|\b)/i.test(item.title) ||
+          (item.languages ?? []).some((value) =>
+            /^(?:hi|hindi)$/i.test(String(value)),
+          ) ||
+          (item.audioLanguages ?? []).some((value) =>
+            /^(?:hi|hindi)$/i.test(String(value)),
+          ),
+      )
+      .filter(
+        (item) =>
+          !/adult|erotic|porn|hentai/i.test(item.category ?? "") &&
+          !item.genres.some((genre) =>
+            /adult|erotic|porn|hentai/i.test(genre),
+          ),
+      ),
+  )
+    .sort((a, b) => (b.year ?? 0) - (a.year ?? 0))
+    .slice(0, limit);
+}
 
 export async function getWebsiteTaggedTitles(
   kind: "movie" | "show",
