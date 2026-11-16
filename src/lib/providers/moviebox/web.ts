@@ -400,7 +400,6 @@ export async function getFilteredPage(
   const url = new URL("/wefeed-h5api-bff/subject/filter", API_BASE);
   const payload = {
     tabId: kind === "movie" ? 2 : 5,
-    channelId: kind === "movie" ? 1 : 2,
     filter: {
       sort: filters.sort || "Latest",
       genre: filters.genre || "ALL",
