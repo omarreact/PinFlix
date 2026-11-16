@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
+import * as cheerio from "cheerio";
 import type { ProviderCatalogPage, ProviderCategory, SeriesNavigation } from "../contracts";
 import { cache } from "react";
 import { extractSearchItems, validSearchSubject } from "./search-response";
@@ -400,6 +401,7 @@ export async function getFilteredPage(
   const url = new URL("/wefeed-h5api-bff/subject/filter", API_BASE);
   const payload = {
     tabId: kind === "movie" ? 2 : 5,
+    channelId: kind === "movie" ? 1 : 2,
     filter: {
       sort: filters.sort || "Latest",
       genre: filters.genre || "ALL",
@@ -434,7 +436,8 @@ export async function getFilteredPage(
     const items = distinctById(
       raw
         .filter(validSearchSubject)
-        .map((item) => mapItem(item, kind))
+        .map((item) => mapItem(item))
+        .filter((item) => item.kind === kind)
         .filter((item) => matchesCountryFilter(item, filters.country))
         .filter((item) => matchesLanguageFilter(item, filters.language)),
     );
@@ -463,6 +466,115 @@ export async function getFilteredPage(
       formatError(error),
     );
     return { items: [], page: safePage, hasNextPage: false };
+  }
+}
+
+async function resolveWebsiteDetailPath(
+  detailPath: string,
+): Promise<Entertainment | null> {
+  const url = new URL("/wefeed-h5api-bff/detail", API_BASE);
+  url.searchParams.set("detailPath", detailPath);
+
+  try {
+    const res = await fetchJson<H5ApiResponse<any>>(url, {}, 4_500);
+    if (res.code !== 0 || !res.data?.subject) return null;
+    return mapItem({ ...res.data.subject, detailPath });
+  } catch {
+    return null;
+  }
+}
+
+const resolveWebsiteDetailPathCached = cache(resolveWebsiteDetailPath);
+
+export async function getWebsiteTaggedTitles(
+  kind: "movie" | "show",
+  tag: string,
+  limit = 12,
+): Promise<Entertainment[]> {
+  const pageUrl = new URL(kind === "movie" ? "/movie" : "/tv-series", SITE_BASE);
+  try {
+    const response = await fetch(pageUrl, {
+      headers: {
+        Accept: "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+        Referer: SITE_BASE + "/",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return [];
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const wanted = tag.trim().toLowerCase();
+    const paths: string[] = [];
+    const seen = new Set<string>();
+
+    $("a[href*='/detail/']").each((_, element) => {
+      if (paths.length >= Math.max(limit * 3, 24)) return;
+      const anchor = $(element);
+      const evidence = [
+        anchor.text(),
+        anchor.attr("title") || "",
+        anchor.find("img").attr("alt") || "",
+      ]
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .toLowerCase();
+      if (!evidence.includes(wanted)) return;
+
+      const href = anchor.attr("href");
+      if (!href) return;
+      try {
+        const url = new URL(href, SITE_BASE);
+        const marker = "/detail/";
+        const index = url.pathname.indexOf(marker);
+        if (index < 0) return;
+        const detailPath = decodeURIComponent(
+          url.pathname.slice(index + marker.length).replace(/^\/+|\/+$/g, ""),
+        );
+        if (!detailPath || seen.has(detailPath)) return;
+        seen.add(detailPath);
+        paths.push(detailPath);
+      } catch {
+        // Ignore malformed provider links.
+      }
+    });
+
+    const resolved = await Promise.allSettled(
+      paths.map((detailPath) => resolveWebsiteDetailPathCached(detailPath)),
+    );
+    return distinctById(
+      resolved
+        .flatMap((result) =>
+          result.status === "fulfilled" && result.value ? [result.value] : [],
+        )
+        .filter((item) => item.kind === kind)
+        .filter((item) => !item.category || item.category !== "Adult")
+        .filter((item) =>
+          wanted === "hindi"
+            ? /\[hindi(?:\]|\b)/i.test(item.title) ||
+              (item.languages ?? []).some((value) =>
+                /^(?:hi|hindi)$/i.test(String(value)),
+              ) ||
+              (item.audioLanguages ?? []).some((value) =>
+                /^(?:hi|hindi)$/i.test(String(value)),
+              )
+            : true,
+        ),
+    )
+      .sort((a, b) => (b.year ?? 0) - (a.year ?? 0))
+      .slice(0, limit);
+  } catch (error) {
+    console.warn(
+      "MovieBox website tagged catalogue unavailable:",
+      kind,
+      tag,
+      formatError(error),
+    );
+    return [];
   }
 }
 
@@ -498,7 +610,10 @@ export async function getLatestPage(
       const raw = extractSearchItems(res.data);
       if (raw !== null) {
         const items = distinctById(
-          raw.filter(validSearchSubject).map((item) => mapItem(item, kind)),
+          raw
+            .filter(validSearchSubject)
+            .map((item) => mapItem(item))
+            .filter((item) => item.kind === kind),
         );
         if (items.length || page > 1) {
           const pager =
