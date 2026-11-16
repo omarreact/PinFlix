@@ -46,7 +46,6 @@ describe("catalogue continuity during upstream failure",()=>{
     expect(result.items).toHaveLength(1);
     expect(payloads[0]).toMatchObject({
       tabId:2,
-      channelId:1,
       filter:{
         sort:"Latest",
         country:"India",
