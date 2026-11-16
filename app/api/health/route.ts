@@ -1,5 +1,3 @@
-import { getMediaEdgeHealth } from "@/src/lib/media-edge";
-
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const preferredRegion = "sin1";
@@ -59,30 +57,28 @@ async function probe(path: string, init?: RequestInit) {
 }
 
 export async function GET() {
-  const [home, filter, mediaEdge] = await Promise.all([
+  const [home, filter] = await Promise.all([
     probe("/wefeed-h5api-bff/home?host=movibox.net&channel=1"),
     probe("/wefeed-h5api-bff/subject/filter", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ page: 1, perPage: 6, channelId: 1 }),
     }),
-    getMediaEdgeHealth(),
   ]);
 
   const reachable = Boolean(home.ok || filter.ok);
   const rateLimited = Boolean(home.rateLimited || filter.rateLimited);
-  const mediaEdgeReachable = Boolean(mediaEdge.ok && mediaEdge.body && typeof mediaEdge.body === "object");
 
   return Response.json(
     {
-      ok: reachable || mediaEdgeReachable,
-      degraded: !(reachable && mediaEdgeReachable),
+      ok: reachable,
+      degraded: !reachable,
       region: "sin1",
       reason: rateLimited
         ? "moviebox_upstream_rate_limited"
-        : reachable || mediaEdgeReachable
+        : reachable
           ? null
-          : "all_upstreams_unreachable",
+          : "moviebox_upstream_unreachable",
       service: "pinflix",
       catalog: {
         provider: "moviebox",
@@ -90,17 +86,13 @@ export async function GET() {
         reachable,
       },
       playback: {
-        primary: "cloudflare-media-edge",
-        fallback: "moviebox",
+        primary: "moviebox",
+        fallback: null,
         host: "movibox.net",
       },
       mediaEdge: {
-        provider: "cloudflare-worker-r2",
-        reachable: mediaEdgeReachable,
-        status: mediaEdge.status,
-        baseUrl: mediaEdge.baseUrl,
-        body: mediaEdge.body ?? null,
-        error: "error" in mediaEdge ? mediaEdge.error : undefined,
+        enabled: false,
+        reason: "moviebox_only_mode",
       },
       probes: {
         home,
@@ -108,7 +100,7 @@ export async function GET() {
       },
     },
     {
-      status: reachable || mediaEdgeReachable ? 200 : 503,
+      status: reachable ? 200 : 503,
       headers: { "Cache-Control": "no-store" },
     },
   );
