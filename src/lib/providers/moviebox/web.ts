@@ -486,6 +486,36 @@ async function resolveWebsiteDetailPath(
 
 const resolveWebsiteDetailPathCached = cache(resolveWebsiteDetailPath);
 
+// Current MovieBox discovery fallback seeds. These are provider-owned
+// detail paths captured from MovieBox's own "Movies New Release" and
+// Hindi-series surfaces. They are only used when regional HTML rendering does
+// not expose enough cards; metadata and playback are always resolved live from
+// MovieBox.
+const CURRENT_MOVIEBOX_HINDI_MOVIE_PATHS = [
+  "ikka-hindi-s0XqCEYJgs8",
+  "pati-patni-aur-woh-do-hindi-KDgBHBKEfs1",
+  "parimala-and-co-hindi-s6YtZid8dM5",
+  "dose-hindi-QMvlygmUVc2",
+  "cats-and-dogs-3-paws-unite-hindi-Ya47zJ01cy",
+  "boulevard-hindi-2rfAmsjiIx6",
+  "nothing-to-lose-hindi-oSBHPSwRHg",
+  "mario-hindi-0OdLFyCumw",
+  "sing-geetham-hindi-KzYSTGpwVX6",
+] as const;
+
+const CURRENT_MOVIEBOX_HINDI_SHOW_PATHS = [
+  "the-punisher-hindi-ixWFeoeg848",
+  "mobland-hindi-4YpgcZoqqL1",
+  "paris-has-fallen-hindi-YkHtzPnNoI5",
+  "the-gentlemen-hindi-kE1RI08L1t3",
+  "from-hindi-Icj9nKQHUt2",
+  "avatar-the-last-airbender-hindi-UqlHOlHs0M1",
+  "outer-banks-hindi-qXFv72G1Ts2",
+  "off-campus-hindi-wo6t7haj4sa",
+  "sterling-point-hindi-gcy9EMdw7U",
+  "stranger-things-hindi-Aw3jeTNwZX3",
+] as const;
+
 export async function getWebsiteTaggedTitles(
   kind: "movie" | "show",
   tag: string,
@@ -588,6 +618,19 @@ export async function getWebsiteTaggedTitles(
         pagePath,
         formatError(error),
       );
+    }
+  }
+
+  if (wanted === "hindi" && paths.length < limit) {
+    const seeds =
+      kind === "movie"
+        ? CURRENT_MOVIEBOX_HINDI_MOVIE_PATHS
+        : CURRENT_MOVIEBOX_HINDI_SHOW_PATHS;
+    for (const detailPath of seeds) {
+      if (paths.length >= Math.max(limit * 3, 24)) break;
+      if (seen.has(detailPath)) continue;
+      seen.add(detailPath);
+      paths.push(detailPath);
     }
   }
 
