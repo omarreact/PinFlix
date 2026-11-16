@@ -619,6 +619,113 @@ export async function getWebsiteTaggedTitles(
     .slice(0, limit);
 }
 
+export async function getWebsiteRegionalTitles(
+  kind: "movie" | "show",
+  countries: string[],
+  limit = 12,
+): Promise<Entertainment[]> {
+  const pageUrl = new URL(kind === "movie" ? "/movie" : "/tv-series", SITE_BASE);
+  const allowedCountries = new Set(
+    countries.map((country) => country.trim().toLowerCase()).filter(Boolean),
+  );
+
+  try {
+    const response = await fetch(pageUrl, {
+      headers: {
+        Accept: "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+        Referer: SITE_BASE + "/",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return [];
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const paths: string[] = [];
+    const seen = new Set<string>();
+    const candidateLimit = Math.max(limit * 3, 30);
+
+    const addPath = (raw: string) => {
+      if (paths.length >= candidateLimit) return;
+      let detailPath = raw;
+      try {
+        detailPath = decodeURIComponent(raw);
+      } catch {
+        // Keep provider path as returned when it is not percent encoded.
+      }
+      detailPath = detailPath.replace(/^\/+|\/+$/g, "");
+      if (!detailPath || seen.has(detailPath)) return;
+      seen.add(detailPath);
+      paths.push(detailPath);
+    };
+
+    $("a[href*='/detail/']").each((_, element) => {
+      if (paths.length >= candidateLimit) return;
+      const href = $(element).attr("href");
+      if (!href) return;
+      try {
+        const url = new URL(href, SITE_BASE);
+        const marker = "/detail/";
+        const index = url.pathname.indexOf(marker);
+        if (index < 0) return;
+        addPath(url.pathname.slice(index + marker.length));
+      } catch {
+        // Ignore malformed provider links.
+      }
+    });
+
+    if (paths.length < candidateLimit) {
+      const normalizedHtml = html
+        .replace(/\\u002F/gi, "/")
+        .replace(/\\\//g, "/");
+      const pattern =
+        /\/detail\/([a-z0-9][a-z0-9._~%+-]{4,160})/gi;
+      for (const match of normalizedHtml.matchAll(pattern)) {
+        if (paths.length >= candidateLimit) break;
+        addPath(match[1]);
+      }
+    }
+
+    const resolved = await Promise.allSettled(
+      paths.map((detailPath) => resolveWebsiteDetailPathCached(detailPath)),
+    );
+
+    return distinctById(
+      resolved
+        .flatMap((result) =>
+          result.status === "fulfilled" && result.value ? [result.value] : [],
+        )
+        .filter((item) => item.kind === kind)
+        .filter((item) => !/\[hindi(?:\]|\b)/i.test(item.title))
+        .filter(
+          (item) =>
+            !item.isPornographic &&
+            !item.genres.some((genre) =>
+              /adult|erotic|porn|hentai/i.test(genre),
+            ),
+        )
+        .filter((item) =>
+          normalizedList(item.country).some((country) =>
+            allowedCountries.has(country),
+          ),
+        ),
+    )
+      .sort((a, b) => (b.year ?? 0) - (a.year ?? 0))
+      .slice(0, limit);
+  } catch (error) {
+    console.warn(
+      "MovieBox website regional catalogue unavailable:",
+      kind,
+      formatError(error),
+    );
+    return [];
+  }
+}
+
 export async function getLatestPage(
   kind: "movie" | "show",
   page = 1,
