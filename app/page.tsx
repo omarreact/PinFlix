@@ -55,45 +55,15 @@ function titleRows(
   return clean(items).slice(0, limit).map(toTitle);
 }
 
-function isHindiItem(item: Entertainment) {
-  const languages = [
-    ...(item.languages ?? []),
-    ...(item.audioLanguages ?? []),
-  ].map((value) => String(value).trim().toLowerCase());
-  return (
-    /\[hindi(?:\]|\b)/i.test(item.title) ||
-    languages.includes("hindi") ||
-    languages.includes("hi")
-  );
-}
-
-function taggedHindiItems(
-  sections: movieboxWeb.MovieBoxHomeSection[],
-  kind: "movie" | "show",
-) {
-  return clean(
-    sections.flatMap((section) => section.items).filter(isHindiItem),
-    kind,
-  );
-}
-
 export default async function Home() {
   const [
     homeSections,
-    indiaHomeSections,
     hollywoodMoviePage,
     hollywoodSeriesPage,
-    websiteHollywoodMovies,
-    websiteHollywoodSeries,
-    hindiMoviePage1,
-    hindiMoviePage2,
-    hindiSeriesPage1,
-    hindiSeriesPage2,
-    websiteHindiMovies,
-    websiteHindiSeries,
+    hindiMovies,
+    hindiSeries,
   ] = await Promise.all([
     movieboxWeb.getHomeSections().catch(() => []),
-    movieboxWeb.getHomeSections("moviebox.ph").catch(() => []),
     movieboxWeb
       .getFilteredPage("movie", 1, {
         sort: "Latest",
@@ -106,55 +76,16 @@ export default async function Home() {
         country: "United States",
       })
       .catch(() => ({ items: [], page: 1, hasNextPage: false })),
-    movieboxWeb
-      .getWebsiteRegionalTitles(
-        "movie",
-        ["United States", "United Kingdom", "Canada", "Australia"],
-        14,
-      )
-      .catch(() => []),
-    movieboxWeb
-      .getWebsiteRegionalTitles(
-        "show",
-        ["United States", "United Kingdom", "Canada", "Australia"],
-        14,
-      )
-      .catch(() => []),
-    movieboxWeb
-      .getFilteredPage("movie", 1, {
-        sort: "Latest",
-        language: "Hindi",
-      })
-      .catch(() => ({ items: [], page: 1, hasNextPage: false })),
-    movieboxWeb
-      .getFilteredPage("movie", 2, {
-        sort: "Latest",
-        language: "Hindi",
-      })
-      .catch(() => ({ items: [], page: 2, hasNextPage: false })),
-    movieboxWeb
-      .getFilteredPage("show", 1, {
-        sort: "Latest",
-        language: "Hindi",
-      })
-      .catch(() => ({ items: [], page: 1, hasNextPage: false })),
-    movieboxWeb
-      .getFilteredPage("show", 2, {
-        sort: "Latest",
-        language: "Hindi",
-      })
-      .catch(() => ({ items: [], page: 2, hasNextPage: false })),
-    movieboxWeb.getWebsiteTaggedTitles("movie", "Hindi", 12).catch(() => []),
-    movieboxWeb.getWebsiteTaggedTitles("show", "Hindi", 12).catch(() => []),
+    movieboxWeb.getCurrentHindiTitles("movie", 14).catch(() => []),
+    movieboxWeb.getCurrentHindiTitles("show", 14).catch(() => []),
   ]);
 
   const hollywoodMovies = clean(
     unique([
-      ...websiteHollywoodMovies,
       ...hollywoodMoviePage.items,
       ...itemsFromSections(
         homeSections,
-        /hollywood|western|action movies|popular movie/i,
+        /popular movie|action movies|romance/i,
         "movie",
       ),
     ]),
@@ -163,46 +94,13 @@ export default async function Home() {
 
   const hollywoodSeries = clean(
     unique([
-      ...websiteHollywoodSeries,
       ...hollywoodSeriesPage.items,
       ...itemsFromSections(
         homeSections,
-        /hollywood|western|popular series|action&thriller|gangster/i,
+        /popular series|action&thriller|gangster|superhero series|epic fantasy/i,
         "show",
       ),
     ]),
-    "show",
-  ).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
-
-  const hindiMovies = clean(
-    unique([
-      ...hindiMoviePage1.items,
-      ...hindiMoviePage2.items,
-      ...websiteHindiMovies,
-      ...itemsFromSections(
-        indiaHomeSections,
-        /bollywood|hindi|cinema|indian/i,
-        "movie",
-      ),
-      ...taggedHindiItems(homeSections, "movie"),
-      ...taggedHindiItems(indiaHomeSections, "movie"),
-    ]).filter(isHindiItem),
-    "movie",
-  ).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
-
-  const hindiSeries = clean(
-    unique([
-      ...hindiSeriesPage1.items,
-      ...hindiSeriesPage2.items,
-      ...websiteHindiSeries,
-      ...itemsFromSections(
-        indiaHomeSections,
-        /bollywood|hindi|indian/i,
-        "show",
-      ),
-      ...taggedHindiItems(homeSections, "show"),
-      ...taggedHindiItems(indiaHomeSections, "show"),
-    ]).filter(isHindiItem),
     "show",
   ).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
 
