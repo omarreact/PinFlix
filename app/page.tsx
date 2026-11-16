@@ -77,31 +77,14 @@ function taggedHindiItems(
   );
 }
 
-async function regionalFallback(
-  kind: "movie" | "show",
-  country: string,
-  sections: movieboxWeb.MovieBoxHomeSection[],
-  labelPattern: RegExp,
-) {
-  const providerSectionItems = itemsFromSections(sections, labelPattern, kind);
-  if (providerSectionItems.length) return providerSectionItems;
-
-  const broad = await movieboxWeb.getFilteredPage(kind, 1, {
-    sort: "Latest",
-    country,
-  });
-  if (broad.items.length) return clean(broad.items, kind);
-
-  const latest = await movieboxWeb.getLatestPage(kind, 1);
-  return clean(latest.items, kind);
-}
-
 export default async function Home() {
   const [
     homeSections,
     indiaHomeSections,
     hollywoodMoviePage,
     hollywoodSeriesPage,
+    websiteHollywoodMovies,
+    websiteHollywoodSeries,
     hindiMoviePage1,
     hindiMoviePage2,
     hindiSeriesPage1,
@@ -123,6 +106,20 @@ export default async function Home() {
         country: "United States",
       })
       .catch(() => ({ items: [], page: 1, hasNextPage: false })),
+    movieboxWeb
+      .getWebsiteRegionalTitles(
+        "movie",
+        ["United States", "United Kingdom", "Canada", "Australia"],
+        14,
+      )
+      .catch(() => []),
+    movieboxWeb
+      .getWebsiteRegionalTitles(
+        "show",
+        ["United States", "United Kingdom", "Canada", "Australia"],
+        14,
+      )
+      .catch(() => []),
     movieboxWeb
       .getFilteredPage("movie", 1, {
         sort: "Latest",
@@ -151,23 +148,31 @@ export default async function Home() {
     movieboxWeb.getWebsiteTaggedTitles("show", "Hindi", 12).catch(() => []),
   ]);
 
-  const hollywoodMovies = hollywoodMoviePage.items.length
-    ? clean(hollywoodMoviePage.items, "movie")
-    : await regionalFallback(
+  const hollywoodMovies = clean(
+    unique([
+      ...websiteHollywoodMovies,
+      ...hollywoodMoviePage.items,
+      ...itemsFromSections(
+        homeSections,
+        /hollywood|western|action movies|popular movie/i,
         "movie",
-        "United States",
-        homeSections,
-        /hollywood|english|western/i,
-      );
+      ),
+    ]),
+    "movie",
+  ).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
 
-  const hollywoodSeries = hollywoodSeriesPage.items.length
-    ? clean(hollywoodSeriesPage.items, "show")
-    : await regionalFallback(
-        "show",
-        "United States",
+  const hollywoodSeries = clean(
+    unique([
+      ...websiteHollywoodSeries,
+      ...hollywoodSeriesPage.items,
+      ...itemsFromSections(
         homeSections,
-        /hollywood|english|western/i,
-      );
+        /hollywood|western|popular series|action&thriller|gangster/i,
+        "show",
+      ),
+    ]),
+    "show",
+  ).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
 
   const hindiMovies = clean(
     unique([
