@@ -105,6 +105,8 @@ export default async function Home() {
     hindiMoviePage2,
     hindiSeriesPage1,
     hindiSeriesPage2,
+    websiteHindiMovies,
+    websiteHindiSeries,
   ] = await Promise.all([
     movieboxWeb.getHomeSections().catch(() => []),
     movieboxWeb
@@ -143,6 +145,8 @@ export default async function Home() {
         language: "Hindi",
       })
       .catch(() => ({ items: [], page: 2, hasNextPage: false })),
+    movieboxWeb.getWebsiteTaggedTitles("movie", "Hindi", 12).catch(() => []),
+    movieboxWeb.getWebsiteTaggedTitles("show", "Hindi", 12).catch(() => []),
   ]);
 
   const hollywoodMovies = hollywoodMoviePage.items.length
@@ -167,6 +171,7 @@ export default async function Home() {
     unique([
       ...hindiMoviePage1.items,
       ...hindiMoviePage2.items,
+      ...websiteHindiMovies,
       ...taggedHindiItems(homeSections, "movie"),
     ]).filter(isHindiItem),
     "movie",
@@ -176,6 +181,7 @@ export default async function Home() {
     unique([
       ...hindiSeriesPage1.items,
       ...hindiSeriesPage2.items,
+      ...websiteHindiSeries,
       ...taggedHindiItems(homeSections, "show"),
     ]).filter(isHindiItem),
     "show",
