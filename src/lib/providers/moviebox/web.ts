@@ -543,6 +543,29 @@ export async function getWebsiteTaggedTitles(
       }
     });
 
+    // Next/RSC pages can serialize links inside script payloads instead of
+    // exposing every card as a literal anchor in the initial HTML. MovieBox
+    // Hindi detail slugs carry the language marker, so recover those links
+    // from the provider's own serialized payload as a second parser path.
+    if (paths.length < limit) {
+      const normalizedHtml = html
+        .replace(/\\u002F/gi, "/")
+        .replace(/\\\//g, "/");
+      const detailPattern = /\/detail\/([a-z0-9][a-z0-9._~%+-]*hindi[a-z0-9._~%+-]*)/gi;
+      for (const match of normalizedHtml.matchAll(detailPattern)) {
+        if (paths.length >= Math.max(limit * 3, 24)) break;
+        let detailPath = "";
+        try {
+          detailPath = decodeURIComponent(match[1]).replace(/^\/+|\/+$/g, "");
+        } catch {
+          detailPath = match[1].replace(/^\/+|\/+$/g, "");
+        }
+        if (!detailPath || seen.has(detailPath)) continue;
+        seen.add(detailPath);
+        paths.push(detailPath);
+      }
+    }
+
     const resolved = await Promise.allSettled(
       paths.map((detailPath) => resolveWebsiteDetailPathCached(detailPath)),
     );
