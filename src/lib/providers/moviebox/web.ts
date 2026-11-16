@@ -491,72 +491,90 @@ export async function getWebsiteTaggedTitles(
   tag: string,
   limit = 12,
 ): Promise<Entertainment[]> {
-  const pageUrl = new URL(kind === "movie" ? "/movie" : "/tv-series", SITE_BASE);
-  try {
-    const response = await fetch(pageUrl, {
-      headers: {
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "en-US,en;q=0.9",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-        Referer: SITE_BASE + "/",
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(5_000),
-    });
-    if (!response.ok) return [];
+  const pagePaths =
+    kind === "movie"
+      ? [
+          "/movie",
+          "/ranking-list/8uVheKbxVL1?id=1488104699998914056&page_from=more_SUBJECTS_MOVIE",
+        ]
+      : [
+          "/tv-series",
+          "/category?id=3910636007619709856&page_from=more_PLAY_LIST",
+        ];
 
-    const html = await response.text();
-    const $ = cheerio.load(html);
-    const wanted = tag.trim().toLowerCase();
-    const paths: string[] = [];
-    const seen = new Set<string>();
+  const wanted = tag.trim().toLowerCase();
+  const paths: string[] = [];
+  const seen = new Set<string>();
 
-    $("a[href*='/detail/']").each((_, element) => {
-      if (paths.length >= Math.max(limit * 3, 24)) return;
-      const anchor = $(element);
-      const evidence = [
-        anchor.text(),
-        anchor.attr("title") || "",
-        anchor.find("img").attr("alt") || "",
-      ]
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .toLowerCase();
-      if (!evidence.includes(wanted)) return;
+  for (const pagePath of pagePaths) {
+    if (paths.length >= Math.max(limit * 3, 24)) break;
+    const pageUrl = new URL(pagePath, SITE_BASE);
 
-      const href = anchor.attr("href");
-      if (!href) return;
-      try {
-        const url = new URL(href, SITE_BASE);
-        const marker = "/detail/";
-        const index = url.pathname.indexOf(marker);
-        if (index < 0) return;
-        const detailPath = decodeURIComponent(
-          url.pathname.slice(index + marker.length).replace(/^\/+|\/+$/g, ""),
-        );
-        if (!detailPath || seen.has(detailPath)) return;
-        seen.add(detailPath);
-        paths.push(detailPath);
-      } catch {
-        // Ignore malformed provider links.
-      }
-    });
+    try {
+      const response = await fetch(pageUrl, {
+        headers: {
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "en-US,en;q=0.9",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+          Referer: SITE_BASE + "/",
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!response.ok) continue;
 
-    // Next/RSC pages can serialize links inside script payloads instead of
-    // exposing every card as a literal anchor in the initial HTML. MovieBox
-    // Hindi detail slugs carry the language marker, so recover those links
-    // from the provider's own serialized payload as a second parser path.
-    if (paths.length < limit) {
+      const html = await response.text();
+      const $ = cheerio.load(html);
+
+      $("a[href*='/detail/']").each((_, element) => {
+        if (paths.length >= Math.max(limit * 3, 24)) return;
+        const anchor = $(element);
+        const evidence = [
+          anchor.text(),
+          anchor.attr("title") || "",
+          anchor.find("img").attr("alt") || "",
+        ]
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .toLowerCase();
+        if (!evidence.includes(wanted)) return;
+
+        const href = anchor.attr("href");
+        if (!href) return;
+        try {
+          const url = new URL(href, SITE_BASE);
+          const marker = "/detail/";
+          const index = url.pathname.indexOf(marker);
+          if (index < 0) return;
+          const detailPath = decodeURIComponent(
+            url.pathname
+              .slice(index + marker.length)
+              .replace(/^\/+|\/+$/g, ""),
+          );
+          if (!detailPath || seen.has(detailPath)) return;
+          seen.add(detailPath);
+          paths.push(detailPath);
+        } catch {
+          // Ignore malformed provider links.
+        }
+      });
+
+      // Next/RSC pages can serialize links inside script payloads instead of
+      // exposing every card as a literal anchor in the initial HTML.
       const normalizedHtml = html
         .replace(/\\u002F/gi, "/")
         .replace(/\\\//g, "/");
-      const detailPattern = /\/detail\/([a-z0-9][a-z0-9._~%+-]*hindi[a-z0-9._~%+-]*)/gi;
+      const detailPattern =
+        /\/detail\/([a-z0-9][a-z0-9._~%+-]*hindi[a-z0-9._~%+-]*)/gi;
       for (const match of normalizedHtml.matchAll(detailPattern)) {
         if (paths.length >= Math.max(limit * 3, 24)) break;
         let detailPath = "";
         try {
-          detailPath = decodeURIComponent(match[1]).replace(/^\/+|\/+$/g, "");
+          detailPath = decodeURIComponent(match[1]).replace(
+            /^\/+|\/+$/g,
+            "",
+          );
         } catch {
           detailPath = match[1].replace(/^\/+|\/+$/g, "");
         }
@@ -564,41 +582,41 @@ export async function getWebsiteTaggedTitles(
         seen.add(detailPath);
         paths.push(detailPath);
       }
+    } catch (error) {
+      console.warn(
+        "MovieBox website catalogue page unavailable:",
+        pagePath,
+        formatError(error),
+      );
     }
-
-    const resolved = await Promise.allSettled(
-      paths.map((detailPath) => resolveWebsiteDetailPathCached(detailPath)),
-    );
-    return distinctById(
-      resolved
-        .flatMap((result) =>
-          result.status === "fulfilled" && result.value ? [result.value] : [],
-        )
-        .filter((item) => item.kind === kind)
-        .filter((item) => !item.category || item.category !== "Adult")
-        .filter((item) =>
-          wanted === "hindi"
-            ? /\[hindi(?:\]|\b)/i.test(item.title) ||
-              (item.languages ?? []).some((value) =>
-                /^(?:hi|hindi)$/i.test(String(value)),
-              ) ||
-              (item.audioLanguages ?? []).some((value) =>
-                /^(?:hi|hindi)$/i.test(String(value)),
-              )
-            : true,
-        ),
-    )
-      .sort((a, b) => (b.year ?? 0) - (a.year ?? 0))
-      .slice(0, limit);
-  } catch (error) {
-    console.warn(
-      "MovieBox website tagged catalogue unavailable:",
-      kind,
-      tag,
-      formatError(error),
-    );
-    return [];
   }
+
+  if (!paths.length) return [];
+
+  const resolved = await Promise.allSettled(
+    paths.map((detailPath) => resolveWebsiteDetailPathCached(detailPath)),
+  );
+  return distinctById(
+    resolved
+      .flatMap((result) =>
+        result.status === "fulfilled" && result.value ? [result.value] : [],
+      )
+      .filter((item) => item.kind === kind)
+      .filter((item) => !item.category || item.category !== "Adult")
+      .filter((item) =>
+        wanted === "hindi"
+          ? /\[hindi(?:\]|\b)/i.test(item.title) ||
+            (item.languages ?? []).some((value) =>
+              /^(?:hi|hindi)$/i.test(String(value)),
+            ) ||
+            (item.audioLanguages ?? []).some((value) =>
+              /^(?:hi|hindi)$/i.test(String(value)),
+            )
+          : true,
+      ),
+  )
+    .sort((a, b) => (b.year ?? 0) - (a.year ?? 0))
+    .slice(0, limit);
 }
 
 export async function getLatestPage(
