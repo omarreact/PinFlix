@@ -703,7 +703,7 @@ export async function getWebsiteRegionalTitles(
         .filter((item) => !/\[hindi(?:\]|\b)/i.test(item.title))
         .filter(
           (item) =>
-            !item.isPornographic &&
+            !/adult|erotic|porn|hentai/i.test(item.category ?? "") &&
             !item.genres.some((genre) =>
               /adult|erotic|porn|hentai/i.test(genre),
             ),
