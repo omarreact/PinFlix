@@ -1,4 +1,5 @@
 import { catalogProvider } from "@/src/lib/providers/catalog";
+import type { StreamSource } from "@/src/types/catalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
     );
   }
 
-  let streams = [];
+  let streams: StreamSource[] = [];
   try {
     streams = await catalogProvider.resolveStreams(id, {
       season: season || undefined,
