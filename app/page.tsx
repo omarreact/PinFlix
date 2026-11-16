@@ -55,6 +55,28 @@ function titleRows(
   return clean(items).slice(0, limit).map(toTitle);
 }
 
+function isHindiItem(item: Entertainment) {
+  const languages = [
+    ...(item.languages ?? []),
+    ...(item.audioLanguages ?? []),
+  ].map((value) => String(value).trim().toLowerCase());
+  return (
+    /\[hindi(?:\]|\b)/i.test(item.title) ||
+    languages.includes("hindi") ||
+    languages.includes("hi")
+  );
+}
+
+function taggedHindiItems(
+  sections: movieboxWeb.MovieBoxHomeSection[],
+  kind: "movie" | "show",
+) {
+  return clean(
+    sections.flatMap((section) => section.items).filter(isHindiItem),
+    kind,
+  );
+}
+
 async function regionalFallback(
   kind: "movie" | "show",
   country: string,
@@ -79,8 +101,10 @@ export default async function Home() {
     homeSections,
     hollywoodMoviePage,
     hollywoodSeriesPage,
-    hindiMoviePage,
-    hindiSeriesPage,
+    hindiMoviePage1,
+    hindiMoviePage2,
+    hindiSeriesPage1,
+    hindiSeriesPage2,
   ] = await Promise.all([
     movieboxWeb.getHomeSections().catch(() => []),
     movieboxWeb
@@ -98,17 +122,27 @@ export default async function Home() {
     movieboxWeb
       .getFilteredPage("movie", 1, {
         sort: "Latest",
-        country: "India",
         language: "Hindi",
       })
       .catch(() => ({ items: [], page: 1, hasNextPage: false })),
     movieboxWeb
+      .getFilteredPage("movie", 2, {
+        sort: "Latest",
+        language: "Hindi",
+      })
+      .catch(() => ({ items: [], page: 2, hasNextPage: false })),
+    movieboxWeb
       .getFilteredPage("show", 1, {
         sort: "Latest",
-        country: "India",
         language: "Hindi",
       })
       .catch(() => ({ items: [], page: 1, hasNextPage: false })),
+    movieboxWeb
+      .getFilteredPage("show", 2, {
+        sort: "Latest",
+        language: "Hindi",
+      })
+      .catch(() => ({ items: [], page: 2, hasNextPage: false })),
   ]);
 
   const hollywoodMovies = hollywoodMoviePage.items.length
@@ -129,23 +163,23 @@ export default async function Home() {
         /hollywood|english|western/i,
       );
 
-  const hindiMovies = hindiMoviePage.items.length
-    ? clean(hindiMoviePage.items, "movie")
-    : await regionalFallback(
-        "movie",
-        "India",
-        homeSections,
-        /hindi|bollywood|indian/i,
-      );
+  const hindiMovies = clean(
+    unique([
+      ...hindiMoviePage1.items,
+      ...hindiMoviePage2.items,
+      ...taggedHindiItems(homeSections, "movie"),
+    ]).filter(isHindiItem),
+    "movie",
+  ).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
 
-  const hindiSeries = hindiSeriesPage.items.length
-    ? clean(hindiSeriesPage.items, "show")
-    : await regionalFallback(
-        "show",
-        "India",
-        homeSections,
-        /hindi|bollywood|indian|web series/i,
-      );
+  const hindiSeries = clean(
+    unique([
+      ...hindiSeriesPage1.items,
+      ...hindiSeriesPage2.items,
+      ...taggedHindiItems(homeSections, "show"),
+    ]).filter(isHindiItem),
+    "show",
+  ).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
 
   const providerRows = homeSections
     .map((section) => ({
@@ -245,14 +279,14 @@ export default async function Home() {
 
         <Row
           kicker="BOLLYWOOD & HINDI"
-          title="Latest Hindi & Indian Movies"
+          title="Latest Hindi Movies"
           items={titleRows(hindiMovies)}
           href="/movies?category=Hindi"
         />
 
         <Row
           kicker="BOLLYWOOD & HINDI"
-          title="Latest Hindi & Indian TV Shows"
+          title="Latest Hindi TV Shows"
           items={titleRows(hindiSeries)}
           href="/series"
         />
