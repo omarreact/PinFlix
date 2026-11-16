@@ -99,6 +99,7 @@ async function regionalFallback(
 export default async function Home() {
   const [
     homeSections,
+    indiaHomeSections,
     hollywoodMoviePage,
     hollywoodSeriesPage,
     hindiMoviePage1,
@@ -109,6 +110,7 @@ export default async function Home() {
     websiteHindiSeries,
   ] = await Promise.all([
     movieboxWeb.getHomeSections().catch(() => []),
+    movieboxWeb.getHomeSections("moviebox.ph").catch(() => []),
     movieboxWeb
       .getFilteredPage("movie", 1, {
         sort: "Latest",
@@ -172,7 +174,13 @@ export default async function Home() {
       ...hindiMoviePage1.items,
       ...hindiMoviePage2.items,
       ...websiteHindiMovies,
+      ...itemsFromSections(
+        indiaHomeSections,
+        /bollywood|hindi|cinema|indian/i,
+        "movie",
+      ),
       ...taggedHindiItems(homeSections, "movie"),
+      ...taggedHindiItems(indiaHomeSections, "movie"),
     ]).filter(isHindiItem),
     "movie",
   ).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
@@ -182,7 +190,13 @@ export default async function Home() {
       ...hindiSeriesPage1.items,
       ...hindiSeriesPage2.items,
       ...websiteHindiSeries,
+      ...itemsFromSections(
+        indiaHomeSections,
+        /bollywood|hindi|indian/i,
+        "show",
+      ),
       ...taggedHindiItems(homeSections, "show"),
+      ...taggedHindiItems(indiaHomeSections, "show"),
     ]).filter(isHindiItem),
     "show",
   ).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
