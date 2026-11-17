@@ -3,7 +3,6 @@
 import type { Entertainment, StreamSource } from "@/src/types/catalog";
 import * as cheerio from "cheerio";
 import type { ProviderCatalogPage, ProviderCategory, SeriesNavigation } from "../contracts";
-import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { extractSearchItems, validSearchSubject } from "./search-response";
 import { getSearchSession, invalidateSearchSession } from "./search-session";
@@ -512,7 +511,11 @@ async function resolveWebsiteDetailPath(
   }
 }
 
-const resolveWebsiteDetailPathCached = cache(resolveWebsiteDetailPath);
+const resolveWebsiteDetailPathCached = unstable_cache(
+  resolveWebsiteDetailPath,
+  ["moviebox-seeded-detail-v2"],
+  { revalidate: 900 },
+);
 
 // Current MovieBox discovery fallback seeds. These are provider-owned
 // detail paths captured from MovieBox's own "Movies New Release" and
