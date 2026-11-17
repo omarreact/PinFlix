@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for path in / /catalogue "/search?q=inception" /api/health "/api/search?q=inception"; do
+          for path in / /catalogue "/search?q=inception" "/api/search?q=inception"; do
             code="$(curl --retry 2 --retry-delay 2 --connect-timeout 10 --max-time 40 -sS -o /tmp/body -w '%{http_code}' "$BASE_URL$path")"
             echo "$path -> $code"
             if [ "$code" -lt 200 ] || [ "$code" -ge 400 ]; then
@@ -32,6 +32,16 @@ jobs:
               exit 1
             fi
           done
+
+          health_code="$(curl --connect-timeout 10 --max-time 30 -sS -o /tmp/health.json -w '%{http_code}' "$BASE_URL/api/health" || true)"
+          echo "/api/health -> $health_code"
+          HEALTH_CODE="$health_code" node - <<'NODE'
+          const fs=require("fs");
+          const x=JSON.parse(fs.readFileSync("/tmp/health.json","utf8"));
+          const code=Number(process.env.HEALTH_CODE);
+          if(code!==200 && !(code===503 && x.reason==="moviebox_upstream_rate_limited")) throw new Error("Unexpected MovieBox health failure");
+          console.log("health:",JSON.stringify({ok:x.ok,degraded:x.degraded,reason:x.reason,home:x.probes?.home?.http,filter:x.probes?.filter?.http}));
+          NODE
 
           curl -fsS --connect-timeout 10 --max-time 45 "$BASE_URL/api/search?q=inception" > /tmp/search.json
           node - <<'NODE'
