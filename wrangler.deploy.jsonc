@@ -1,0 +1,41 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pinflix",
+  "main": ".cloudflare/output/v0/workers/default/bundle/index.js",
+  "compatibility_date": "2026-10-02",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": true,
+  "placement": {
+    "mode": "smart"
+  },
+  "routes": [
+    {
+      "pattern": "pinflix.pincodeit.com",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": ".cloudflare/output/v0/workers/default/assets",
+    "binding": "ASSETS",
+    "run_worker_first": false
+  },
+  "images": {
+    "binding": "IMAGES"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
+  },
+  "services": [
+    {
+      "binding": "CINEPLEX_EDGE",
+      "service": "pinflix-media-edge"
+    }
+  ]
+}

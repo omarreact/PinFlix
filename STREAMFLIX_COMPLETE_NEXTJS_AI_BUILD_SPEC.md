@@ -1,0 +1,2894 @@
+# STREAMFLIX — COMPLETE NEXT.JS STREAMING WEB APPLICATION MASTER SPEC
+
+> **Purpose:** Give this single Markdown file to ChatGPT, Codex, Gemini, Grok, Antigravity, Claude, Cursor, Windsurf, or another capable coding agent. The agent must be able to create, run, test, and finish a complete Netflix/Disney+-style **legal streaming web application** without asking the user for architecture decisions.
+>
+> **Default behavior:** Build the application in **Demo Mode first**, so it works immediately with no paid service, no API key, and no external database. Then add production adapters that activate automatically when credentials are supplied.
+>
+> **Important legal rule:** Only play media the operator owns, has licensed, or that is explicitly public-domain/demo/test content. Do not scrape, bypass authentication, replay protected cookies, defeat DRM, or hotlink unauthorized streams.
+
+---
+
+# 0. AUTONOMOUS AI EXECUTION CONTRACT
+
+You are the implementation agent.
+
+Your job is to create a production-quality streaming web application named **StreamFlix** using **Next.js**.
+
+Do not stop after scaffolding. Do not return a plan only. Do not ask the user to manually create files that you can create yourself. Work until the repository builds and the demo media plays.
+
+## 0.1 Required final result
+
+The completed project must include:
+
+- polished streaming homepage;
+- movies page;
+- TV/series page;
+- search;
+- title detail pages;
+- working HLS/MP4 player;
+- quality/source switching;
+- subtitles;
+- season/episode navigation;
+- My List;
+- watch history;
+- resume playback;
+- user registration/login;
+- profiles;
+- admin panel;
+- title/content CRUD;
+- stream-source CRUD;
+- content publishing;
+- genres/categories;
+- subscription-plan model;
+- demo checkout flow;
+- optional Stripe production payment adapter;
+- role-based authorization;
+- responsive desktop/tablet/mobile UI;
+- keyboard/TV-friendly navigation;
+- REST-style server endpoints;
+- local demo database;
+- production database adapter;
+- seed data;
+- automated tests;
+- environment-variable validation;
+- security middleware;
+- error boundaries;
+- loading states;
+- empty states;
+- README;
+- `.env.example`;
+- deployment configuration;
+- working demo playback immediately after setup.
+
+## 0.2 Never block on missing credentials
+
+If a production credential is missing:
+
+1. continue building;
+2. use Demo Mode;
+3. display a clear admin warning;
+4. never crash the application;
+5. never ask for an API key merely to make the app run.
+
+## 0.3 Completion rule
+
+Do not call the project complete until all of these commands succeed:
+
+```bash
+npm install
+npm run db:setup
+npm run seed
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run dev
+```
+
+Then verify manually or with browser automation:
+
+```text
+/
+ /movies
+ /series
+ /search?q=demo
+ /title/<demo-slug>
+ /watch/<demo-id>
+ /login
+ /register
+ /my-list
+ /history
+ /admin
+```
+
+The demo title must actually play.
+
+---
+
+# 1. PROJECT GOAL
+
+Build a modern VOD streaming application inspired by the **interaction patterns** of Netflix, Disney+, Prime Video, Streamit and other OTT services, but do not copy proprietary branding, graphics, logos, code, or protected assets.
+
+The product should feel cinematic and premium.
+
+The application has two operating modes.
+
+## 1.1 Demo Mode
+
+Default.
+
+Requires no API keys.
+
+Uses:
+
+- local SQLite database;
+- credentials-based local authentication;
+- bundled SVG poster/backdrop placeholders;
+- public test/demo video streams;
+- demo subscription checkout;
+- local watch history and My List.
+
+It must work immediately after installation.
+
+## 1.2 Production Mode
+
+Activated when production environment variables exist.
+
+May use:
+
+- PostgreSQL;
+- Stripe;
+- Mux, Cloudflare Stream, Bunny Stream, S3/CloudFront, or another authorized video backend;
+- Resend/Postmark/SES;
+- Sentry;
+- Redis/Upstash;
+- legal metadata providers.
+
+The UI and application domain model must stay provider-neutral.
+
+---
+
+# 2. REQUIRED TECHNOLOGY STACK
+
+Use the following stack unless there is a hard incompatibility.
+
+| Area | Technology |
+|---|---|
+| Framework | Next.js 16 App Router |
+| UI | React 19 |
+| Language | TypeScript 5 |
+| Styling | Tailwind CSS 4 |
+| Icons | lucide-react |
+| Validation | Zod |
+| Forms | React Hook Form |
+| Local DB | SQLite |
+| ORM | Prisma |
+| Production DB | PostgreSQL through same Prisma schema |
+| Authentication | Auth.js credentials/JWT or a small secure credentials implementation |
+| Password hashing | bcryptjs |
+| HLS playback | hls.js |
+| MP4 playback | native HTML5 video |
+| State | React + URL state; Zustand only where useful |
+| Testing | Vitest + React Testing Library + Playwright |
+| Lint | ESLint |
+| Formatting | Prettier |
+| Security | secure headers + CSRF-aware mutations + rate limiting adapter |
+| Images | `next/image` when practical, native `<img>` for arbitrary remote demo artwork |
+| Deployment | Node-compatible hosting first; Vercel/Railway/Fly supported |
+| Optional edge | Cloudflare for DNS/CDN/rate limiting |
+
+Use npm.
+
+Do not introduce unnecessary dependencies.
+
+---
+
+# 3. INITIALIZATION
+
+Create the project if no repository exists.
+
+```bash
+npx create-next-app@latest streamflix \
+  --typescript \
+  --tailwind \
+  --eslint \
+  --app \
+  --src-dir \
+  --import-alias "@/*"
+cd streamflix
+```
+
+Install required packages:
+
+```bash
+npm install \
+  zod \
+  prisma \
+  @prisma/client \
+  bcryptjs \
+  jose \
+  hls.js \
+  lucide-react \
+  react-hook-form \
+  @hookform/resolvers \
+  clsx \
+  tailwind-merge
+
+npm install -D \
+  vitest \
+  @testing-library/react \
+  @testing-library/jest-dom \
+  jsdom \
+  @playwright/test \
+  prettier \
+  prettier-plugin-tailwindcss \
+  tsx
+```
+
+Optional production packages may be installed only if their feature is implemented:
+
+```bash
+npm install stripe
+npm install @sentry/nextjs
+npm install resend
+```
+
+---
+
+# 4. PACKAGE SCRIPTS
+
+The final `package.json` must expose at least:
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint || eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "db:setup": "prisma generate && prisma db push",
+    "seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+  }
+}
+```
+
+Adapt `lint` if the installed Next version no longer exposes `next lint`.
+
+---
+
+# 5. DIRECTORY STRUCTURE
+
+Create approximately this structure.
+
+```text
+streamflix/
+├─ app/
+│  ├─ (public)/
+│  │  ├─ page.tsx
+│  │  ├─ movies/page.tsx
+│  │  ├─ series/page.tsx
+│  │  ├─ search/page.tsx
+│  │  └─ title/[slug]/page.tsx
+│  ├─ watch/[id]/page.tsx
+│  ├─ login/page.tsx
+│  ├─ register/page.tsx
+│  ├─ my-list/page.tsx
+│  ├─ history/page.tsx
+│  ├─ profiles/page.tsx
+│  ├─ account/page.tsx
+│  ├─ admin/
+│  │  ├─ page.tsx
+│  │  ├─ titles/page.tsx
+│  │  ├─ titles/new/page.tsx
+│  │  ├─ titles/[id]/page.tsx
+│  │  ├─ users/page.tsx
+│  │  ├─ plans/page.tsx
+│  │  └─ settings/page.tsx
+│  ├─ api/
+│  │  ├─ auth/
+│  │  ├─ catalog/
+│  │  ├─ titles/
+│  │  ├─ search/
+│  │  ├─ playback/
+│  │  ├─ progress/
+│  │  ├─ my-list/
+│  │  ├─ profiles/
+│  │  ├─ admin/
+│  │  ├─ payments/
+│  │  └─ health/
+│  ├─ globals.css
+│  ├─ layout.tsx
+│  ├─ loading.tsx
+│  ├─ error.tsx
+│  └─ not-found.tsx
+├─ src/
+│  ├─ components/
+│  │  ├─ app-shell.tsx
+│  │  ├─ hero.tsx
+│  │  ├─ media-card.tsx
+│  │  ├─ media-rail.tsx
+│  │  ├─ media-grid.tsx
+│  │  ├─ search-box.tsx
+│  │  ├─ player/
+│  │  │  ├─ video-player.tsx
+│  │  │  ├─ player-controls.tsx
+│  │  │  └─ subtitle-menu.tsx
+│  │  ├─ admin/
+│  │  └─ ui/
+│  ├─ lib/
+│  │  ├─ auth/
+│  │  ├─ db/
+│  │  ├─ catalog/
+│  │  ├─ playback/
+│  │  ├─ payments/
+│  │  ├─ recommendations/
+│  │  ├─ rate-limit/
+│  │  ├─ env.ts
+│  │  ├─ security.ts
+│  │  └─ utils.ts
+│  ├─ server/
+│  │  ├─ actions/
+│  │  ├─ repositories/
+│  │  └─ services/
+│  └─ types/
+├─ prisma/
+│  ├─ schema.prisma
+│  └─ seed.ts
+├─ public/
+│  ├─ posters/
+│  ├─ backdrops/
+│  ├─ logos/
+│  └─ subtitles/
+├─ tests/
+├─ middleware.ts
+├─ .env.example
+├─ README.md
+└─ package.json
+```
+
+Minor deviations are acceptable if the architecture remains clean.
+
+---
+
+# 6. DATA MODEL
+
+Use Prisma.
+
+The schema must support both SQLite and PostgreSQL with minimal changes.
+
+Use string IDs generated with `cuid()`.
+
+Required entities:
+
+## 6.1 User
+
+Fields:
+
+```text
+id
+email unique
+passwordHash
+name
+role: USER | EDITOR | ADMIN
+status: ACTIVE | SUSPENDED
+createdAt
+updatedAt
+```
+
+## 6.2 Profile
+
+Users may have multiple viewing profiles.
+
+```text
+id
+userId
+name
+avatar
+isKids
+createdAt
+updatedAt
+```
+
+## 6.3 Title
+
+```text
+id
+slug unique
+name
+originalName optional
+type: MOVIE | SERIES
+status: DRAFT | PUBLISHED | ARCHIVED
+overview
+releaseYear
+runtimeMinutes optional
+maturityRating optional
+featured boolean
+trendingScore float
+rating float optional
+ratingCount int
+posterPath
+backdropPath
+logoPath optional
+trailerUrl optional
+country optional
+language optional
+createdAt
+updatedAt
+publishedAt optional
+```
+
+## 6.4 Genre
+
+```text
+id
+name unique
+slug unique
+```
+
+Many-to-many with Title.
+
+## 6.5 Season
+
+```text
+id
+titleId
+number
+name optional
+overview optional
+posterPath optional
+```
+
+Unique on `(titleId, number)`.
+
+## 6.6 Episode
+
+```text
+id
+seasonId
+number
+name
+overview
+runtimeMinutes optional
+stillPath optional
+airDate optional
+```
+
+Unique on `(seasonId, number)`.
+
+## 6.7 StreamSource
+
+Can belong to a movie or an episode.
+
+```text
+id
+titleId optional
+episodeId optional
+label
+protocol: MP4 | HLS
+url
+qualityLabel
+width optional
+height optional
+bitrate optional
+isDefault
+priority
+isActive
+requiresSubscription
+createdAt
+updatedAt
+```
+
+Validate that exactly one of `titleId` or `episodeId` is present.
+
+Do not store protected third-party authentication cookies.
+
+## 6.8 SubtitleTrack
+
+```text
+id
+titleId optional
+episodeId optional
+language
+label
+url
+format: VTT | SRT
+isDefault
+```
+
+Prefer WebVTT for browser display.
+
+## 6.9 MyList
+
+```text
+id
+profileId
+titleId
+createdAt
+```
+
+Unique `(profileId, titleId)`.
+
+## 6.10 WatchProgress
+
+```text
+id
+profileId
+titleId optional
+episodeId optional
+positionSeconds
+durationSeconds
+completed
+updatedAt
+```
+
+Unique logical record per profile/media.
+
+## 6.11 WatchEvent
+
+Analytics/history record.
+
+```text
+id
+profileId
+titleId optional
+episodeId optional
+event: START | PROGRESS | COMPLETE
+positionSeconds
+createdAt
+```
+
+## 6.12 Plan
+
+```text
+id
+slug
+name
+priceMonthlyCents
+currency
+maxProfiles
+maxStreams
+maxQuality
+active
+```
+
+## 6.13 Subscription
+
+```text
+id
+userId
+planId
+provider: DEMO | STRIPE
+providerCustomerId optional
+providerSubscriptionId optional
+status
+periodStart
+periodEnd
+createdAt
+updatedAt
+```
+
+## 6.14 AppSetting
+
+Key/value configuration.
+
+---
+
+# 7. DEMO DATA
+
+The project must work without any external keys.
+
+Create at least:
+
+- 6 movies;
+- 3 series;
+- 2 seasons for one series;
+- at least 3 episodes;
+- 6 genres;
+- one admin account;
+- one normal demo account;
+- Free and Premium plans.
+
+## 7.1 Demo accounts
+
+Create these only in development/demo mode:
+
+```text
+Admin:
+admin@example.com
+Admin123!
+
+Viewer:
+viewer@example.com
+Viewer123!
+```
+
+Display them on the login page only when `DEMO_MODE=true`.
+
+## 7.2 Demo streams
+
+Use only public demo/test content.
+
+Primary HLS demo:
+
+```text
+https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
+```
+
+Primary MP4 demo:
+
+```text
+https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4
+```
+
+Backup MP4:
+
+```text
+https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4
+```
+
+These are development/demo references only.
+
+Production admins must replace them with owned/licensed media.
+
+## 7.3 Local artwork
+
+Do not rely on remote poster services for Demo Mode.
+
+Generate simple SVG files in `/public/posters` and `/public/backdrops`.
+
+Example appearance:
+
+- dark cinematic gradient;
+- title text;
+- genre;
+- large abstract circle/light;
+- no copyrighted art.
+
+---
+
+# 8. ENVIRONMENT VARIABLES
+
+Create `.env.example`.
+
+```dotenv
+# Application
+NODE_ENV=development
+NEXT_PUBLIC_APP_NAME=StreamFlix
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+DEMO_MODE=true
+
+# Database
+DATABASE_URL=file:./dev.db
+
+# Authentication
+AUTH_SECRET=change-this-to-a-long-random-secret-at-least-32-characters
+SESSION_COOKIE_NAME=streamflix_session
+
+# Optional production Postgres
+# DATABASE_URL=postgresql://user:password@host:5432/streamflix
+
+# Optional Stripe
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+STRIPE_PRICE_BASIC=
+STRIPE_PRICE_PREMIUM=
+
+# Optional email
+RESEND_API_KEY=
+EMAIL_FROM=StreamFlix <no-reply@example.com>
+
+# Optional error monitoring
+SENTRY_DSN=
+NEXT_PUBLIC_SENTRY_DSN=
+
+# Optional metadata provider
+TMDB_READ_ACCESS_TOKEN=
+
+# Optional Redis/rate limiting
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+```
+
+Validate environment variables centrally with Zod.
+
+Missing optional values must never crash Demo Mode.
+
+---
+
+# 9. AUTHENTICATION
+
+Implement email/password authentication.
+
+Requirements:
+
+- registration;
+- login;
+- logout;
+- secure password hashing;
+- HTTP-only cookies;
+- Secure flag in production;
+- SameSite=Lax or stricter;
+- session expiration;
+- CSRF-aware POST mutations;
+- role checks;
+- suspension checks;
+- no secret in client bundles.
+
+A user session object should contain only:
+
+```ts
+type SessionUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: "USER" | "EDITOR" | "ADMIN";
+};
+```
+
+Never return password hashes.
+
+## 9.1 Authorization
+
+Rules:
+
+```text
+USER:
+browse
+play
+My List
+history
+profiles
+account
+
+EDITOR:
+all USER permissions
+create/edit content
+manage seasons/episodes/sources
+
+ADMIN:
+all permissions
+publish/unpublish
+manage users
+manage plans
+manage settings
+```
+
+Protect admin routes on the server.
+
+Do not rely only on client-side route hiding.
+
+---
+
+# 10. CATALOG ARCHITECTURE
+
+UI code must never depend directly on Prisma records.
+
+Create normalized domain types.
+
+```ts
+export type MediaKind = "movie" | "series";
+
+export type CatalogItem = {
+  id: string;
+  slug: string;
+  title: string;
+  kind: MediaKind;
+  year?: number;
+  overview: string;
+  poster: string;
+  backdrop: string;
+  logo?: string;
+  genres: string[];
+  rating?: number;
+  runtimeMinutes?: number;
+  featured?: boolean;
+};
+```
+
+Create a repository/service layer.
+
+```text
+CatalogRepository
+ ├─ getHome()
+ ├─ getMovies()
+ ├─ getSeries()
+ ├─ getBySlug()
+ ├─ search()
+ ├─ getGenres()
+ ├─ getRecommendations()
+ └─ getContinueWatching()
+```
+
+This makes it possible to replace the metadata backend later.
+
+---
+
+# 11. HOME PAGE
+
+The homepage must feel like a premium OTT application.
+
+Required sections:
+
+1. cinematic hero;
+2. Continue Watching;
+3. Trending Now;
+4. Movies;
+5. Popular Series;
+6. New Releases;
+7. Top Rated;
+8. genre rails;
+9. My List rail when authenticated.
+
+## 11.1 Hero
+
+Hero must contain:
+
+- full-width backdrop;
+- overlay gradient;
+- optional logo;
+- title;
+- year;
+- rating;
+- runtime or season count;
+- genre chips;
+- overview;
+- Play button;
+- Details button;
+- My List button.
+
+Use responsive sizing.
+
+Do not make the hero taller than necessary on mobile.
+
+---
+
+# 12. MEDIA RAILS
+
+Use real horizontal rails, not a desktop grid pretending to be a carousel.
+
+Requirements:
+
+- horizontal scrolling;
+- snap behavior;
+- arrow buttons on desktop;
+- touch scroll on mobile;
+- keyboard focus support;
+- lazy images;
+- no layout shift.
+
+Card hover on desktop:
+
+- slight scale;
+- title;
+- year;
+- genre;
+- play icon;
+- My List icon.
+
+Do not make hover mandatory for information required on touch devices.
+
+---
+
+# 13. MOVIES AND SERIES PAGES
+
+Both pages need:
+
+- heading;
+- search/filter controls;
+- genre filter;
+- year filter;
+- sort;
+- responsive grid;
+- pagination or load more.
+
+Series page additionally supports:
+
+- season count;
+- latest episode where available.
+
+---
+
+# 14. SEARCH
+
+Search must work locally without external APIs.
+
+Search fields:
+
+- title;
+- original title;
+- overview;
+- genre.
+
+Normalize:
+
+- lowercase;
+- trim;
+- collapse whitespace.
+
+Search page behavior:
+
+```text
+empty query -> trending/suggestions
+typing -> 250–350 ms debounce
+results -> movie/series cards
+no results -> useful empty state
+```
+
+Admin search must remain separate.
+
+---
+
+# 15. TITLE DETAIL PAGE
+
+Required:
+
+- backdrop;
+- poster;
+- title/logo;
+- type;
+- year;
+- runtime;
+- genres;
+- maturity rating;
+- rating;
+- overview;
+- Play/Resume;
+- My List;
+- trailer if configured;
+- seasons/episodes for series;
+- recommendations;
+- More Like This.
+
+For a series, show episode cards with:
+
+```text
+episode number
+episode title
+still
+runtime
+overview
+play/resume state
+```
+
+---
+
+# 16. PLAYER
+
+This is a core requirement.
+
+Build a custom React player on top of:
+
+- native `<video>`;
+- `hls.js` for HLS where native HLS is unavailable.
+
+Do not proxy third-party media unless the operator owns/controls it.
+
+## 16.1 Source resolution
+
+Create:
+
+```ts
+type PlayableSource = {
+  id: string;
+  protocol: "mp4" | "hls";
+  url: string;
+  quality: string;
+  priority: number;
+  subtitles: SubtitleSource[];
+};
+```
+
+Server endpoint:
+
+```text
+GET /api/playback/:mediaId
+```
+
+For series accept:
+
+```text
+?season=1&episode=2
+```
+
+Return:
+
+```json
+{
+  "mediaId": "abc",
+  "sources": [
+    {
+      "protocol": "hls",
+      "url": "https://...",
+      "quality": "Auto",
+      "priority": 100,
+      "subtitles": []
+    },
+    {
+      "protocol": "mp4",
+      "url": "https://...",
+      "quality": "720p",
+      "priority": 80,
+      "subtitles": []
+    }
+  ]
+}
+```
+
+## 16.2 Player capabilities
+
+Required:
+
+- play/pause;
+- seek;
+- volume;
+- mute;
+- fullscreen;
+- current time;
+- duration;
+- progress bar;
+- buffering indicator;
+- quality/source selector;
+- subtitle selector;
+- playback speed:
+  - 0.5
+  - 0.75
+  - 1
+  - 1.25
+  - 1.5
+  - 2
+- keyboard controls;
+- next episode;
+- error failover to next source;
+- save progress;
+- resume;
+- autoplay next episode optional;
+- hide controls after inactivity.
+
+Keyboard:
+
+```text
+Space / K = play/pause
+Left = -10s
+Right = +10s
+M = mute
+F = fullscreen
+Esc = close menus/fullscreen
+```
+
+## 16.3 HLS logic
+
+Pseudo implementation:
+
+```ts
+if (source.protocol === "hls") {
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = source.url;
+  } else if (Hls.isSupported()) {
+    const hls = new Hls({
+      enableWorker: true,
+      lowLatencyMode: false
+    });
+    hls.loadSource(source.url);
+    hls.attachMedia(video);
+  }
+}
+```
+
+Destroy HLS instance when the source changes or component unmounts.
+
+## 16.4 Failover
+
+If playback receives a fatal error:
+
+```text
+source 0 fails
+ -> source 1
+ -> source 2
+ -> show unavailable UI
+```
+
+Do not infinite-loop.
+
+---
+
+# 17. SUBTITLES
+
+Browser-friendly subtitle format is WebVTT.
+
+Support:
+
+```text
+English
+Bangla
+Hindi
+Off
+```
+
+Use `<track>` for simple MP4 playback or HLS subtitle APIs where appropriate.
+
+Provide an admin field for subtitle URL.
+
+If SRT is uploaded, either:
+
+- convert it to WebVTT server-side; or
+- reject it with a clear instruction.
+
+Simple SRT → VTT conversion may be implemented.
+
+---
+
+# 18. WATCH PROGRESS
+
+Update progress approximately every 10 seconds and on:
+
+- pause;
+- page unload;
+- media ended.
+
+Do not write to DB every second.
+
+Mark complete when:
+
+```text
+position >= 90% of duration
+```
+
+Continue Watching should exclude completed media unless replayed.
+
+Resume playback from stored position if more than 20 seconds and less than 90%.
+
+---
+
+# 19. MY LIST
+
+Authenticated profiles can:
+
+- add;
+- remove;
+- view list.
+
+Use optimistic client UI but server-authoritative persistence.
+
+Endpoint shape:
+
+```text
+POST /api/my-list
+DELETE /api/my-list/:titleId
+GET /api/my-list
+```
+
+---
+
+# 20. RECOMMENDATIONS
+
+Do not require machine learning.
+
+Implement deterministic recommendations:
+
+Score candidates using:
+
+```text
++4 same genre
++2 same language
++2 same country
++2 release year within 5 years
++rating bonus
++trending bonus
+```
+
+Exclude current title.
+
+Return top 12.
+
+Later production systems may replace this service without changing UI.
+
+---
+
+# 21. PROFILES
+
+Allow:
+
+- create;
+- rename;
+- delete;
+- set avatar;
+- kids toggle.
+
+Maximum profile count comes from subscription plan.
+
+Demo Free plan:
+
+```text
+maxProfiles = 2
+```
+
+Demo Premium:
+
+```text
+maxProfiles = 5
+```
+
+Require at least one profile.
+
+Store active profile ID in a secure or non-sensitive cookie.
+
+---
+
+# 22. SUBSCRIPTIONS AND PAYMENTS
+
+The app must work without Stripe.
+
+## 22.1 Demo checkout
+
+When `DEMO_MODE=true`:
+
+- `/account/plans` shows plans;
+- selecting Premium displays a clearly labeled "Activate Demo Premium" action;
+- it creates a `DEMO` subscription;
+- no fake credit card form.
+
+## 22.2 Stripe production adapter
+
+Only activate when:
+
+```text
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+```
+
+exist.
+
+Use Stripe Checkout.
+
+Required flow:
+
+```text
+user selects plan
+ -> server creates Checkout Session
+ -> redirect to Stripe
+ -> Stripe webhook
+ -> verify signature
+ -> update Subscription
+```
+
+Webhook route:
+
+```text
+POST /api/payments/stripe/webhook
+```
+
+Handle:
+
+```text
+checkout.session.completed
+customer.subscription.created
+customer.subscription.updated
+customer.subscription.deleted
+invoice.payment_failed
+```
+
+Never trust a successful return-page query parameter as payment proof.
+
+Webhook is authoritative.
+
+---
+
+# 23. ADMIN PANEL
+
+Admin UI must be functional, not decorative.
+
+Dashboard:
+
+```text
+published titles
+draft titles
+users
+active subscriptions
+watch starts
+completion count
+```
+
+## 23.1 Title editor
+
+Fields:
+
+- name;
+- slug;
+- type;
+- overview;
+- year;
+- runtime;
+- genres;
+- language;
+- country;
+- maturity;
+- poster;
+- backdrop;
+- logo;
+- trailer;
+- featured;
+- publication status.
+
+## 23.2 Movie streams
+
+Admin can add multiple sources.
+
+Example:
+
+```text
+480p MP4
+720p MP4
+Auto HLS
+```
+
+Fields:
+
+```text
+URL
+protocol
+quality
+priority
+requires subscription
+active
+default
+```
+
+## 23.3 Series editor
+
+Hierarchy:
+
+```text
+Series
+ └─ Season
+     └─ Episode
+         ├─ metadata
+         ├─ streams
+         └─ subtitles
+```
+
+## 23.4 Publishing
+
+Only `PUBLISHED` titles appear in public catalog.
+
+Draft preview is allowed to EDITOR/ADMIN.
+
+---
+
+# 24. API DESIGN
+
+Use route handlers.
+
+Minimum endpoints:
+
+```text
+GET    /api/health
+
+POST   /api/auth/register
+POST   /api/auth/login
+POST   /api/auth/logout
+GET    /api/auth/me
+
+GET    /api/catalog/home
+GET    /api/catalog/movies
+GET    /api/catalog/series
+GET    /api/titles/:slug
+GET    /api/search?q=
+
+GET    /api/playback/:id
+GET    /api/playback/:id?season=1&episode=1
+
+GET    /api/my-list
+POST   /api/my-list
+DELETE /api/my-list/:titleId
+
+GET    /api/history
+POST   /api/progress
+
+GET    /api/profiles
+POST   /api/profiles
+PATCH  /api/profiles/:id
+DELETE /api/profiles/:id
+
+POST   /api/payments/demo/activate
+POST   /api/payments/stripe/checkout
+POST   /api/payments/stripe/webhook
+
+/admin endpoints or server actions for CRUD
+```
+
+Return consistent API errors:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Title not found"
+  }
+}
+```
+
+---
+
+# 25. UI DESIGN SYSTEM
+
+Visual direction:
+
+```text
+Background: near-black
+Panels: deep charcoal
+Accent: electric violet / magenta gradient
+Text: white / zinc
+Borders: low-opacity white
+Cards: cinematic
+```
+
+Use CSS custom properties.
+
+Example:
+
+```css
+:root {
+  --background: #08080b;
+  --panel: #111116;
+  --panel-2: #17171f;
+  --foreground: #f7f7f8;
+  --muted: #a1a1aa;
+  --brand: #a855f7;
+  --brand-2: #ec4899;
+}
+```
+
+Avoid excessive glassmorphism.
+
+Use it only for:
+
+- nav;
+- player floating controls;
+- modal surfaces.
+
+Use strong contrast.
+
+---
+
+# 26. NAVIGATION
+
+Desktop header:
+
+```text
+Logo
+Home
+Movies
+Series
+My List
+Search
+Profile
+```
+
+Mobile:
+
+- compact header;
+- bottom navigation or compact menu;
+- large touch targets.
+
+Watch route:
+
+- remove regular site chrome;
+- player-first layout;
+- Close button;
+- next episode control.
+
+---
+
+# 27. RESPONSIVE BREAKPOINT EXPECTATIONS
+
+Minimum support:
+
+```text
+360 px
+390 px
+768 px
+1024 px
+1280 px
+1440 px
+1920 px
+```
+
+No horizontal body overflow.
+
+Media cards must remain usable at 360px.
+
+Player controls must wrap or collapse gracefully.
+
+---
+
+# 28. ACCESSIBILITY
+
+Meet practical WCAG AA standards.
+
+Required:
+
+- semantic headings;
+- button labels;
+- visible focus;
+- keyboard navigation;
+- alt text where useful;
+- decorative images use empty alt;
+- sufficient contrast;
+- dialogs trap focus;
+- Escape closes dialogs;
+- no color-only status indicators.
+
+---
+
+# 29. SECURITY
+
+This section is mandatory.
+
+## 29.1 Headers
+
+Configure:
+
+```text
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy
+X-Frame-Options or CSP frame-ancestors
+Content-Security-Policy
+```
+
+CSP should permit only required media/image domains.
+
+Do not use `*` for `connect-src` or `media-src` in production.
+
+## 29.2 Authentication
+
+- password hashes only;
+- no plaintext passwords;
+- rotate session after login;
+- secure HTTP-only session cookie;
+- rate-limit login;
+- generic invalid login error;
+- prevent user enumeration.
+
+## 29.3 Admin
+
+Every write action must re-check server role.
+
+Never trust a role passed by client.
+
+## 29.4 Media
+
+For owned/licensed production media:
+
+- use short-lived signed playback URLs;
+- never expose storage admin credentials;
+- use CDN;
+- optionally bind tokens to session;
+- avoid embedding permanent private S3 object URLs.
+
+Do not build mechanisms to bypass another provider's DRM/authentication.
+
+## 29.5 Payments
+
+- verify webhook signature;
+- idempotent webhook handling;
+- never store card details;
+- use provider checkout UI.
+
+## 29.6 Input validation
+
+Validate all mutations with Zod.
+
+Reject dangerous URL schemes.
+
+Media URLs allowed:
+
+```text
+https:
+http: only in local development if explicitly enabled
+```
+
+Never allow:
+
+```text
+javascript:
+data:
+file:
+```
+
+for user-controlled streaming URLs.
+
+---
+
+# 30. RATE LIMITING
+
+Implement local memory limiting for Demo Mode.
+
+Production adapter interface:
+
+```ts
+interface RateLimiter {
+  check(key: string, limit: number, windowSeconds: number): Promise<boolean>;
+}
+```
+
+Apply to:
+
+```text
+login
+register
+search
+progress writes
+admin mutations
+checkout creation
+```
+
+Optional production backend: Upstash Redis.
+
+---
+
+# 31. DATABASE PERFORMANCE
+
+Add indexes for:
+
+```text
+Title.slug
+Title.status
+Title.type
+Title.releaseYear
+Title.trendingScore
+Episode.seasonId + number
+WatchProgress.profileId
+MyList.profileId
+Subscription.userId
+```
+
+Use pagination.
+
+Do not return thousands of titles in one request.
+
+Default page size:
+
+```text
+24
+```
+
+Max:
+
+```text
+60
+```
+
+---
+
+# 32. CACHING
+
+Public catalog:
+
+```text
+60–300 seconds
+```
+
+Title detail:
+
+```text
+60–300 seconds
+```
+
+Search:
+
+```text
+short cache or no-store depending query
+```
+
+User-specific pages:
+
+```text
+private/no-store
+```
+
+Playback response:
+
+```text
+private/no-store
+```
+
+especially when signed URLs are used.
+
+---
+
+# 33. SEO
+
+Public title pages must include:
+
+- title;
+- description;
+- canonical URL;
+- Open Graph;
+- Twitter card;
+- poster/backdrop;
+- JSON-LD where practical.
+
+Use:
+
+```text
+Movie
+TVSeries
+TVEpisode
+```
+
+schema types where applicable.
+
+Admin/watch/private account pages should not be indexed.
+
+---
+
+# 34. PERFORMANCE
+
+Targets:
+
+```text
+LCP < 2.5s on reasonable broadband
+CLS < 0.1
+minimal JS on catalog pages
+lazy below-the-fold images
+avoid loading hls.js before player is opened
+```
+
+Dynamically import hls.js.
+
+Do not render hundreds of cards above the fold.
+
+---
+
+# 35. HEALTH ENDPOINT
+
+`GET /api/health`
+
+Return:
+
+```json
+{
+  "ok": true,
+  "app": "StreamFlix",
+  "mode": "demo",
+  "database": "ok",
+  "playback": "configured"
+}
+```
+
+Do not expose secrets.
+
+Production may include dependency health but never credential values.
+
+---
+
+# 36. ERROR HANDLING
+
+Create friendly states for:
+
+```text
+title unavailable
+stream unavailable
+network error
+database error
+unauthorized
+forbidden
+payment unavailable
+empty My List
+empty history
+```
+
+The app must not show raw stack traces to users in production.
+
+---
+
+# 37. LOADING STATES
+
+Use skeletons for:
+
+- hero;
+- rails;
+- grids;
+- title detail;
+- episodes.
+
+Player uses:
+
+- spinner;
+- "Loading stream";
+- "Trying another source".
+
+---
+
+# 38. PLAYER PROGRESS API
+
+Request:
+
+```json
+POST /api/progress
+{
+  "titleId": "optional",
+  "episodeId": "optional",
+  "positionSeconds": 823,
+  "durationSeconds": 3550
+}
+```
+
+Server:
+
+- validate;
+- require profile;
+- clamp values;
+- upsert progress;
+- optionally create event;
+- return current progress.
+
+---
+
+# 39. LOCAL AUTH IMPLEMENTATION DETAILS
+
+If Auth.js creates compatibility problems, implement a minimal secure session service with `jose`.
+
+Flow:
+
+```text
+register
+ -> validate
+ -> bcrypt hash
+ -> create user
+ -> sign session JWT
+ -> HttpOnly cookie
+
+login
+ -> find user
+ -> bcrypt compare
+ -> sign session JWT
+ -> HttpOnly cookie
+```
+
+JWT claims:
+
+```text
+sub = user ID
+role
+email
+iat
+exp
+```
+
+Keep expiration reasonable, e.g. 7 days.
+
+Use `AUTH_SECRET`.
+
+Verify JWT on server.
+
+---
+
+# 40. PRODUCTION MEDIA PROVIDER ADAPTER
+
+Define:
+
+```ts
+interface VideoProvider {
+  createAsset?(input: CreateAssetInput): Promise<CreateAssetResult>;
+  getPlaybackSources(mediaId: string): Promise<PlayableSource[]>;
+  deleteAsset?(id: string): Promise<void>;
+}
+```
+
+Built-in provider:
+
+```text
+DatabaseUrlVideoProvider
+```
+
+This reads authorized URLs stored by admin.
+
+Optional future providers:
+
+```text
+MuxVideoProvider
+CloudflareStreamProvider
+BunnyStreamProvider
+S3CloudFrontProvider
+```
+
+Do not hardwire provider-specific objects into player UI.
+
+---
+
+# 41. OPTIONAL METADATA PROVIDER ADAPTER
+
+The project must not need an external metadata API.
+
+But define:
+
+```ts
+interface MetadataProvider {
+  search(query: string): Promise<MetadataSearchResult[]>;
+  getDetails(id: string): Promise<MetadataTitle | null>;
+}
+```
+
+Optional adapter:
+
+```text
+TMDB
+```
+
+Only enable if `TMDB_READ_ACCESS_TOKEN` is present.
+
+Metadata import is an admin convenience, never required for public runtime.
+
+---
+
+# 42. CONTENT INGESTION
+
+The minimal working ingestion workflow:
+
+```text
+Admin
+ -> New Title
+ -> metadata
+ -> artwork
+ -> stream URL
+ -> subtitles
+ -> preview
+ -> publish
+```
+
+For production video upload/transcoding use a dedicated authorized provider.
+
+Do not upload multi-GB video through a normal Next.js route on serverless hosting.
+
+Use direct-to-provider upload.
+
+Adapter architecture must support:
+
+```text
+browser requests upload URL
+ -> provider returns signed upload endpoint
+ -> browser uploads directly
+ -> provider webhook says asset ready
+ -> app stores playback ID/source
+```
+
+---
+
+# 43. MULTI-BITRATE STREAMING
+
+Production ABR ladder recommendation:
+
+```text
+360p  ~0.8 Mbps
+480p  ~1.2–1.8 Mbps
+720p  ~2.5–4 Mbps
+1080p ~5–8 Mbps
+```
+
+These are starting points, not universal constants.
+
+Use HLS.
+
+If provider supports automatic ABR, prefer that instead of manually generating renditions.
+
+---
+
+# 44. DRM
+
+Do not implement DRM for Demo Mode.
+
+Production DRM is optional.
+
+Typical systems:
+
+```text
+Widevine
+FairPlay
+PlayReady
+```
+
+Use DRM only through an authorized video/DRM platform.
+
+Do not attempt to reverse engineer DRM.
+
+---
+
+# 45. ADMIN AUDIT
+
+For important admin mutations optionally record:
+
+```text
+actor user ID
+action
+entity
+entity ID
+timestamp
+safe metadata
+```
+
+Examples:
+
+```text
+TITLE_PUBLISHED
+STREAM_ADDED
+USER_SUSPENDED
+PLAN_UPDATED
+```
+
+Never store secrets in audit logs.
+
+---
+
+# 46. TESTS
+
+## 46.1 Unit tests
+
+Test:
+
+- password utilities;
+- JWT session;
+- URL validation;
+- recommendation scoring;
+- progress completion logic;
+- source sorting/failover;
+- env validation.
+
+## 46.2 Component tests
+
+Test:
+
+- media card;
+- My List button;
+- player error state;
+- login form;
+- admin title form.
+
+## 46.3 E2E tests
+
+Required flows:
+
+```text
+anonymous home loads
+register
+login
+select profile
+open demo title
+demo video begins playback
+add to My List
+progress saved
+history visible
+admin login
+create draft title
+publish title
+public title appears
+```
+
+Skip real Stripe in normal CI.
+
+Mock external adapters.
+
+---
+
+# 47. SEED IMPLEMENTATION
+
+`prisma/seed.ts` should:
+
+1. clear database safely only in development/test;
+2. create genres;
+3. create users;
+4. create plans;
+5. create demo titles;
+6. create series/seasons/episodes;
+7. create stream sources.
+
+Demo movie example:
+
+```text
+Title: Big Buck Bunny — Demo
+Slug: big-buck-bunny-demo
+Type: MOVIE
+Genre: Animation, Family
+Stream:
+  protocol: HLS
+  url: https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
+```
+
+Second source:
+
+```text
+protocol: MP4
+url: https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4
+```
+
+This also tests failover.
+
+---
+
+# 48. UI COPY
+
+Do not use lorem ipsum.
+
+Use realistic but fictional catalog copy.
+
+Example:
+
+```text
+"Signal Beyond"
+"A deep-space research crew discovers a repeating transmission that appears to predict events before they happen."
+```
+
+Create fictional demo titles around:
+
+- sci-fi;
+- drama;
+- documentary;
+- animation;
+- action;
+- mystery.
+
+Do not falsely label demo videos as those fictional films if the video itself is Big Buck Bunny. Clearly show:
+
+```text
+Demo playback media
+```
+
+in Demo Mode.
+
+---
+
+# 49. README REQUIREMENTS
+
+README must contain:
+
+```text
+Project overview
+Features
+Architecture
+Prerequisites
+Install
+Environment variables
+Database setup
+Seed
+Run
+Demo accounts
+Demo playback note
+Tests
+Build
+Production configuration
+Stripe setup
+Video provider architecture
+Security notes
+Legal/media rights note
+Deployment
+Troubleshooting
+```
+
+Exact quick start:
+
+```bash
+cp .env.example .env
+npm install
+npm run db:setup
+npm run seed
+npm run dev
+```
+
+Then:
+
+```text
+http://localhost:3000
+```
+
+---
+
+# 50. DEPLOYMENT PROFILE A — SIMPLE NODE HOST
+
+Best zero-friction production path:
+
+```text
+Next.js
+PostgreSQL
+Node hosting
+CDN in front
+authorized video provider
+```
+
+Before deploy:
+
+```bash
+npm run check
+```
+
+Set:
+
+```text
+DATABASE_URL
+AUTH_SECRET
+NEXT_PUBLIC_APP_URL
+DEMO_MODE=false
+```
+
+Change DB datasource from SQLite to PostgreSQL if necessary.
+
+Never deploy with demo credentials.
+
+---
+
+# 51. DEPLOYMENT PROFILE B — VERCEL
+
+For Vercel:
+
+- PostgreSQL required;
+- do not use persistent local SQLite;
+- video must be external/CDN;
+- use environment variables;
+- Stripe webhook URL:
+
+```text
+https://your-domain.com/api/payments/stripe/webhook
+```
+
+Use provider direct upload for large files.
+
+---
+
+# 52. DEPLOYMENT PROFILE C — CLOUDFLARE
+
+If targeting Cloudflare Workers:
+
+- SQLite Prisma must be replaced/adapted to D1/Drizzle or external Postgres;
+- verify Next.js adapter compatibility;
+- keep video outside Worker storage;
+- use R2 only for owned assets;
+- use Cloudflare Stream or another lawful media delivery provider for video if desired.
+
+This deployment adaptation is optional.
+
+Do not compromise the locally working project merely to force edge compatibility.
+
+---
+
+# 53. CONTENT RIGHTS
+
+The application must include an admin notice:
+
+```text
+Only add media that you own, have licensed, or are authorized to distribute.
+```
+
+Do not include:
+
+- scraped pirate catalogs;
+- DRM bypass;
+- stolen signed URLs;
+- authentication-cookie replay;
+- private CDN token extraction;
+- source obfuscation circumvention.
+
+The engineering architecture must remain lawful.
+
+---
+
+# 54. QUALITY SORTING
+
+For explicit quality sources:
+
+```text
+1080p
+720p
+480p
+360p
+```
+
+Sort numerically descending if the user has not saved a preference.
+
+If the saved quality exists, prefer it.
+
+HLS adaptive stream can be labelled:
+
+```text
+Auto
+```
+
+---
+
+# 55. SAVED PLAYER SETTINGS
+
+Use localStorage for non-sensitive player preferences:
+
+```text
+quality preference
+volume
+muted
+playback speed
+subtitle language
+```
+
+Do not store auth/session secrets in localStorage.
+
+---
+
+# 56. CONTINUE WATCHING
+
+Rail should show titles where:
+
+```text
+position > 20 seconds
+AND
+completed = false
+```
+
+Progress bar appears on card.
+
+Series card should resume exact episode.
+
+---
+
+# 57. HISTORY
+
+History page:
+
+- most recent first;
+- movie/episode title;
+- timestamp;
+- progress;
+- resume button;
+- remove from history;
+- clear history confirmation.
+
+---
+
+# 58. KIDS PROFILE
+
+Kids profile may filter by maturity rating.
+
+Minimal logic:
+
+```text
+if profile.isKids:
+  show only titles with allowed rating
+```
+
+Do not claim sophisticated parental compliance without implementing it.
+
+---
+
+# 59. ADMIN CONTENT VALIDATION
+
+Before publish require:
+
+Movie:
+
+```text
+name
+slug
+overview
+poster
+at least one active stream
+```
+
+Series:
+
+```text
+name
+slug
+overview
+poster
+at least one season
+at least one episode with stream
+```
+
+Allow draft without these requirements.
+
+---
+
+# 60. TRAILERS
+
+Trailer URL must be optional.
+
+For Demo Mode:
+
+- do not embed random YouTube videos;
+- use a configured demo MP4/HLS only.
+
+If implementing YouTube in production, use the official embed URL and do not scrape it.
+
+---
+
+# 61. ANALYTICS
+
+Local application analytics:
+
+```text
+play starts
+completions
+watch seconds
+popular titles
+```
+
+Store aggregates or events.
+
+Never collect unnecessary sensitive personal data.
+
+Optional external analytics should be disabled by default.
+
+---
+
+# 62. EMAIL
+
+Email is optional.
+
+If no email provider:
+
+- registration still works;
+- no crash;
+- password reset may display:
+  "Email delivery is not configured."
+
+If Resend is configured:
+
+- welcome email;
+- password-reset email;
+- subscription notification.
+
+Never expose API key client-side.
+
+---
+
+# 63. PASSWORD RESET
+
+If email service is not configured:
+
+- admin can reset user password in Demo Mode;
+- production should require configured email provider.
+
+If implemented normally:
+
+```text
+random reset token
+store hash
+short expiry
+single use
+```
+
+Never store raw reset token in DB.
+
+---
+
+# 64. STREAM URL SECURITY
+
+Public demo media may be direct URLs.
+
+Private production media should return short-lived URLs from server playback resolver.
+
+Pattern:
+
+```text
+browser -> /api/playback/:id
+server checks:
+  session
+  subscription
+  media permissions
+server asks video provider for signed URL
+server returns short-lived URL
+```
+
+Cache:
+
+```text
+private, no-store
+```
+
+---
+
+# 65. SUBSCRIPTION ENFORCEMENT
+
+If `StreamSource.requiresSubscription=true`:
+
+server playback resolver checks active subscription.
+
+Do not merely hide the Play button.
+
+Unauthorized result:
+
+```json
+{
+  "error": {
+    "code": "SUBSCRIPTION_REQUIRED",
+    "message": "A subscription is required to play this title."
+  }
+}
+```
+
+HTTP:
+
+```text
+403
+```
+
+---
+
+# 66. CONCURRENT STREAMS
+
+Optional.
+
+If implemented, keep active playback sessions with TTL.
+
+Plan may define:
+
+```text
+maxStreams
+```
+
+Do not block Demo Mode unnecessarily.
+
+---
+
+# 67. PLAYER ERROR MESSAGES
+
+Map technical errors to user messages.
+
+Examples:
+
+```text
+404 source -> "This video is temporarily unavailable."
+403 source -> "Playback authorization expired. Retry."
+network -> "Connection lost. Retrying…"
+unsupported -> "This format is not supported by this browser."
+```
+
+Do not expose signed URLs in visible errors.
+
+---
+
+# 68. OBSERVABILITY
+
+Server logging must include:
+
+```text
+request ID
+route
+status
+duration
+safe error code
+```
+
+Do not log:
+
+```text
+password
+session cookie
+Stripe secret
+full auth token
+private signed stream query string
+```
+
+---
+
+# 69. DATABASE ADAPTER PRINCIPLE
+
+Application logic must call repositories/services instead of Prisma directly from every page.
+
+Example:
+
+```text
+Page
+ -> CatalogService
+ -> CatalogRepository
+ -> Prisma
+```
+
+This enables migration later.
+
+---
+
+# 70. BUILD ORDER FOR THE AI AGENT
+
+Follow this order.
+
+## Phase 1 — Foundation
+
+1. initialize project;
+2. install packages;
+3. environment validation;
+4. Prisma schema;
+5. DB setup;
+6. seed.
+
+## Phase 2 — Auth
+
+1. register;
+2. login;
+3. session;
+4. roles;
+5. profiles.
+
+## Phase 3 — Catalog
+
+1. services;
+2. home;
+3. cards/rails;
+4. movie/series pages;
+5. detail;
+6. search.
+
+## Phase 4 — Playback
+
+1. resolver;
+2. video player;
+3. HLS;
+4. source failover;
+5. subtitles;
+6. player settings.
+
+## Phase 5 — Personalization
+
+1. My List;
+2. progress;
+3. Continue Watching;
+4. history;
+5. recommendations.
+
+## Phase 6 — Admin
+
+1. dashboard;
+2. title CRUD;
+3. season/episode CRUD;
+4. source CRUD;
+5. publish.
+
+## Phase 7 — Subscription
+
+1. plan model;
+2. Demo Premium;
+3. gated source check;
+4. optional Stripe adapter.
+
+## Phase 8 — Polish
+
+1. responsive UI;
+2. accessibility;
+3. skeletons;
+4. error states;
+5. SEO;
+6. security headers.
+
+## Phase 9 — QA
+
+Run all tests/build.
+
+Fix every error.
+
+---
+
+# 71. AI AGENT DECISION RULES
+
+When ambiguous:
+
+- choose the simplest production-sensible implementation;
+- do not ask the user unless a real external credential or business/legal decision is unavoidable;
+- Demo Mode must remain functional;
+- do not delete working features while refactoring;
+- commit logically if Git is available;
+- do not claim something is live unless verified.
+
+If a library API has changed:
+
+- adapt implementation to installed version;
+- preserve the behavior described in this specification.
+
+---
+
+# 72. ACCEPTANCE TEST MATRIX
+
+| Requirement | Must Pass |
+|---|---|
+| Home renders | Yes |
+| Demo content visible | Yes |
+| Demo video plays | Yes |
+| HLS works on Chrome | Yes |
+| Native HLS works where browser supports it | Yes |
+| MP4 fallback | Yes |
+| Search works | Yes |
+| Movie detail | Yes |
+| Series detail | Yes |
+| Episode switching | Yes |
+| Register/login | Yes |
+| Logout | Yes |
+| Profile selection | Yes |
+| My List | Yes |
+| Progress save | Yes |
+| Resume | Yes |
+| Continue Watching | Yes |
+| History | Yes |
+| Admin title CRUD | Yes |
+| Admin stream CRUD | Yes |
+| Draft/publish | Yes |
+| Demo subscription | Yes |
+| Subscription gating server-side | Yes |
+| Mobile layout | Yes |
+| Keyboard player controls | Yes |
+| Lint | Yes |
+| Typecheck | Yes |
+| Tests | Yes |
+| Production build | Yes |
+
+---
+
+# 73. FINAL VERIFICATION SCRIPT
+
+The agent must perform roughly:
+
+```bash
+cp .env.example .env
+npm install
+npm run db:setup
+npm run seed
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
+Start:
+
+```bash
+npm run dev
+```
+
+Test with browser/Playwright:
+
+```text
+1. Open homepage.
+2. Verify hero and rails.
+3. Open Big Buck Bunny demo.
+4. Press Play.
+5. Confirm currentTime increases.
+6. Change quality/source if multiple.
+7. Seek.
+8. Reload.
+9. Confirm Resume.
+10. Log in as viewer.
+11. Add title to My List.
+12. Confirm My List.
+13. Confirm history.
+14. Log in as admin.
+15. Create draft.
+16. Add stream.
+17. Publish.
+18. Confirm public catalog.
+```
+
+If playback does not start:
+
+- inspect browser console;
+- inspect `/api/playback/...`;
+- verify CORS of demo URL;
+- use fallback MP4;
+- do not finish until one demo video plays.
+
+---
+
+# 74. REQUIRED FINAL REPORT FROM THE IMPLEMENTATION AI
+
+After completing the project, return:
+
+```text
+Status: COMPLETE / BLOCKED
+
+Working:
+- ...
+
+Demo URL:
+- ...
+
+Demo credentials:
+- ...
+
+Build:
+- lint
+- typecheck
+- tests
+- build
+
+Playback verification:
+- title
+- protocol
+- source
+- confirmed playing: yes/no
+
+Production adapters configured:
+- ...
+
+Credentials still optional/missing:
+- ...
+
+Known limitations:
+- ...
+```
+
+Never say COMPLETE if demo playback has not actually been verified.
+
+---
+
+# 75. OPTIONAL FUTURE EXTENSIONS
+
+Do not block project completion on these:
+
+- native Android/iOS app;
+- Android TV;
+- Apple TV;
+- Chromecast;
+- AirPlay;
+- downloads/offline;
+- DRM;
+- live TV;
+- live events;
+- AI recommendations;
+- social watch party;
+- multi-audio;
+- ad-supported tier.
+
+The web VOD application described above is the completion target.
+
+---
+
+# 76. FINAL NON-NEGOTIABLES
+
+The resulting repository must be:
+
+```text
+self-running
+typed
+tested
+secure by default
+provider-neutral
+mobile responsive
+playback verified
+admin manageable
+legal-source oriented
+production upgradeable
+```
+
+The first run must not require:
+
+```text
+TMDB
+Stripe
+Mux
+Cloudflare Stream
+Supabase
+Firebase
+Auth0
+Clerk
+Redis
+email provider
+```
+
+Those are optional production integrations.
+
+The application must work from this specification alone using:
+
+```text
+Next.js
+SQLite
+local credentials auth
+seed data
+public demo/test video
+```
+
+---
+
+# END OF MASTER SPEC
+
+**Implementation agent: start building now. Do not merely summarize this document. Create the project, run it, fix it, test it, and finish with verified video playback.**
