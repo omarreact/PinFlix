@@ -14,7 +14,7 @@ import {
 import { toTitle, titleHref, type Title } from "@/src/lib/source-ui";
 import type { Entertainment } from "@/src/types/catalog";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120;
 export const preferredRegion = "sin1";
 
 function unique(items: Entertainment[]) {
