@@ -4,6 +4,7 @@ import type { Entertainment, StreamSource } from "@/src/types/catalog";
 import * as cheerio from "cheerio";
 import type { ProviderCatalogPage, ProviderCategory, SeriesNavigation } from "../contracts";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { extractSearchItems, validSearchSubject } from "./search-response";
 import { getSearchSession, invalidateSearchSession } from "./search-session";
 
@@ -219,7 +220,7 @@ export async function search(
   return (await searchPage(query, page, kind)).items;
 }
 
-export async function searchPage(
+async function searchPageUncached(
   query: string,
   page = 1,
   kind: "all" | "movie" | "show" = "all",
@@ -318,6 +319,18 @@ export async function searchPage(
   return { items: distinctById(results), page: safePage, hasNextPage };
 }
 
+const searchPageCached = unstable_cache(searchPageUncached, ["moviebox-search-v2"], {
+  revalidate: 120,
+});
+
+export async function searchPage(
+  query: string,
+  page = 1,
+  kind: "all" | "movie" | "show" = "all",
+): Promise<ProviderCatalogPage> {
+  return searchPageCached(query.trim().toLowerCase(), page, kind);
+}
+
 function distinctById(items: Entertainment[]): Entertainment[] {
   return [
     ...new Map(
@@ -389,7 +402,7 @@ function matchesLanguageFilter(item: Entertainment, language: string | undefined
   );
 }
 
-export async function getFilteredPage(
+async function getFilteredPageUncached(
   kind: "movie" | "show",
   page = 1,
   filters: MovieBoxBrowseFilters = {},
@@ -467,6 +480,21 @@ export async function getFilteredPage(
     );
     return { items: [], page: safePage, hasNextPage: false };
   }
+}
+
+const filteredPageCached = unstable_cache(
+  getFilteredPageUncached,
+  ["moviebox-filtered-v2"],
+  { revalidate: 180 },
+);
+
+export async function getFilteredPage(
+  kind: "movie" | "show",
+  page = 1,
+  filters: MovieBoxBrowseFilters = {},
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<ProviderCatalogPage> {
+  return filteredPageCached(kind, page, filters, timeoutMs);
 }
 
 async function resolveWebsiteDetailPath(
@@ -890,7 +918,7 @@ export async function getCategoryPage(_categoryId: string, _page = 1) {
   return null;
 }
 
-export async function getDetails(id: string): Promise<Entertainment | null> {
+async function getDetailsUncached(id: string): Promise<Entertainment | null> {
   const parsed = parseProviderId(id);
   if (!parsed) return null;
 
@@ -993,6 +1021,14 @@ export async function getDetails(id: string): Promise<Entertainment | null> {
     console.error("MovieBox getDetails error:", formatError(error));
     return null;
   }
+}
+
+const getDetailsCached = unstable_cache(getDetailsUncached, ["moviebox-detail-v2"], {
+  revalidate: 300,
+});
+
+export async function getDetails(id: string): Promise<Entertainment | null> {
+  return getDetailsCached(id);
 }
 
 export async function getSeriesNavigation(
@@ -1185,7 +1221,7 @@ export async function resolveStreams(
   return validSources.sort((a, b) => b.priority - a.priority);
 }
 
-export async function getHomeSections(
+async function getHomeSectionsUncached(
   providerHost = "movibox.net",
 ): Promise<MovieBoxHomeSection[]> {
   // Read-only provider discovery fallback. No change to playback origin/CDN.
@@ -1259,6 +1295,17 @@ export async function getHomeSections(
   }
 }
 
-// Request-scoped deduplication: movie and TV shelves reuse one provider home
-// fetch if the category filter fails in both branches on the same page.
-const getHomeSectionsCached = cache(getHomeSections);
+// Persist provider discovery across requests. Vinext maps Next's incremental
+// cache to the existing VINEXT_KV_CACHE binding on Cloudflare, so repeated
+// homepage/catalogue traffic does not hammer MovieBox on every Worker isolate.
+const getHomeSectionsCached = unstable_cache(
+  getHomeSectionsUncached,
+  ["moviebox-home-v3"],
+  { revalidate: 300 },
+);
+
+export async function getHomeSections(
+  providerHost = "movibox.net",
+): Promise<MovieBoxHomeSection[]> {
+  return getHomeSectionsCached(providerHost);
+}
